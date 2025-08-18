@@ -1,0 +1,86 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  relationMode = "foreignKeys"
+}
+
+enum Role {
+  PATIENT
+  DOCTOR
+  ADMIN
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  phone        String    @unique
+  email        String?   @unique
+  refreshToken String?
+  role         Role      @default(PATIENT)
+
+  patient      Patient?
+  doctor       Doctor?
+  otp          OTP?
+}
+
+model Patient {
+  id           String        @id @default(uuid()) @db.Uuid
+  userId       String        @unique @db.Uuid
+  firstName    String
+  lastName     String
+  patronymic   String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName     String
+  birthDate    DateTime
+  gender       String
+  appointments Appointment[]
+}
+
+model Doctor {
+  id             String        @id @default(uuid()) @db.Uuid
+  userId         String        @unique @db.Uuid
+  firstName      String
+  lastName       String
+  patronymic     String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName       String
+  specialization String
+  licenseNumber  String        @unique
+  phone          String?
+  appointments   Appointment[]
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+model Appointment {
+  id        String            @id @default(uuid()) @db.Uuid
+  patientId String            @db.Uuid
+  doctorId  String            @db.Uuid
+  dateTime  DateTime
+  status    AppointmentStatus @default(SCHEDULED)
+  notes     String?
+  patient   Patient           @relation(fields: [patientId], references: [id])
+  doctor    Doctor            @relation(fields: [doctorId], references: [id])
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+}
+
+model OTP {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid @unique
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([code])
+}
