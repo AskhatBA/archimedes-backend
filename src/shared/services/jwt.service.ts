@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { prismaClient } from '@/infrastructure/db';
 import { config } from '@/config';
 import { AppError } from '@/shared/services/app-error.service';
+import { ErrorCodes } from '@/shared/constants/error-codes';
 
 const defaultAccessExpiresIn = '15m';
 const defaultRefreshExpiresIn = '7d';
@@ -37,32 +38,30 @@ export const saveRefreshToken = (userId: string, refreshToken: string) => {
 
 export const verifyAccessToken = (token: string) => {
   try {
-    const decoded = jwt.verify(token, config.token.jwtAccessSecret!, {
+    return jwt.verify(token, config.token.jwtAccessSecret!, {
       issuer: 'archimedes-backend',
       audience: 'archimedes-app',
     }) as TokenPayload;
-
-    return decoded;
   } catch (error: any) {
     if (error.name === 'TokenExpiredError') {
-      throw new AppError('Access token expired', 401);
+      throw new AppError(ErrorCodes.TOKEN_EXPIRED, 401);
     }
 
     if (error.name === 'JsonWebTokenError') {
-      throw new AppError('Invalid access token', 401);
+      throw new AppError(ErrorCodes.INVALID_TOKEN, 401);
     }
 
-    throw new AppError('Token verification failed', 401);
+    throw new AppError(ErrorCodes.TOKEN_VERIFICATION_FAILED, 401);
   }
 };
 
 export const extractTokenFromHeader = (authHeader: string | undefined) => {
   if (!authHeader) {
-    throw new AppError('Authorization header missing', 401);
+    throw new AppError(ErrorCodes.AUTHORIZATION_HEADER_MISSING, 401);
   }
 
   if (!authHeader?.startsWith('Bearer ')) {
-    throw new AppError('Invalid authorization header format', 401);
+    throw new AppError(ErrorCodes.INVALID_TOKEN, 401);
   }
 
   return authHeader?.substring(7);

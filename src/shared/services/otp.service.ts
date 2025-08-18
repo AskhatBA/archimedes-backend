@@ -62,6 +62,10 @@ export const validateOTP = async (phone: string, code: string): Promise<boolean>
     throw new AppError(ErrorCodes.INVALID_OTP, 400);
   }
 
+  if (otp.expiresAt < new Date()) {
+    throw new AppError(ErrorCodes.OTP_EXPIRED, 400);
+  }
+
   return true;
 };
 

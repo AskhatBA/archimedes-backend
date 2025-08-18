@@ -2,9 +2,10 @@ import { Request, Response, NextFunction } from 'express';
 import { Doctor, Patient } from '@prisma/client';
 
 import { asyncHandler } from '@/shared/services/async-handler.service';
-import { extractTokenFromHeader, verifyAccessToken } from '@/shared/services/jwt.service';
+import * as jwtService from '@/shared/services/jwt.service';
 import { prismaClient } from '@/infrastructure/db';
 import { AppError } from '@/shared/services/app-error.service';
+import { ErrorCodes } from '@/shared/constants/error-codes';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -22,16 +23,16 @@ declare global {
 }
 
 export const authenticate = asyncHandler(async (req: Request, _: Response, next: NextFunction) => {
-  const token = extractTokenFromHeader(req.headers.authorization);
+  const token = jwtService.extractTokenFromHeader(req.headers.authorization);
 
   if (!token) {
-    throw new AppError('Token not found', 401);
+    throw new AppError(ErrorCodes.INVALID_TOKEN, 401);
   }
 
-  const decoded = verifyAccessToken(token);
+  const decoded = jwtService.verifyAccessToken(token);
 
   if (!decoded) {
-    throw new AppError('Token not found', 401);
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
 
   const user = await prismaClient.user.findUnique({

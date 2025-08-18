@@ -17,10 +17,7 @@ export const requestOtp = async (req: Request, res: Response) => {
   const phoneRegex = /^7\d{10}$/;
 
   if (!phone || !phoneRegex.test(phone)) {
-    return res.status(400).json({
-      message: 'Phone number should start with 7 and contain 12 digits',
-      code: ErrorCodes.INVALID_PHONE,
-    });
+    throw new AppError(ErrorCodes.INVALID_PHONE, 400);
   }
 
   if (isUserExists) {
@@ -38,31 +35,22 @@ export const requestOtp = async (req: Request, res: Response) => {
   return res.status(200).json({ id: createdUser?.id, phone: phone, otp: otp });
 };
 
-export const loginWithOtp = async (req: Request, res: Response) => {
+export const verifyOtp = async (req: Request, res: Response) => {
   const { phone, otp } = req.body;
 
-  try {
-    await otpService.validateOTP(phone, otp);
-    const user = await authService.findUserByPhone(phone);
+  await otpService.validateOTP(phone, otp);
+  const user = await authService.findUserByPhone(phone);
 
-    if (!user) {
-      return res.status(404).json(new AppError(ErrorCodes.USER_NOT_FOUND, 404));
-    }
-
-    const tokens = jwtService.generateTokenPair({ userId: user.id, role: Role.PATIENT });
-    await jwtService.saveRefreshToken(user.id, tokens.refreshToken);
-
-    return res.status(200).json({
-      success: true,
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-    });
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-expect-error
-  } catch (error: AppError) {
-    return res.status(error.statusCode).json({
-      success: false,
-      message: error.message,
-    });
+  if (!user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 404);
   }
+
+  const tokens = jwtService.generateTokenPair({ userId: user.id, role: Role.PATIENT });
+  await jwtService.saveRefreshToken(user.id, tokens.refreshToken);
+
+  return res.status(200).json({
+    success: true,
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+  });
 };
