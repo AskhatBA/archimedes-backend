@@ -5,6 +5,7 @@ import { ErrorCodes } from '@/shared/constants/error-codes';
 import { AppError } from '@/shared/services/app-error.service';
 import * as otpService from '@/shared/services/otp.service';
 import * as jwtService from '@/shared/services/jwt.service';
+// import * as smsService from '@/infrastructure/sms/sms.service';
 
 import * as authService from './auth.service';
 
@@ -19,6 +20,8 @@ export const requestOtp = async (req: Request, res: Response) => {
   if (!phone || !phoneRegex.test(phone)) {
     throw new AppError(ErrorCodes.INVALID_PHONE, 400);
   }
+
+  // await smsService.sendSMS(phone, `Код для авторизации: ${otp}`);
 
   if (isUserExists) {
     await otpService.saveOTP(user.id, hashedOTP);

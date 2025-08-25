@@ -1,3 +1,5 @@
+import * as console from 'node:console';
+
 import { Request, Response, NextFunction } from 'express';
 
 import { AppError } from '@/shared/services/app-error.service';
@@ -9,6 +11,8 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
       message: err.message,
     });
   }
+
+  console.log('error: ', JSON.stringify(err));
 
   return res.status(500).json({
     success: false,

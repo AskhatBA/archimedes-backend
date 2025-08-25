@@ -35,7 +35,7 @@ model Patient {
   patronymic   String
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   fullName     String
-  birthDate    DateTime
+  birthDate    String
   gender       String
   appointments Appointment[]
 }
@@ -51,7 +51,7 @@ model Doctor {
   specialization String
   licenseNumber  String        @unique
   phone          String?
-  appointments   Appointment[]
+  appointments Appointment[]
 }
 
 enum AppointmentStatus {

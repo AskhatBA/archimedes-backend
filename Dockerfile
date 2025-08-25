@@ -17,4 +17,4 @@ RUN npx prisma generate
 RUN npm run build
 
 # Default command
-CMD ["npm", "run", "dev"]
+CMD ["npm", "run", "start"]
