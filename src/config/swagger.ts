@@ -11,6 +11,22 @@ const options: swaggerJsdoc.Options = {
       description: 'API documentation for Archimedes backend',
     },
     servers: [{ url: 'http://localhost:4000/v1/api' }],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          description:
+            'JWT Authorization header using the Bearer scheme. Example: "Authorization: Bearer {token}"',
+        },
+      },
+    },
+    security: [
+      {
+        bearerAuth: [],
+      },
+    ],
   },
   apis: ['./src/domains/**/*.routes.ts', './src/domains/**/*.controller.ts'], // files where you write docs
 };

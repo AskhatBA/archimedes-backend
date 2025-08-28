@@ -1,3 +1,5 @@
+import * as process from 'node:process';
+
 import dotenv from 'dotenv';
 
 const DEFAULT_PORT = 5050;
@@ -21,5 +23,9 @@ export const config = {
     accountSid: process.env.TWILIO_ACCOUNT_SID!,
     authToken: process.env.TWILIO_AUTH_TOKEN!,
     phoneNumber: process.env.TWILIO_PHONE_NUMBER!,
+  },
+
+  mis: {
+    apiUrl: `${process.env.MIS_API_URL}${process.env.MIS_API_PREFIX}`,
   },
 };

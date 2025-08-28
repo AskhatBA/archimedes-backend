@@ -8,6 +8,7 @@ import { setupSwagger } from './config/swagger';
 import { errorHandler } from './middlewares/error-handler.middleware';
 import authRoutes from './domains/auth/auth.routes';
 import patientRoutes from './domains/patient/patient.routes';
+import misRoutes from './domains/mis/mis.routes';
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 app.use('/v1/api/auth', authRoutes);
 app.use('/v1/api/patient', patientRoutes);
+app.use('/v1/api/mis', misRoutes);
 
 setupSwagger(app);
 
