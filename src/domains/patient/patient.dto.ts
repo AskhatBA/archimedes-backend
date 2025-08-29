@@ -7,4 +7,5 @@ export interface PatientDto {
   firstName: Patient['firstName'];
   patronymic?: Patient['patronymic'];
   lastName: Patient['lastName'];
+  iin: string;
 }

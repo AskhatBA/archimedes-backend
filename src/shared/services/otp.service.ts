@@ -17,7 +17,7 @@ export const hashOTP = (otp: string) => {
 
 export const saveOTP = async (userId: string, code: string): Promise<void> => {
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes from now
-  const otp = prismaClient.oTP.findFirst({ where: { userId, used: false } });
+  const otp = await prismaClient.oTP.findFirst({ where: { userId, used: false } });
 
   if (!otp) {
     await prismaClient.oTP.create({

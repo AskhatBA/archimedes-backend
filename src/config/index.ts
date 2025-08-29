@@ -28,4 +28,11 @@ export const config = {
   mis: {
     apiUrl: `${process.env.MIS_API_URL}${process.env.MIS_API_PREFIX}`,
   },
+
+  smsService: {
+    apiUrl: process.env.SMS_SERVICE_API_URL,
+    username: process.env.SMS_SERVICE_USERNAME,
+    password: process.env.SMS_SERVICE_PASSWORD,
+    originator: process.env.SMS_SERVICE_ORIGINATOR,
+  },
 };

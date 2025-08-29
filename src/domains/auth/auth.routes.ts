@@ -27,9 +27,6 @@ const router = Router();
  *          phone:
  *            type: string
  *            description: Phone number
- *          otp:
- *            type: string
- *            description: Generated OTP code
  * /auth/request-otp:
  *   post:
  *     summary: Request OTP code for phone verification

@@ -36,16 +36,23 @@ export const findPatientByPhone = async (phone: string): Promise<FindPatientResp
 };
 
 export const createPatient = async (patient: CreatePatientDto): Promise<void> => {
-  try {
-    await instance.post('/auth/beneficiary-create/', {
-      phone_number: patient.phoneNumber,
-      name: patient.firstName + ' ' + patient.lastName + ' ' + patient.patronymic,
-      gender: patient.gender === 'M' ? 0 : 1,
-      birth_date: patient.birthDate,
-      iin: patient.iin,
-    });
-  } catch (error: unknown) {
-    const axiosError = error as AxiosError;
-    throw new AppError(ErrorCodes.MIS_PATIENT_NOT_FOUND, axiosError?.response?.status);
-  }
+  console.log('Creating patient in MIS...', {
+    phone_number: `8${patient.phoneNumber.slice(1)}`,
+    name: patient.firstName + ' ' + patient.lastName + ' ' + patient.patronymic,
+    gender: patient.gender === 'M' ? 0 : 1,
+    birth_date: patient.birthDate,
+    iin: patient.iin,
+  });
+  // try {
+  //   await instance.post('/auth/beneficiary-create/', {
+  //     phone_number: `8${patient.phoneNumber.slice(1)}`,
+  //     name: patient.firstName + ' ' + patient.lastName + ' ' + patient.patronymic,
+  //     gender: patient.gender === 'M' ? 0 : 1,
+  //     birth_date: patient.birthDate,
+  //     iin: patient.iin,
+  //   });
+  // } catch (error: unknown) {
+  //   const axiosError = error as AxiosError;
+  //   throw new AppError(ErrorCodes.MIS_PATIENT_NOT_FOUND, axiosError?.response?.status);
+  // }
 };

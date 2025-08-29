@@ -18,6 +18,7 @@ export const createPatient = (patient: PatientDto) => {
       patronymic: patient.patronymic || '',
       gender: patient.gender,
       birthDate: patient.birthDate,
+      iin: patient.iin,
     },
   });
 };
