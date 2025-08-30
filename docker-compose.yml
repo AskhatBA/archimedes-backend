@@ -6,17 +6,17 @@ services:
     restart: always
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: Passqqaazz!1
       POSTGRES_DB: archimedes
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 
   backend:
     build: ./
     volumes:
-      - ./backend:/app
+      - .:/app
       - /app/node_modules
     ports:
       - "4000:4000"
@@ -26,8 +26,8 @@ services:
       - .env
     command: >
       sh -c "
-      npx prisma migrate deploy &&
-      npm run dev
+      npm run db:migrate &&
+      npm start
       "
 
 volumes:
