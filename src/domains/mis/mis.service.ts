@@ -6,8 +6,13 @@ import { config } from '@/config';
 import { AppError } from '@/shared/services/app-error.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
 
+import {
+  MISAppointmentResponse,
+  FindPatientResponse,
+  CreatePatientDto,
+  CreateAppointmentDto,
+} from './mis.dto';
 import { availableSlotsMapper } from './helper';
-import { FindPatientResponse, CreatePatientDto, CreateAppointmentDto } from './mis.dto';
 import {
   MISFindPatientResponse,
   MISBranchesResponse,
@@ -169,6 +174,24 @@ export const createAppointment = async (newAppointment: CreateAppointmentDto) =>
       }
     );
     return response.data;
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError;
+    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
+
+    if (errorMessage) {
+      throw new AppError(errorMessage, axiosError?.response?.status);
+    }
+
+    throw new AppError(ErrorCodes.MIS_CREATE_APPOINTMENT_FAILED, axiosError?.response?.status);
+  }
+};
+
+export const getAppointments = async (misPatientId: string) => {
+  try {
+    const response = await instance.get<MISAppointmentResponse>(
+      `/beneficiary/${misPatientId}/appointments/`
+    );
+    return response.data.appointments;
   } catch (error: unknown) {
     const axiosError = error as AxiosError;
     const errorMessage = (axiosError?.response?.data as { error: string })?.error;

@@ -1,5 +1,7 @@
 import { Gender } from '@/shared/types/gender';
 
+import { MISAppointment } from './mis.types';
+
 export interface FindPatientResponse {
   id: string;
   firstName: string;
@@ -26,4 +28,11 @@ export interface CreateAppointmentDto {
   startTime: string;
   endTime: string;
   branchId: string;
+}
+
+export interface MISAppointmentResponse {
+  status: string;
+  beneficiary_id: string;
+  count: 1;
+  appointments: MISAppointment[];
 }

@@ -413,4 +413,63 @@ router.get('/doctor/:doctorId/available-slots', authenticate, controller.getDoct
  */
 router.post('/create-appointment', authenticate, controller.createAppointment);
 
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     MISAppointment:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *         doctor_name:
+ *           type: string
+ *         beneficiary_name:
+ *           type: string
+ *         branch_name:
+ *           type: string
+ *         start_time:
+ *           type: string
+ *         end_time:
+ *           type: string
+ *         status:
+ *           type: string
+ *         status_display:
+ *           type: string
+ *         record_type:
+ *           type: string
+ *         record_type_display:
+ *           type: string
+ *         appointment_type:
+ *           type: string
+ *         appointment_type_display:
+ *           type: string
+ *         notes:
+ *           type: string
+ * /mis/appointments:
+ *   get:
+ *     summary: Get patient appointments from MIS
+ *     tags: [MIS]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Appointments fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 appointments:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/MISAppointment'
+ *       401:
+ *         description: User not found or unauthorized
+ */
+router.get('/appointments', authenticate, controller.getAppointments);
+
 export default router;

@@ -200,3 +200,25 @@ export const createAppointment = async (req: Request, res: Response) => {
     appointment,
   });
 };
+
+export const getAppointments = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  const patient = await patientService.getPatientById(req.user.id);
+
+  if (!patient) {
+    return res.status(400).json({
+      success: false,
+      message: 'Patient not found',
+    });
+  }
+
+  const appointments = await misService.getAppointments(patient.misPatientId);
+
+  return res.status(200).json({
+    success: true,
+    appointments,
+  });
+};

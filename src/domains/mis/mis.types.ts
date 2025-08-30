@@ -107,3 +107,19 @@ export interface MappedAvailableSlots {
     }[];
   };
 }
+
+export interface MISAppointment {
+  id: string;
+  doctor_name: string;
+  beneficiary_name: string;
+  branch_name: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  status_display: string;
+  record_type: string;
+  record_type_display: string;
+  appointment_type: string;
+  appointment_type_display: string;
+  notes: string;
+}
