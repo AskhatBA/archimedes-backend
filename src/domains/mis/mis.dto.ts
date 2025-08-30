@@ -19,3 +19,11 @@ export interface CreatePatientDto {
   birthDate: string;
   iin: string;
 }
+
+export interface CreateAppointmentDto {
+  doctorId: string;
+  patientId: string;
+  startTime: string;
+  endTime: string;
+  branchId: string;
+}

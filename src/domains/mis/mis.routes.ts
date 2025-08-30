@@ -128,4 +128,289 @@ router.get('/find-patient', authenticate, controller.findPatient);
  */
 router.post('/create-patient', authenticate, controller.createPatient);
 
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     MISBranch:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *         name:
+ *           type: string
+ *         address:
+ *           type: string
+ * /mis/branches:
+ *   get:
+ *     summary: Get medical branches from MIS
+ *     tags: [MIS]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Branches fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 branches:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/MISBranch'
+ *       401:
+ *         description: User not found or unauthorized
+ */
+router.get('/branches', authenticate, controller.getBranches);
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     MISSpecialization:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *         name:
+ *           type: string
+ * /mis/specializations:
+ *   get:
+ *     summary: Get medical specializations from MIS
+ *     tags: [MIS]
+ *     parameters:
+ *       - name: branchId
+ *         in: query
+ *         description: Branch ID from MIS
+ *         required: true
+ *         schema:
+ *           type: string
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Specializations fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 specializations:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/MISSpecialization'
+ *       401:
+ *         description: User not found or unauthorized
+ */
+router.get('/specializations', authenticate, controller.getSpecializations);
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     MISDoctor:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *         name:
+ *           type: string
+ *         position:
+ *           type: string
+ *         specialtyName:
+ *           type: string
+ *         branchName:
+ *           type: string
+ *         appointmentDurationMinutes:
+ *           type: number
+ * /mis/doctors:
+ *   get:
+ *     summary: Get medical specializations from MIS
+ *     tags: [MIS]
+ *     parameters:
+ *       - name: branchId
+ *         in: query
+ *         description: Branch ID from MIS
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - name: specializationId
+ *         in: query
+ *         description: Specialization ID from MIS
+ *         required: true
+ *         schema:
+ *           type: string
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Doctors fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 doctors:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/MISDoctor'
+ *       401:
+ *         description: User not found or unauthorized
+ */
+router.get('/doctors', authenticate, controller.getDoctors);
+
+router.get('/doctor/:id', authenticate, controller.getDoctor);
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     MISAvailableTime:
+ *       type: object
+ *       required:
+ *         - startTime
+ *         - endTime
+ *         - available
+ *       properties:
+ *         startTime:
+ *           type: string
+ *           description: The start time of the slot
+ *           example: "09:00"
+ *         endTime:
+ *           type: string
+ *           description: The end time of the slot
+ *           example: "09:30"
+ *         available:
+ *           type: boolean
+ *           description: Whether the time slot is available
+ *           example: true
+ *     MISAvailableDay:
+ *       type: object
+ *       required:
+ *         - date
+ *         - timeSlots
+ *       properties:
+ *         date:
+ *           type: string
+ *           description: The date for this set of time slots
+ *           example: "2023-12-01"
+ *         timeSlots:
+ *           type: array
+ *           description: Array of time slots for this date
+ *           items:
+ *             $ref: '#/components/schemas/MISAvailableTime'
+ *     MISAvailableSlots:
+ *       type: object
+ *       additionalProperties:
+ *         $ref: '#/components/schemas/MISAvailableDay'
+ * /mis/doctor/{doctorId}/available-slots:
+ *   get:
+ *     summary: Get medical specializations from MIS
+ *     tags: [MIS]
+ *     parameters:
+ *       - name: doctorId
+ *         in: path
+ *         description: Doctor ID from MIS
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - name: startDate
+ *         in: query
+ *         description: Start date
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - name: endDate
+ *         in: query
+ *         description: End date
+ *         required: true
+ *         schema:
+ *           type: string
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Slots fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 availableSlots:
+ *                   type: object
+ *                   $ref: '#/components/schemas/MISAvailableSlots'
+ *       401:
+ *         description: User not found or unauthorized
+ */
+router.get('/doctor/:doctorId/available-slots', authenticate, controller.getDoctorAvailableSlots);
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     CreateMISAppointmentBody:
+ *       type: object
+ *       required:
+ *         - doctorId
+ *         - patientId
+ *         - startTime
+ *         - endTime
+ *         - branchId
+ *       properties:
+ *         doctorId:
+ *           type: string
+ *           example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+ *         startTime:
+ *           type: string
+ *           example: "2025-09-10"
+ *         endTime:
+ *           type: string
+ *           example: "2025-09-10"
+ *         branchId:
+ *           type: string
+ *           example: "8b9a7c6d-5e4f-4321-a987-6543210fedcb"
+ * /mis/create-appointment:
+ *   post:
+ *     summary: Create a new appointment
+ *     tags: [MIS]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CreateMISAppointmentBody'
+ *     responses:
+ *       200:
+ *         description: Appointment created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 description:
+ *                   type: string
+ *                   example: Appointment created
+ *       401:
+ *         description: User not found or unauthorized
+ */
+router.post('/create-appointment', authenticate, controller.createAppointment);
+
 export default router;

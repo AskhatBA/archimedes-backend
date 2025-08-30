@@ -38,6 +38,7 @@ model Patient {
   birthDate    String
   gender       String
   iin          String        @unique
+  misPatientId String        @unique
   appointments Appointment[]
 }
 

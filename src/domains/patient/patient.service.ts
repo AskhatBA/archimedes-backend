@@ -19,6 +19,7 @@ export const createPatient = (patient: PatientDto) => {
       gender: patient.gender,
       birthDate: patient.birthDate,
       iin: patient.iin,
+      misPatientId: patient.misPatientId,
     },
   });
 };
