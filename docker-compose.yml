@@ -18,6 +18,7 @@ services:
     volumes:
       - .:/app
       - /app/node_modules
+      - /app/dist
     ports:
       - "4000:4000"
     depends_on:
