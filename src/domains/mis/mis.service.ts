@@ -1,5 +1,3 @@
-import * as console from 'node:console';
-
 import axios, { AxiosError } from 'axios';
 
 import { config } from '@/config';
