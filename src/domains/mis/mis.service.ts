@@ -54,7 +54,7 @@ export const createPatient = async (patient: CreatePatientDto): Promise<void> =>
   const name = [patient.lastName, patient.firstName, patient.patronymic].filter(Boolean).join(' ');
 
   try {
-    const response = await instance.post('/auth/beneficiary-create/', {
+    await instance.post('/auth/beneficiary-create/', {
       phone_number: `8${patient.phoneNumber.slice(1)}`,
       otp_verified: true,
       name,
@@ -62,11 +62,14 @@ export const createPatient = async (patient: CreatePatientDto): Promise<void> =>
       birth_date: patient.birthDate,
       iin: patient.iin,
     });
-
-    console.log('MIS CREATE PATIENT RESPONSE: ', response.data);
   } catch (error: unknown) {
     const axiosError = error as AxiosError;
-    console.log('MIS CREATE PATIENT ERROR: ', axiosError.response);
+    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
+
+    if (errorMessage) {
+      throw new AppError(errorMessage, axiosError?.response?.status);
+    }
+
     throw new AppError(ErrorCodes.MIS_PATIENT_NOT_FOUND, axiosError?.response?.status);
   }
 };
