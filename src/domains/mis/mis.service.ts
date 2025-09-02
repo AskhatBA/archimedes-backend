@@ -9,6 +9,7 @@ import {
   FindPatientResponse,
   CreatePatientDto,
   CreateAppointmentDto,
+  MISCreatePatientResponse,
 } from './mis.dto';
 import { availableSlotsMapper } from './helper';
 import {
@@ -44,15 +45,21 @@ export const findPatientByPhone = async (phone: string): Promise<FindPatientResp
     };
   } catch (error: unknown) {
     const axiosError = error as AxiosError;
+    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
+
+    if (errorMessage) {
+      throw new AppError(errorMessage, axiosError?.response?.status);
+    }
+
     throw new AppError(ErrorCodes.MIS_PATIENT_NOT_FOUND, axiosError?.response?.status);
   }
 };
 
-export const createPatient = async (patient: CreatePatientDto): Promise<void> => {
+export const createPatient = async (patient: CreatePatientDto) => {
   const name = [patient.lastName, patient.firstName, patient.patronymic].filter(Boolean).join(' ');
 
   try {
-    await instance.post('/auth/beneficiary-create/', {
+    const response = await instance.post<MISCreatePatientResponse>('/auth/beneficiary-create/', {
       phone_number: `8${patient.phoneNumber.slice(1)}`,
       otp_verified: true,
       name,
@@ -60,6 +67,8 @@ export const createPatient = async (patient: CreatePatientDto): Promise<void> =>
       birth_date: patient.birthDate,
       iin: patient.iin,
     });
+
+    return response.data.beneficiary;
   } catch (error: unknown) {
     const axiosError = error as AxiosError;
     const errorMessage = (axiosError?.response?.data as { error: string })?.error;

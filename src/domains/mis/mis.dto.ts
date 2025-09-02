@@ -36,3 +36,18 @@ export interface MISAppointmentResponse {
   count: 1;
   appointments: MISAppointment[];
 }
+
+export interface MISCreatePatientResponse {
+  status: string;
+  message: string;
+  beneficiary: {
+    id: string;
+    name: string;
+    gender: 0;
+    iin: string;
+    birth_date: string;
+    phone_number: string;
+    address: string;
+    address_details: string;
+  };
+}

@@ -97,6 +97,37 @@ router.get('/find-patient', authenticate, controller.findPatient);
  *         iin:
  *           type: string
  *           example: "123456789012"
+ *     CreateMISPatientResponse:
+ *       type: object
+ *       required:
+ *         - phoneNumber
+ *         - firstName
+ *         - lastName
+ *         - gender
+ *         - birthDate
+ *         - iin
+ *       properties:
+ *         id:
+ *           type: string
+ *           example: "7f5a8b13-74e8-4c25-9ac5-bc2df1cf9f64"
+ *         name:
+ *           type: string
+ *           example: "John Doe"
+ *         gender:
+ *           type: number
+ *           example: 0
+ *         iin:
+ *           type: string
+ *           example: "999999999999"
+ *         phone_number:
+ *           type: string
+ *           example: "87771112233"
+ *         address:
+ *           type: string
+ *           example: "Street, something"
+ *         address_details:
+ *           type: string
+ *           example: "Street, something"
  * /mis/create-patient:
  *   post:
  *     summary: Create a new patient
@@ -123,6 +154,8 @@ router.get('/find-patient', authenticate, controller.findPatient);
  *                 description:
  *                   type: string
  *                   example: Patient created
+ *                 patient:
+ *                   $ref: '#/components/schemas/CreateMISPatientResponse'
  *       401:
  *         description: User not found or unauthorized
  */

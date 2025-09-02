@@ -26,11 +26,12 @@ export const createPatient = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
 
-  await misService.createPatient(req.body);
+  const patient = await misService.createPatient(req.body);
 
   return res.status(200).json({
     success: true,
     description: 'Patient created',
+    patient,
   });
 };
 
