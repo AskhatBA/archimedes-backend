@@ -16,15 +16,16 @@ enum Role {
 }
 
 model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  phone        String    @unique
-  email        String?   @unique
-  refreshToken String?
-  role         Role      @default(PATIENT)
+  id                    String   @id @default(uuid()) @db.Uuid
+  phone                 String    @unique
+  email                 String?   @unique
+  refreshToken          String?
+  role                  Role      @default(PATIENT)
 
-  patient      Patient?
-  doctor       Doctor?
-  otp          OTP?
+  patient               Patient?
+  doctor                Doctor?
+  otp                   OTP?
+  insuranceServiceToken InsuranceServiceToken?
 }
 
 model Patient {
@@ -85,4 +86,11 @@ model OTP {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([code])
+}
+
+model InsuranceServiceToken {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid @unique
+  accessToken String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

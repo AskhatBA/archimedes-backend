@@ -35,4 +35,8 @@ export const config = {
     password: process.env.SMS_SERVICE_PASSWORD,
     originator: process.env.SMS_SERVICE_ORIGINATOR,
   },
+
+  insuranceService: {
+    apiUrl: process.env.INSURANCE_SERVICE_API_URL!,
+  },
 };
