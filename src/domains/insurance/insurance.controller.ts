@@ -192,6 +192,31 @@ export const getPrograms = async (req: Request, res: Response) => {
   });
 };
 
+export const getProgramById = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  const userToken = await insuranceService.checkInsuranceToken(req.user.id);
+
+  if (!userToken?.accessToken) {
+    return res.status(404).json({
+      success: false,
+      message: 'User is not authorized',
+    });
+  }
+
+  const program = await insuranceService.getProgramById(
+    userToken.accessToken,
+    req.params.programId
+  );
+
+  return res.status(200).json({
+    success: true,
+    program,
+  });
+};
+
 export const getFamily = async (req: Request, res: Response) => {
   if (!req.user) {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
@@ -217,4 +242,28 @@ export const getFamily = async (req: Request, res: Response) => {
     success: true,
     family,
   });
+};
+
+export const getInsuranceCertificate = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  const userToken = await insuranceService.checkInsuranceToken(req.user.id);
+
+  if (!userToken?.accessToken) {
+    return res.status(404).json({
+      success: false,
+      message: 'User is not authorized',
+    });
+  }
+
+  const certificate = await insuranceService.getInsuranceCertificate(
+    userToken.accessToken,
+    req.params.programId
+  );
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="certificate"`);
+  return res.send(certificate);
 };

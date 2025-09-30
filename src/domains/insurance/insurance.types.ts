@@ -44,3 +44,32 @@ export interface RefundRequest {
   amount: number;
   status: string;
 }
+
+interface ProgramExtendedSubLimits {
+  name: string;
+  limit: number;
+  currentLimit: number;
+  incidentLimit: number;
+  currentIncidentLimit: number;
+}
+
+export interface ProgramExtended {
+  id: string;
+  code: string;
+  title: string;
+  status: string;
+  cardNo: string;
+  insurer: string;
+  insuranceCompany: string;
+  dateStart: string;
+  dateEnd: string;
+  information: string;
+  programUrl: string;
+  stdexclusions: string;
+  exclusions: string;
+  inclusions: string;
+  limit: number;
+  currentLimit: number;
+  logo: string;
+  subLimits: ProgramExtendedSubLimits[];
+}

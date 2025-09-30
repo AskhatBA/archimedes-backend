@@ -238,6 +238,97 @@ router.get('/programs', authenticate, controller.getPrograms);
  * @openapi
  * components:
  *   schemas:
+ *     InsuranceProgramExtended:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *         code:
+ *           type: string
+ *         title:
+ *           type: string
+ *         status:
+ *           type: string
+ *         cardNo:
+ *           type: string
+ *         insurer:
+ *           type: string
+ *         insuranceCompany:
+ *           type: string
+ *         dateStart:
+ *           type: string
+ *           format: date
+ *         dateEnd:
+ *           type: string
+ *           format: date
+ *         information:
+ *           type: string
+ *         programUrl:
+ *           type: string
+ *         stdexclusions:
+ *           type: string
+ *         exclusions:
+ *           type: string
+ *         inclusions:
+ *           type: string
+ *         limit:
+ *           type: number
+ *         currentLimit:
+ *           type: number
+ *         logo:
+ *           type: string
+ *         subLimits:
+ *           type: array
+ *           items:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               limit:
+ *                 type: number
+ *               currentLimit:
+ *                 type: number
+ *               incidentLimit:
+ *                 type: number
+ *               currentIncidentLimit:
+ *                 type: number
+ *     InsuranceProgramResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *         program:
+ *           type: object
+ *           $ref: '#/components/schemas/InsuranceProgramExtended'
+ * /insurance/programs/{programId}:
+ *   get:
+ *     summary: Get insurance program by id
+ *     tags: [Insurance]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: programId
+ *         in: path
+ *         description: Program ID
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/InsuranceProgramResponse'
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/programs/:programId', authenticate, controller.getProgramById);
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
  *     InsuranceFamily:
  *       type: object
  *       required: [id, fullName, relationship, dateBirth]
@@ -345,5 +436,7 @@ router.get('/family', authenticate, controller.getFamily);
  *         description: Unauthorized
  */
 router.get('/refund-requests', authenticate, controller.getRefundRequests);
+
+router.get('/certificate/:programId', authenticate, controller.getInsuranceCertificate);
 
 export default router;

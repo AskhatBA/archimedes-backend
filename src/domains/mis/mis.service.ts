@@ -213,3 +213,21 @@ export const getAppointments = async (misPatientId: string) => {
     throw new AppError(ErrorCodes.MIS_CREATE_APPOINTMENT_FAILED, axiosError?.response?.status);
   }
 };
+
+export const removeAppointment = async (misPatientId: string, appointmentId: string) => {
+  try {
+    const response = await instance.delete(
+      `/beneficiary/${misPatientId}/appointments/${appointmentId}`
+    );
+    return response.data;
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError;
+    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
+
+    if (errorMessage) {
+      throw new AppError(errorMessage, axiosError?.response?.status);
+    }
+
+    throw new AppError(ErrorCodes.MIS_CREATE_APPOINTMENT_FAILED, axiosError?.response?.status);
+  }
+};

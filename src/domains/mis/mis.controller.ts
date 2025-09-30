@@ -223,3 +223,26 @@ export const getAppointments = async (req: Request, res: Response) => {
     appointments,
   });
 };
+
+export const removeAppointment = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  await param('appointmentId').notEmpty().withMessage('Doctor ID is required').run(req);
+
+  const patient = await patientService.getPatientById(req.user.id);
+
+  if (!patient) {
+    return res.status(400).json({
+      success: false,
+      message: 'Patient not found',
+    });
+  }
+
+  await misService.removeAppointment(patient.misPatientId, req.params.appointmentId);
+
+  return res.status(200).json({
+    success: true,
+  });
+};

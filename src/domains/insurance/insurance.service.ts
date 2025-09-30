@@ -11,6 +11,7 @@ import {
   Program,
   Family,
   RefundRequest,
+  ProgramExtended,
 } from './insurance.types';
 import { RefundRequestDTO } from './insurance.dto';
 
@@ -204,6 +205,31 @@ export const getPrograms = async (token: string) => {
   }
 };
 
+export const getProgramById = async (token: string, programId: string) => {
+  try {
+    const response = await insuranceApi.get<{ errorCode: number; data: ProgramExtended }>(
+      `/v1/client/programs/${programId}`,
+      {
+        headers: {
+          Authorization: token || '',
+        },
+      }
+    );
+
+    return response.data.data;
+  } catch (error) {
+    const axiosError = error as AxiosError;
+    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
+    const errorStatus = axiosError?.response?.status === 401 ? 404 : axiosError?.response?.status;
+
+    if (errorMessage) {
+      throw new AppError(errorMessage, errorStatus);
+    }
+
+    throw new AppError(ErrorCodes.INSURANCE_PROGRAMS_NOT_FOUND, errorStatus);
+  }
+};
+
 export const getFamily = async (token: string, programId: string) => {
   try {
     const response = await insuranceApi.get<{ errorCode: number; data: Family[] }>(
@@ -217,6 +243,26 @@ export const getFamily = async (token: string, programId: string) => {
     );
 
     return response.data.data;
+  } catch (error) {
+    const axiosError = error as AxiosError;
+    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
+    const errorStatus = axiosError?.response?.status === 401 ? 404 : axiosError?.response?.status;
+
+    if (errorMessage) {
+      throw new AppError(errorMessage, errorStatus);
+    }
+
+    throw new AppError(ErrorCodes.INSURANCE_FAMILY_INFO_NOT_FOUND, errorStatus);
+  }
+};
+
+export const getInsuranceCertificate = async (token: string, programId: string) => {
+  try {
+    const response = await insuranceApi.get(`v1/certificate/${programId}`, {
+      headers: { Authorization: token || '' },
+    });
+
+    return response.data;
   } catch (error) {
     const axiosError = error as AxiosError;
     const errorMessage = (axiosError?.response?.data as { error: string })?.error;

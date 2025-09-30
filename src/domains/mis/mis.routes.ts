@@ -505,4 +505,35 @@ router.post('/create-appointment', authenticate, controller.createAppointment);
  */
 router.get('/appointments', authenticate, controller.getAppointments);
 
+/**
+ * @openapi
+ * /mis/appointments/{appointmentId}:
+ *   delete:
+ *     summary: Delete an appointment
+ *     tags: [MIS]
+ *     parameters:
+ *       - name: appointmentId
+ *         in: path
+ *         description: Appointment ID to delete
+ *         required: true
+ *         schema:
+ *           type: string
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Appointment deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *       401:
+ *         description: User not found or unauthorized
+ */
+router.delete('/appointments/:appointmentId', authenticate, controller.removeAppointment);
+
 export default router;
