@@ -180,7 +180,7 @@ export const getPrograms = async (req: Request, res: Response) => {
   if (!userToken?.accessToken) {
     return res.status(404).json({
       success: false,
-      message: 'User is not authorized',
+      message: ErrorCodes.INSURANCE_USER_NOT_AUTHORIZED,
     });
   }
 
