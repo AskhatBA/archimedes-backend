@@ -2,7 +2,7 @@ import { Gender } from '@/shared/types/gender';
 
 import { MISAppointment } from './mis.types';
 
-export interface FindPatientResponse {
+export type FindPatientResponse = {
   id: string;
   firstName: string;
   lastName: string;
@@ -10,7 +10,7 @@ export interface FindPatientResponse {
   birthDate: string;
   gender: Gender;
   iin: string;
-}
+};
 
 export interface CreatePatientDto {
   phoneNumber: string;

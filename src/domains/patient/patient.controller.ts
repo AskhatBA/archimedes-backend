@@ -68,7 +68,17 @@ export const createPatientProfile = async (req: Request, res: Response) => {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const misPatient = await misService.findPatientByPhone(`8${req.user.phone.slice(1)}`);
+  const misPatient = await misService.findPatientByIinAndPhone(
+    req.body.iin,
+    `8${req.user.phone.slice(1)}`
+  );
+
+  if (!misPatient) {
+    return res.status(400).json({
+      success: false,
+      message: 'Patient not found',
+    });
+  }
 
   const newPatient = await patientService.createPatient({
     firstName: req.body.firstName,

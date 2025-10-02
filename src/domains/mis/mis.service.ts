@@ -3,6 +3,7 @@ import axios, { AxiosError } from 'axios';
 import { config } from '@/config';
 import { AppError } from '@/shared/services/app-error.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
+import { Gender } from '@/shared/types/gender';
 
 import {
   MISAppointmentResponse,
@@ -25,23 +26,45 @@ const instance = axios.create({
   baseURL: config.mis.apiUrl,
 });
 
-export const findPatientByPhone = async (phone: string): Promise<FindPatientResponse> => {
+export const findPatientByIinAndPhone = async (
+  iin: string,
+  phone: string
+): Promise<FindPatientResponse | undefined> => {
   try {
     const response = await instance.post<MISFindPatientResponse>('/auth/beneficiary-login/', {
       phone_number: phone,
       otp_verified: true,
     });
 
-    const [firstName, lastName, patronymic] = response.data.beneficiary.name.split(' ');
+    if (response.data?.beneficiaries?.length) {
+      return response.data.beneficiaries
+        .map((beneficiary) => {
+          const [firstName, lastName, patronymic] = beneficiary.name.split(' ');
+          return {
+            id: beneficiary.id,
+            firstName,
+            lastName,
+            patronymic,
+            birthDate: beneficiary.birth_date,
+            iin: beneficiary.iin,
+            gender: (beneficiary.gender === 0 ? 'M' : 'F') as Gender,
+          };
+        })
+        .find((beneficiary) => beneficiary.iin === iin);
+    }
+
+    const [firstName, lastName, patronymic] = response.data.beneficiary
+      ? response.data.beneficiary.name.split(' ')
+      : '';
 
     return {
-      id: response.data.beneficiary.id,
+      id: response.data.beneficiary?.id || '',
       firstName,
       lastName,
       patronymic,
-      birthDate: response.data.beneficiary.birth_date,
-      iin: response.data.beneficiary.iin,
-      gender: response.data.beneficiary.gender === 0 ? 'M' : 'F',
+      birthDate: response.data.beneficiary?.birth_date || '',
+      iin: response.data.beneficiary?.iin || '',
+      gender: response.data.beneficiary?.gender === 0 ? 'M' : 'F',
     };
   } catch (error: unknown) {
     const axiosError = error as AxiosError;

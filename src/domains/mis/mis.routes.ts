@@ -40,6 +40,13 @@ const router = Router();
  *   get:
  *     summary: Find patient by phone number
  *     tags: [MIS]
+ *     parameters:
+ *       - name: iin
+ *         in: query
+ *         description: Individual Identification Number
+ *         required: true
+ *         schema:
+ *           type: string
  *     security:
  *       - bearerAuth: []
  *     responses:

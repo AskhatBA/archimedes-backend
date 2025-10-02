@@ -13,7 +13,12 @@ export const findPatient = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
 
-  const patient = await misService.findPatientByPhone(`8${req.user.phone.slice(1)}`);
+  await query('iin').notEmpty().withMessage('IIN is required').run(req);
+
+  const patient = await misService.findPatientByIinAndPhone(
+    (req.query.iin as string) || '',
+    `8${req.user.phone.slice(1)}`
+  );
 
   return res.status(200).json({
     success: true,
