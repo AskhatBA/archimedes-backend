@@ -439,4 +439,119 @@ router.get('/refund-requests', authenticate, controller.getRefundRequests);
 
 router.get('/certificate/:programId', authenticate, controller.getInsuranceCertificate);
 
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     AvailableInsuranceCity:
+ *       type: object
+ *       required: [id, title]
+ *       properties:
+ *         id:
+ *           type: number
+ *           example: 1
+ *         title:
+ *           type: string
+ *           example: "Астана"
+ * /insurance/cities:
+ *   get:
+ *     summary: Get list of cities from insurance service
+ *     tags: [Insurance]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 cities:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/AvailableInsuranceCity'
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/cities', authenticate, controller.getAvailableCities);
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     MedicalNetworkClinics:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: number
+ *           example: 1
+ *         city:
+ *           type: number
+ *           example: 1
+ *         title:
+ *           type: string
+ *           example: "Medical Center"
+ *         address:
+ *           type: string
+ *           example: "123 Healthcare St."
+ *         contacts:
+ *           type: null
+ *           example: null
+ *         latitude:
+ *           type: number
+ *           example: 51.1801
+ *         longitude:
+ *           type: number
+ *           example: 71.446
+ *         link2GIS:
+ *           type: string
+ *           example: "https://2gis.kz/clinic"
+ *         extraInformation:
+ *           type: null
+ *           example: null
+ * /insurance/medical-network:
+ *   get:
+ *     summary: Get list of medical network locations
+ *     tags: [Insurance]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: cityId
+ *         in: query
+ *         description: City ID
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - name: programId
+ *         in: query
+ *         description: Program ID
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 clinics:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/MedicalNetworkClinics'
+ *       401:
+ *         description: Unauthorized
+ *       400:
+ *         description: Bad Request - Missing required parameters
+ */
+router.get('/medical-network', authenticate, controller.getMedicalNetwork);
+
 export default router;

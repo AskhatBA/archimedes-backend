@@ -1,6 +1,6 @@
 import { Gender } from '@/shared/types/gender';
 
-import { MISAppointment } from './mis.types';
+import { MISAppointment, MISInsuranceInfo, MISPatientBeneficiary } from './mis.types';
 
 export type FindPatientResponse = {
   id: string;
@@ -49,5 +49,17 @@ export interface MISCreatePatientResponse {
     phone_number: string;
     address: string;
     address_details: string;
+  };
+}
+
+export interface MISFindPatientResponse {
+  status: string;
+  message: string;
+  beneficiary?: MISPatientBeneficiary;
+  beneficiaries?: MISPatientBeneficiary[];
+  access_token: string;
+  token_type: string;
+  profile: {
+    insurance: MISInsuranceInfo;
   };
 }

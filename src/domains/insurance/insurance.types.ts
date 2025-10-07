@@ -73,3 +73,20 @@ export interface ProgramExtended {
   logo: string;
   subLimits: ProgramExtendedSubLimits[];
 }
+
+export interface AvailableInsuranceCity {
+  id: number;
+  title: string;
+}
+
+export interface MedicalNetworkClinic {
+  id: number;
+  city: number;
+  title: string;
+  address: string;
+  contacts: null;
+  latitude: number;
+  longitude: number;
+  link2GIS: string;
+  extraInformation: null;
+}

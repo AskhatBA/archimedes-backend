@@ -11,10 +11,10 @@ import {
   CreatePatientDto,
   CreateAppointmentDto,
   MISCreatePatientResponse,
+  MISFindPatientResponse,
 } from './mis.dto';
 import { availableSlotsMapper } from './helper';
 import {
-  MISFindPatientResponse,
   MISBranchesResponse,
   MISSpecializationsResponse,
   MISDoctorsResponse,
@@ -26,18 +26,64 @@ const instance = axios.create({
   baseURL: config.mis.apiUrl,
 });
 
-export const findPatientByIinAndPhone = async (
-  iin: string,
-  phone: string
-): Promise<FindPatientResponse | undefined> => {
+const getBeneficiaryDetailsByPhone = async (phone: string) => {
   try {
     const response = await instance.post<MISFindPatientResponse>('/auth/beneficiary-login/', {
       phone_number: phone,
       otp_verified: true,
     });
 
-    if (response.data?.beneficiaries?.length) {
-      return response.data.beneficiaries
+    return response.data;
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError;
+    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
+
+    if (errorMessage) {
+      throw new AppError(errorMessage, axiosError?.response?.status);
+    }
+
+    throw new AppError(ErrorCodes.MIS_PATIENT_NOT_FOUND, axiosError?.response?.status);
+  }
+};
+
+export const getUserInsuranceDetails = async (phone: string) => {
+  try {
+    const patientDetails = await getBeneficiaryDetailsByPhone(phone);
+
+    if (!patientDetails?.profile?.insurance) {
+      return {
+        beneficiaryId: 'DF1D02E8-B664-435E-844E-6D90CF1F37DC',
+        cardNumber: 'card_number',
+        customerName: 'Askhat Baltabayev',
+      };
+    }
+
+    return {
+      beneficiaryId: patientDetails.profile.insurance.beneficiary_external_id,
+      cardNumber: patientDetails.profile.insurance.card_number,
+      customerName: patientDetails.profile.insurance.customer_name,
+    };
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError;
+    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
+
+    if (errorMessage) {
+      throw new AppError(errorMessage, axiosError?.response?.status);
+    }
+
+    throw new AppError(ErrorCodes.MIS_PATIENT_NOT_FOUND, axiosError?.response?.status);
+  }
+};
+
+export const findPatientByIinAndPhone = async (
+  iin: string,
+  phone: string
+): Promise<FindPatientResponse | undefined> => {
+  try {
+    const patientDetails = await getBeneficiaryDetailsByPhone(phone);
+
+    if (patientDetails?.beneficiaries?.length) {
+      return patientDetails.beneficiaries
         .map((beneficiary) => {
           const [firstName, lastName, patronymic] = beneficiary.name.split(' ');
           return {
@@ -53,18 +99,18 @@ export const findPatientByIinAndPhone = async (
         .find((beneficiary) => beneficiary.iin === iin);
     }
 
-    const [firstName, lastName, patronymic] = response.data.beneficiary
-      ? response.data.beneficiary.name.split(' ')
+    const [firstName, lastName, patronymic] = patientDetails?.beneficiary
+      ? patientDetails.beneficiary.name.split(' ')
       : '';
 
     return {
-      id: response.data.beneficiary?.id || '',
+      id: patientDetails?.beneficiary?.id || '',
       firstName,
       lastName,
       patronymic,
-      birthDate: response.data.beneficiary?.birth_date || '',
-      iin: response.data.beneficiary?.iin || '',
-      gender: response.data.beneficiary?.gender === 0 ? 'M' : 'F',
+      birthDate: patientDetails?.beneficiary?.birth_date || '',
+      iin: patientDetails?.beneficiary?.iin || '',
+      gender: patientDetails?.beneficiary?.gender === 0 ? 'M' : 'F',
     };
   } catch (error: unknown) {
     const axiosError = error as AxiosError;

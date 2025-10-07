@@ -9,15 +9,6 @@ export interface MISPatientBeneficiary {
   address_details: string;
 }
 
-export interface MISFindPatientResponse {
-  status: string;
-  message: string;
-  beneficiary?: MISPatientBeneficiary;
-  beneficiaries?: MISPatientBeneficiary[];
-  access_token: string;
-  token_type: string;
-}
-
 export interface MISBranch {
   id: string;
   name: string;
@@ -125,4 +116,10 @@ export interface MISAppointment {
   appointment_type: string;
   appointment_type_display: string;
   notes: string;
+}
+
+export interface MISInsuranceInfo {
+  beneficiary_external_id: string | null;
+  card_number: string;
+  customer_name: string;
 }

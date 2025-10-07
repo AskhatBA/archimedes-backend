@@ -12,6 +12,8 @@ import {
   Family,
   RefundRequest,
   ProgramExtended,
+  AvailableInsuranceCity,
+  MedicalNetworkClinic,
 } from './insurance.types';
 import { RefundRequestDTO } from './insurance.dto';
 
@@ -21,7 +23,7 @@ const insuranceApi = axios.create({
 
 export const sendOtp = async (phone: string, iin: string) => {
   try {
-    const response = await insuranceApi.post<InsuranceServiceResponse>('/v1/auth/sendOtp', {
+    const response = await insuranceApi.post<InsuranceServiceResponse>('/v3/auth/sendOtp', {
       phoneNumber: phone,
       iin: iin,
     });
@@ -47,7 +49,7 @@ export const verifyOtp = async (phone: string, otp: string, userId: string) => {
     const response = await insuranceApi.post<{
       errorCode: number;
       access_token: string;
-    }>('/v1/auth/verifyOtp', { phoneNumber: phone, otp });
+    }>('/v3/auth/verifyOtp', { phoneNumber: phone, otp });
 
     if (response.data.errorCode === -1) {
       throw new AppError(ErrorCodes.INVALID_OTP, 400);
@@ -72,16 +74,12 @@ export const verifyOtp = async (phone: string, otp: string, userId: string) => {
   }
 };
 
-export const requestRefund = async (refundRequestBody: RefundRequestDTO, userId: string) => {
+export const requestRefund = async (refundRequestBody: RefundRequestDTO, token: string) => {
   try {
-    const token = await db.prismaClient.insuranceServiceToken.findUnique({
-      where: { userId },
-    });
-
-    const userProfile = await getProfile(userId);
+    const userProfile = await getProfile(token);
 
     await insuranceApi.post(
-      '/v1/client/refundRequest',
+      '/v3/client/refundRequest',
       {
         ...refundRequestBody,
         id: 0,
@@ -91,7 +89,7 @@ export const requestRefund = async (refundRequestBody: RefundRequestDTO, userId:
       },
       {
         headers: {
-          Authorization: token?.accessToken || '',
+          Authorization: token || '',
         },
       }
     );
@@ -111,7 +109,7 @@ export const requestRefund = async (refundRequestBody: RefundRequestDTO, userId:
 export const getRefundRequests = async (token: string) => {
   try {
     const response = await insuranceApi.get<{ errorCode: number; data: RefundRequest[] }>(
-      '/v1/client/refundRequests',
+      '/v3/client/refundRequests',
       {
         headers: {
           Authorization: token || '',
@@ -151,17 +149,13 @@ export const checkInsuranceToken = async (userId: string) => {
   }
 };
 
-export const getProfile = async (userId: string) => {
+export const getProfile = async (token: string) => {
   try {
-    const token = await db.prismaClient.insuranceServiceToken.findUnique({
-      where: { userId },
-    });
-
     const response = await insuranceApi.get<{ errorCode: number; data: ProfileData }>(
-      '/v1/client/profile',
+      '/v3/client/profile',
       {
         headers: {
-          Authorization: token?.accessToken || '',
+          Authorization: token,
         },
       }
     );
@@ -183,7 +177,7 @@ export const getProfile = async (userId: string) => {
 export const getPrograms = async (token: string) => {
   try {
     const response = await insuranceApi.get<{ errorCode: number; programs: Program[] }>(
-      '/v1/client/programs',
+      '/v3/client/programs',
       {
         headers: {
           Authorization: token || '',
@@ -208,7 +202,7 @@ export const getPrograms = async (token: string) => {
 export const getProgramById = async (token: string, programId: string) => {
   try {
     const response = await insuranceApi.get<{ errorCode: number; data: ProgramExtended }>(
-      `/v1/client/programs/${programId}`,
+      `/v3/client/programs/${programId}`,
       {
         headers: {
           Authorization: token || '',
@@ -233,7 +227,7 @@ export const getProgramById = async (token: string, programId: string) => {
 export const getFamily = async (token: string, programId: string) => {
   try {
     const response = await insuranceApi.get<{ errorCode: number; data: Family[] }>(
-      '/v1/client/family',
+      '/v3/client/family',
       {
         headers: {
           Authorization: token || '',
@@ -258,11 +252,53 @@ export const getFamily = async (token: string, programId: string) => {
 
 export const getInsuranceCertificate = async (token: string, programId: string) => {
   try {
-    const response = await insuranceApi.get(`v1/certificate/${programId}`, {
+    const response = await insuranceApi.get(`v3/certificate/${programId}`, {
       headers: { Authorization: token || '' },
     });
 
     return response.data;
+  } catch (error) {
+    const axiosError = error as AxiosError;
+    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
+    const errorStatus = axiosError?.response?.status === 401 ? 404 : axiosError?.response?.status;
+
+    if (errorMessage) {
+      throw new AppError(errorMessage, errorStatus);
+    }
+
+    throw new AppError(ErrorCodes.INSURANCE_FAMILY_INFO_NOT_FOUND, errorStatus);
+  }
+};
+
+export const getAvailableCities = async (token: string) => {
+  try {
+    const response = await insuranceApi.get<{ errorCode: number; data: AvailableInsuranceCity[] }>(
+      '/v3/cities',
+      { headers: { Authorization: token || '' } }
+    );
+
+    return response.data.data;
+  } catch (error) {
+    const axiosError = error as AxiosError;
+    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
+    const errorStatus = axiosError?.response?.status === 401 ? 404 : axiosError?.response?.status;
+
+    if (errorMessage) {
+      throw new AppError(errorMessage, errorStatus);
+    }
+
+    throw new AppError(ErrorCodes.INSURANCE_FAMILY_INFO_NOT_FOUND, errorStatus);
+  }
+};
+
+export const getMedicalNetwork = async (token: string, programId: string, cityId: string) => {
+  try {
+    const response = await insuranceApi.get<{ errorCode: number; data: MedicalNetworkClinic[] }>(
+      `/v3/medical_network/${programId}`,
+      { headers: { Authorization: token || '' }, params: { cityId } }
+    );
+
+    return response.data.data;
   } catch (error) {
     const axiosError = error as AxiosError;
     const errorMessage = (axiosError?.response?.data as { error: string })?.error;
