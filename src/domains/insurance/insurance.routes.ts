@@ -554,4 +554,79 @@ router.get('/cities', authenticate, controller.getAvailableCities);
  */
 router.get('/medical-network', authenticate, controller.getMedicalNetwork);
 
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     ElectronicReferralDetail:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: number
+ *         service:
+ *           type: string
+ *         amount:
+ *           type: number
+ *     ElectronicReferralItem:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: number
+ *         date:
+ *           type: string
+ *           example: "10.11.2020"
+ *         name:
+ *           type: string
+ *           example: "Иванов Иван Иванович"
+ *         medical_institution:
+ *           type: string
+ *           example: "Алматы, ТОО Архимедес"
+ *         diagnosis:
+ *           type: string
+ *           example: "Остеохондроз"
+ *         amount:
+ *           type: number
+ *           example: 3850
+ *         currency:
+ *           type: string
+ *           example: "KZT"
+ *         appointmentDetail:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/ElectronicReferralDetail'
+ * /insurance/electronic-referrals:
+ *   get:
+ *     summary: Get electronic referrals (appointments)
+ *     tags: [Insurance]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: programId
+ *         in: query
+ *         description: Program ID
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 electronicReferrals:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/ElectronicReferralItem'
+ *       401:
+ *         description: Unauthorized
+ *       400:
+ *         description: Bad Request - Missing required parameters
+ */
+router.get('/electronic-referrals', authenticate, controller.getElectronicReferrals);
+
 export default router;

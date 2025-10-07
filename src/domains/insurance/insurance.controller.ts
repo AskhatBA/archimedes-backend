@@ -337,3 +337,37 @@ export const getMedicalNetwork = async (req: Request, res: Response) => {
     clinics,
   });
 };
+
+export const getElectronicReferrals = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  await query('programId').notEmpty().withMessage('Program ID is required').run(req);
+
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      errorCode: -1,
+      data: [],
+      message: errors.array(),
+    });
+  }
+
+  const misInsurance = await misService.getUserInsuranceDetails(req.user.phone);
+
+  if (!misInsurance.beneficiaryId) {
+    return res.status(404).json({
+      errorCode: -1,
+      data: [],
+      message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
+    });
+  }
+
+  const response = await insuranceService.getElectronicReferrals(
+    misInsurance.beneficiaryId,
+    req.query.programId as string
+  );
+
+  return res.status(200).json(response);
+};

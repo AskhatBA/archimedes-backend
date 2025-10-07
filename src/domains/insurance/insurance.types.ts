@@ -90,3 +90,20 @@ export interface MedicalNetworkClinic {
   link2GIS: string;
   extraInformation: null;
 }
+
+export interface AppointmentDetail {
+  id: number;
+  service: string;
+  amount: number;
+}
+
+export interface AppointmentItem {
+  id: number;
+  date: string;
+  name: string;
+  medical_institution: string;
+  diagnosis: string;
+  amount: number;
+  currency: string;
+  appointmentDetail: AppointmentDetail[];
+}

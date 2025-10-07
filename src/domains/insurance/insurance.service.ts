@@ -14,6 +14,7 @@ import {
   ProgramExtended,
   AvailableInsuranceCity,
   MedicalNetworkClinic,
+  AppointmentItem,
 } from './insurance.types';
 import { RefundRequestDTO } from './insurance.dto';
 
@@ -296,6 +297,27 @@ export const getMedicalNetwork = async (token: string, programId: string, cityId
     const response = await insuranceApi.get<{ errorCode: number; data: MedicalNetworkClinic[] }>(
       `/v3/medical_network/${programId}`,
       { headers: { Authorization: token || '' }, params: { cityId } }
+    );
+
+    return response.data.data;
+  } catch (error) {
+    const axiosError = error as AxiosError;
+    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
+    const errorStatus = axiosError?.response?.status === 401 ? 404 : axiosError?.response?.status;
+
+    if (errorMessage) {
+      throw new AppError(errorMessage, errorStatus);
+    }
+
+    throw new AppError(ErrorCodes.INSURANCE_FAMILY_INFO_NOT_FOUND, errorStatus);
+  }
+};
+
+export const getElectronicReferrals = async (token: string, programId: string) => {
+  try {
+    const response = await insuranceApi.get<{ errorCode: number; data: AppointmentItem[] }>(
+      '/v3/client/appointments',
+      { headers: { Authorization: token || '' }, params: { programId } }
     );
 
     return response.data.data;
