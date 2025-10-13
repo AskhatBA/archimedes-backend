@@ -292,11 +292,21 @@ export const getAvailableCities = async (token: string) => {
   }
 };
 
-export const getMedicalNetwork = async (token: string, programId: string, cityId: string) => {
+export const getMedicalNetwork = async ({
+  token,
+  programId,
+  cityId,
+  type,
+}: {
+  token: string;
+  programId: string;
+  cityId: string;
+  type?: string;
+}) => {
   try {
     const response = await insuranceApi.get<{ errorCode: number; data: MedicalNetworkClinic[] }>(
       `/v3/medical_network/${programId}`,
-      { headers: { Authorization: token || '' }, params: { cityId } }
+      { headers: { Authorization: token || '' }, params: { cityId, type } }
     );
 
     return response.data.data;

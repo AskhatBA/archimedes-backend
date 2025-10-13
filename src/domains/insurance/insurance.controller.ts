@@ -326,11 +326,12 @@ export const getMedicalNetwork = async (req: Request, res: Response) => {
     });
   }
 
-  const clinics = await insuranceService.getMedicalNetwork(
-    misInsurance.beneficiaryId,
-    req.query.programId as string,
-    req.query.cityId as string
-  );
+  const clinics = await insuranceService.getMedicalNetwork({
+    token: misInsurance.beneficiaryId,
+    programId: req.query.programId as string,
+    cityId: req.query.cityId as string,
+    type: req.query.type as string,
+  });
 
   return res.status(200).json({
     success: true,

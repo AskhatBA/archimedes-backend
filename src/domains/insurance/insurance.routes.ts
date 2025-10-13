@@ -532,6 +532,11 @@ router.get('/cities', authenticate, controller.getAvailableCities);
  *         required: true
  *         schema:
  *           type: string
+ *       - name: type
+ *         in: query
+ *         description: Clinic type ID
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
  *         description: Response
