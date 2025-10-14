@@ -51,11 +51,12 @@ export const getUserInsuranceDetails = async (phone: string) => {
     const patientDetails = await getBeneficiaryDetailsByPhone(phone);
 
     if (!patientDetails?.profile?.insurance) {
-      return {
-        beneficiaryId: 'DF1D02E8-B664-435E-844E-6D90CF1F37DC',
-        cardNumber: 'card_number',
-        customerName: 'Askhat Baltabayev',
-      };
+      throw new AppError(ErrorCodes.MIS_PATIENT_HAS_NO_INSURANCE, 404);
+      // return {
+      //   beneficiaryId: 'DF1D02E8-B664-435E-844E-6D90CF1F37DC',
+      //   cardNumber: 'card_number',
+      //   customerName: 'Askhat Baltabayev',
+      // };
     }
 
     return {
