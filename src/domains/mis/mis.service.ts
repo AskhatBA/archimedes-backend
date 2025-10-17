@@ -83,8 +83,8 @@ export const findPatientByIinAndPhone = async (
   try {
     const patientDetails = await getBeneficiaryDetailsByPhone(phone);
 
-    if (patientDetails?.beneficiaries?.length) {
-      return patientDetails.beneficiaries
+    if (patientDetails?.beneficiarys?.length) {
+      return patientDetails.beneficiarys
         .map((beneficiary) => {
           const [firstName, lastName, patronymic] = beneficiary.name.split(' ');
           return {
