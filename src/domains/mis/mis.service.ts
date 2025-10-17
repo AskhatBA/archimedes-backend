@@ -4,6 +4,7 @@ import { config } from '@/config';
 import { AppError } from '@/shared/services/app-error.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
 import { Gender } from '@/shared/types/gender';
+import { getPatientById } from '@/domains/patient/patient.service';
 
 import {
   MISAppointmentResponse,
@@ -46,23 +47,19 @@ const getBeneficiaryDetailsByPhone = async (phone: string) => {
   }
 };
 
-export const getUserInsuranceDetails = async (phone: string) => {
+export const getUserInsuranceDetails = async (userId: string, phone: string) => {
   try {
-    const patientDetails = await getBeneficiaryDetailsByPhone(phone);
+    const patient = await getPatientById(userId);
 
-    if (!patientDetails?.profile?.insurance) {
-      throw new AppError(ErrorCodes.MIS_PATIENT_HAS_NO_INSURANCE, 404);
-      // return {
-      //   beneficiaryId: 'DF1D02E8-B664-435E-844E-6D90CF1F37DC',
-      //   cardNumber: 'card_number',
-      //   customerName: 'Askhat Baltabayev',
-      // };
-    }
+    if (!patient) return;
+
+    const misPatient = await findPatientByIinAndPhone(patient.iin, phone);
+    const response = await instance.get<MISFindPatientResponse>(
+      `/auth/beneficiary/${misPatient?.id}/profile`
+    );
 
     return {
-      beneficiaryId: patientDetails.profile.insurance.beneficiary_external_id,
-      cardNumber: patientDetails.profile.insurance.card_number,
-      customerName: patientDetails.profile.insurance.customer_name,
+      beneficiaryId: response.data?.profile?.insurance?.beneficiary_external_id || misPatient?.id,
     };
   } catch (error: unknown) {
     const axiosError = error as AxiosError;

@@ -7,6 +7,9 @@ export interface MISPatientBeneficiary {
   birth_date: string;
   address: string;
   address_details: string;
+  profile: {
+    insurance: MISInsuranceInfo;
+  };
 }
 
 export interface MISBranch {
