@@ -56,7 +56,7 @@ export interface MISFindPatientResponse {
   status: string;
   message: string;
   beneficiary?: MISPatientBeneficiary;
-  beneficiaries?: MISPatientBeneficiary[];
+  beneficiarys?: MISPatientBeneficiary[];
   access_token: string;
   token_type: string;
   profile: {
