@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Role } from '@prisma/client';
 
+import { isProduction } from '@/config';
 import { ErrorCodes } from '@/shared/constants/error-codes';
 import { AppError } from '@/shared/services/app-error.service';
 import * as otpService from '@/shared/services/otp.service';
@@ -21,11 +22,15 @@ export const requestOtp = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.INVALID_PHONE, 400);
   }
 
-  await smsService.sendSMS(phone, `Код для авторизации: ${otp}`);
+  if (isProduction) {
+    await smsService.sendSMS(phone, `Код для авторизации: ${otp}`);
+  }
 
   if (isUserExists) {
     await otpService.saveOTP(user.id, hashedOTP);
-    return res.status(200).json({ id: user?.id, phone: phone, otp: otp });
+    return res
+      .status(200)
+      .json({ id: user?.id, phone: phone, otp: isProduction ? undefined : otp });
   }
 
   const createdUser = await authService.createUser({
@@ -35,7 +40,9 @@ export const requestOtp = async (req: Request, res: Response) => {
 
   await otpService.saveOTP(createdUser.id, hashedOTP);
 
-  return res.status(200).json({ id: createdUser?.id, phone: phone, otp: otp });
+  return res
+    .status(200)
+    .json({ id: createdUser?.id, phone: phone, otp: isProduction ? undefined : otp });
 };
 
 export const verifyOtp = async (req: Request, res: Response) => {

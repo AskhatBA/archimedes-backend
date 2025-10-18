@@ -40,3 +40,6 @@ export const config = {
     apiUrl: process.env.INSURANCE_SERVICE_API_URL!,
   },
 };
+
+export const isDevelopment = config.nodeEnv === 'development';
+export const isProduction = config.nodeEnv === 'production';
