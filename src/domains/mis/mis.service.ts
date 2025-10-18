@@ -1,9 +1,3 @@
-import axios, { AxiosError } from 'axios';
-
-import { config } from '@/config';
-import { AppError } from '@/shared/services/app-error.service';
-import { ErrorCodes } from '@/shared/constants/error-codes';
-import { Gender } from '@/shared/types/gender';
 import { getPatientById } from '@/domains/patient/patient.service';
 
 import {
@@ -14,203 +8,153 @@ import {
   MISCreatePatientResponse,
   MISFindPatientResponse,
 } from './mis.dto';
-import { availableSlotsMapper } from './helper';
+import { availableSlotsMapper, parsePatientFullName, misRequest } from './mis.helpers';
+import {
+  MIS_API_GET_USER_BY_PHONE,
+  MIS_API_GET_USER_PROFILE_BY_ID,
+  MIS_API_BRANCH_LIST,
+  MIS_API_CREATE_USER,
+  MIS_API_GET_SPECIALIZATION_BY_BRANCH_ID,
+  MIS_API_GET_DOCTOR_LIST,
+  MIS_API_GET_DOCTOR_BY_ID,
+  MIS_API_GET_DOCTOR_AVAILABLE_SLOTS,
+  MIS_API_CREATE_APPOINTMENT,
+  MIS_API_GET_USER_APPOINTMENTS,
+} from './mis.constants';
 import {
   MISBranchesResponse,
   MISSpecializationsResponse,
   MISDoctorsResponse,
   MISDoctorDetailsResponse,
   MISDoctorAvailableSlotsResponse,
+  MISPatientBeneficiary,
 } from './mis.types';
 
-const instance = axios.create({
-  baseURL: config.mis.apiUrl,
-});
-
-const getBeneficiaryDetailsByPhone = async (phone: string) => {
-  try {
-    const response = await instance.post<MISFindPatientResponse>('/auth/beneficiary-login/', {
-      phone_number: phone,
-      otp_verified: true,
-    });
-
-    return response.data;
-  } catch (error: unknown) {
-    const axiosError = error as AxiosError;
-    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
-
-    if (errorMessage) {
-      throw new AppError(errorMessage, axiosError?.response?.status);
-    }
-
-    throw new AppError(ErrorCodes.MIS_PATIENT_NOT_FOUND, axiosError?.response?.status);
-  }
-};
-
 export const getUserInsuranceDetails = async (userId: string, phone: string) => {
-  try {
-    const patient = await getPatientById(userId);
+  const patient = await getPatientById(userId);
+  if (!patient) return;
 
-    if (!patient) return;
+  const misPatient = await findPatientByIinAndPhone(patient.iin, phone);
+  if (!misPatient) return;
 
-    const misPatient = await findPatientByIinAndPhone(patient.iin, phone);
-    const response = await instance.get<MISFindPatientResponse>(
-      `/auth/beneficiary/${misPatient?.id}/profile`
-    );
+  const misPatientProfile = await misRequest<MISFindPatientResponse>({
+    resolverName: MIS_API_GET_USER_PROFILE_BY_ID,
+    params: {
+      userId: misPatient.id,
+    },
+  });
 
-    return {
-      beneficiaryId: response.data?.profile?.insurance?.beneficiary_external_id || misPatient?.id,
-    };
-  } catch (error: unknown) {
-    const axiosError = error as AxiosError;
-    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
-
-    if (errorMessage) {
-      throw new AppError(errorMessage, axiosError?.response?.status);
-    }
-
-    throw new AppError(ErrorCodes.MIS_PATIENT_NOT_FOUND, axiosError?.response?.status);
-  }
+  return {
+    beneficiaryId: misPatientProfile?.profile?.insurance?.beneficiary_external_id || misPatient?.id,
+  };
 };
 
 export const findPatientByIinAndPhone = async (
   iin: string,
   phone: string
 ): Promise<FindPatientResponse | undefined> => {
-  try {
-    const patientDetails = await getBeneficiaryDetailsByPhone(phone);
+  const misPatientDetail = await misRequest<MISFindPatientResponse>({
+    resolverName: MIS_API_GET_USER_BY_PHONE,
+    payload: {
+      phone_number: phone,
+    },
+  });
+  if (!misPatientDetail) return;
 
-    if (patientDetails?.beneficiarys?.length) {
-      return patientDetails.beneficiarys
-        .map((beneficiary) => {
-          const [firstName, lastName, patronymic] = beneficiary.name.split(' ');
-          return {
-            id: beneficiary.id,
-            firstName,
-            lastName,
-            patronymic,
-            birthDate: beneficiary.birth_date,
-            iin: beneficiary.iin,
-            gender: (beneficiary.gender === 0 ? 'M' : 'F') as Gender,
-          };
-        })
-        .find((beneficiary) => beneficiary.iin === iin);
-    }
+  const isMultipleBeneficiaries =
+    !!misPatientDetail.beneficiarys && !!misPatientDetail.beneficiarys.length;
+  let currentBeneficiary: MISPatientBeneficiary | undefined = undefined;
 
-    const [firstName, lastName, patronymic] = patientDetails?.beneficiary
-      ? patientDetails.beneficiary.name.split(' ')
-      : '';
-
-    return {
-      id: patientDetails?.beneficiary?.id || '',
-      firstName,
-      lastName,
-      patronymic,
-      birthDate: patientDetails?.beneficiary?.birth_date || '',
-      iin: patientDetails?.beneficiary?.iin || '',
-      gender: patientDetails?.beneficiary?.gender === 0 ? 'M' : 'F',
-    };
-  } catch (error: unknown) {
-    const axiosError = error as AxiosError;
-    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
-
-    if (errorMessage) {
-      throw new AppError(errorMessage, axiosError?.response?.status);
-    }
-
-    throw new AppError(ErrorCodes.MIS_PATIENT_NOT_FOUND, axiosError?.response?.status);
+  if (isMultipleBeneficiaries) {
+    currentBeneficiary = misPatientDetail.beneficiarys?.find(
+      (beneficiary) => beneficiary.iin === iin
+    );
+  } else {
+    currentBeneficiary = misPatientDetail.beneficiary;
   }
+
+  if (!currentBeneficiary) return;
+
+  const { firstName, lastName, patronymic } = parsePatientFullName(currentBeneficiary.name);
+
+  return {
+    id: currentBeneficiary.id || '',
+    firstName,
+    lastName,
+    patronymic,
+    birthDate: currentBeneficiary.birth_date || '',
+    iin: currentBeneficiary.iin || '',
+    gender: currentBeneficiary.gender === 0 ? 'M' : 'F',
+  };
 };
 
 export const createPatient = async (patient: CreatePatientDto) => {
   const name = [patient.lastName, patient.firstName, patient.patronymic].filter(Boolean).join(' ');
 
-  try {
-    const response = await instance.post<MISCreatePatientResponse>('/auth/beneficiary-create/', {
+  const response = await misRequest<MISCreatePatientResponse>({
+    resolverName: MIS_API_CREATE_USER,
+    payload: {
       phone_number: `8${patient.phoneNumber.slice(1)}`,
       otp_verified: true,
       name,
       gender: patient.gender === 'M' ? 0 : 1,
       birth_date: patient.birthDate,
       iin: patient.iin,
-    });
+    },
+  });
 
-    return response.data.beneficiary;
-  } catch (error: unknown) {
-    const axiosError = error as AxiosError;
-    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
-
-    if (errorMessage) {
-      throw new AppError(errorMessage, axiosError?.response?.status);
-    }
-
-    throw new AppError(ErrorCodes.MIS_PATIENT_NOT_FOUND, axiosError?.response?.status);
-  }
+  return response.beneficiary;
 };
 
 export const getBranches = async () => {
-  try {
-    const response = await instance.get<MISBranchesResponse>('/beneficiary/branches/');
-    return response.data.branches;
-  } catch (error: unknown) {
-    const axiosError = error as AxiosError;
-    throw new AppError(ErrorCodes.MIS_PATIENT_NOT_FOUND, axiosError?.response?.status);
-  }
+  const response = await misRequest<MISBranchesResponse>({ resolverName: MIS_API_BRANCH_LIST });
+  return response.branches;
 };
 
 export const getSpecializationsByBranchId = async (branchId: string) => {
-  try {
-    const response = await instance.get<MISSpecializationsResponse>(
-      `/beneficiary/branches/${branchId}/specialties/`
-    );
-    return response.data.specialties;
-  } catch (error: unknown) {
-    const axiosError = error as AxiosError;
-    throw new AppError(ErrorCodes.MIS_SPECIALTY_NOT_FOUND, axiosError?.response?.status);
-  }
+  const response = await misRequest<MISSpecializationsResponse>({
+    resolverName: MIS_API_GET_SPECIALIZATION_BY_BRANCH_ID,
+    params: { branchId },
+  });
+
+  return response.specialties;
 };
 
 export const getDoctorsBySpecializationIdAndBranchId = async (
   specializationId: string,
   branchId: string
 ) => {
-  try {
-    const response = await instance.get<MISDoctorsResponse>(
-      `/beneficiary/branches/${branchId}/specialties/${specializationId}/doctors/`
-    );
-    return response.data.doctors.map((doctor) => ({
-      id: doctor.id,
-      name: doctor.name,
-      position: doctor.position,
-      specialtyName: doctor.specialty_name,
-      branchName: doctor.branch_name,
-      appointmentDurationMinutes: doctor.appointment_duration_minutes,
-    }));
-  } catch (error: unknown) {
-    const axiosError = error as AxiosError;
-    throw new AppError(ErrorCodes.MIS_SPECIALTY_NOT_FOUND, axiosError?.response?.status);
-  }
+  const response = await misRequest<MISDoctorsResponse>({
+    resolverName: MIS_API_GET_DOCTOR_LIST,
+    params: { branchId, specializationId },
+  });
+
+  return response.doctors.map((doctor) => ({
+    id: doctor.id,
+    name: doctor.name,
+    position: doctor.position,
+    specialtyName: doctor.specialty_name,
+    branchName: doctor.branch_name,
+    appointmentDurationMinutes: doctor.appointment_duration_minutes,
+  }));
 };
 
 export const getDoctorDetailsById = async (doctorId: string) => {
-  try {
-    const response = await instance.get<MISDoctorDetailsResponse>(
-      `/beneficiary/doctors/${doctorId}/`
-    );
-    return {
-      id: response.data.doctor.id,
-      name: response.data.doctor.name,
-      specialty: response.data.doctor.specialty,
-      branch: response.data.doctor.branch,
-      position: response.data.doctor.position,
-      appointmentDurationMinutes: response.data.doctor.appointment_duration_minutes,
-      workPhone: response.data.doctor.work_phone,
-      mobilePhone: response.data.doctor.mobile_phone,
-    };
-  } catch (error: unknown) {
-    const axiosError = error as AxiosError;
-    throw new AppError(ErrorCodes.MIS_SPECIALTY_NOT_FOUND, axiosError?.response?.status);
-  }
+  const response = await misRequest<MISDoctorDetailsResponse>({
+    resolverName: MIS_API_GET_DOCTOR_BY_ID,
+    params: { doctorId },
+  });
+
+  return {
+    id: response.doctor.id,
+    name: response.doctor.name,
+    specialty: response.doctor.specialty,
+    branch: response.doctor.branch,
+    position: response.doctor.position,
+    appointmentDurationMinutes: response.doctor.appointment_duration_minutes,
+    workPhone: response.doctor.work_phone,
+    mobilePhone: response.doctor.mobile_phone,
+  };
 };
 
 export const getDoctorAvailableSlots = async (
@@ -218,83 +162,40 @@ export const getDoctorAvailableSlots = async (
   startDate: string,
   endDate: string
 ) => {
-  try {
-    const response = await instance.get<MISDoctorAvailableSlotsResponse>(
-      `/beneficiary/doctors/${doctorId}/available-slots/`,
-      {
-        params: {
-          start_date: startDate,
-          end_date: endDate,
-        },
-      }
-    );
-    return availableSlotsMapper(response.data.available_slots);
-  } catch (error: unknown) {
-    const axiosError = error as AxiosError;
-    throw new AppError(ErrorCodes.MIS_SPECIALTY_NOT_FOUND, axiosError?.response?.status);
-  }
+  const response = await misRequest<MISDoctorAvailableSlotsResponse>({
+    resolverName: MIS_API_GET_DOCTOR_AVAILABLE_SLOTS,
+    params: { doctorId },
+    query: { start_date: startDate, end_date: endDate },
+  });
+
+  return availableSlotsMapper(response.available_slots);
 };
 
 export const createAppointment = async (newAppointment: CreateAppointmentDto) => {
-  try {
-    const response = await instance.post<MISDoctorAvailableSlotsResponse>(
-      `/beneficiary/appointments/create/`,
-      {
-        doctor: newAppointment.doctorId,
-        beneficiary: newAppointment.patientId,
-        start_time: newAppointment.startTime,
-        end_time: newAppointment.endTime,
-        record_type: 'paid',
-        appointment_type: 'primary',
-        notes: '',
-        branch: newAppointment.branchId,
-      }
-    );
-    return response.data;
-  } catch (error: unknown) {
-    const axiosError = error as AxiosError;
-    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
-
-    if (errorMessage) {
-      throw new AppError(errorMessage, axiosError?.response?.status);
-    }
-
-    throw new AppError(ErrorCodes.MIS_CREATE_APPOINTMENT_FAILED, axiosError?.response?.status);
-  }
+  return misRequest<MISDoctorAvailableSlotsResponse>({
+    resolverName: MIS_API_CREATE_APPOINTMENT,
+    payload: {
+      doctor: newAppointment.doctorId,
+      beneficiary: newAppointment.patientId,
+      start_time: newAppointment.startTime,
+      end_time: newAppointment.endTime,
+      branch: newAppointment.branchId,
+    },
+  });
 };
 
 export const getAppointments = async (misPatientId: string) => {
-  try {
-    const response = await instance.get<MISAppointmentResponse>(
-      `/beneficiary/${misPatientId}/appointments/`
-    );
-    return response.data.appointments;
-  } catch (error: unknown) {
-    const axiosError = error as AxiosError;
-    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
+  const response = await misRequest<MISAppointmentResponse>({
+    resolverName: MIS_API_GET_USER_APPOINTMENTS,
+    params: { userId: misPatientId },
+  });
 
-    if (errorMessage) {
-      throw new AppError(errorMessage, axiosError?.response?.status);
-    }
-
-    throw new AppError(ErrorCodes.MIS_CREATE_APPOINTMENT_FAILED, axiosError?.response?.status);
-  }
+  return response.appointments;
 };
 
 export const removeAppointment = async (misPatientId: string, appointmentId: string) => {
-  try {
-    const response = await instance.delete(
-      `/beneficiary/${misPatientId}/appointments/${appointmentId}`
-    );
-    return response.data;
-  } catch (error: unknown) {
-    const axiosError = error as AxiosError;
-    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
-
-    if (errorMessage) {
-      throw new AppError(errorMessage, axiosError?.response?.status);
-    }
-
-    throw new AppError(ErrorCodes.MIS_CREATE_APPOINTMENT_FAILED, axiosError?.response?.status);
-  }
+  return misRequest({
+    resolverName: MIS_API_GET_USER_APPOINTMENTS,
+    params: { userId: misPatientId, appointmentId },
+  });
 };

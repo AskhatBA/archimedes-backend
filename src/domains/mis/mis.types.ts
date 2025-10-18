@@ -1,3 +1,5 @@
+import { misApiResolvers } from '@/domains/mis/mis.constants';
+
 export interface MISPatientBeneficiary {
   id: string;
   name: string;
@@ -125,4 +127,11 @@ export interface MISInsuranceInfo {
   beneficiary_external_id: string | null;
   card_number: string;
   customer_name: string;
+}
+
+export interface MisRequestPayload {
+  resolverName: keyof typeof misApiResolvers;
+  payload?: any;
+  params?: any;
+  query?: any;
 }
