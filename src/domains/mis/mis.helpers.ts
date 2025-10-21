@@ -45,7 +45,10 @@ export const parseApiError = (
 
   return {
     message: errorMessage,
-    status: axiosError?.response?.status || 404,
+    status:
+      !axiosError?.response?.status || axiosError?.response?.status === 401
+        ? 404
+        : axiosError?.response?.status,
   };
 };
 

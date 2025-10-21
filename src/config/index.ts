@@ -38,6 +38,7 @@ export const config = {
 
   insuranceService: {
     apiUrl: process.env.INSURANCE_SERVICE_API_URL!,
+    testId: process.env.INSURANCE_TEST_ID,
   },
 };
 

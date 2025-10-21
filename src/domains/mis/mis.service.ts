@@ -1,5 +1,5 @@
 import { getPatientById } from '@/domains/patient/patient.service';
-import { isDevelopment } from '@/config';
+import { isDevelopment, config } from '@/config';
 
 import {
   MISAppointmentResponse,
@@ -45,9 +45,9 @@ export const getUserInsuranceDetails = async (userId: string, phone: string) => 
     },
   });
 
-  if (isDevelopment) {
+  if (isDevelopment && config.insuranceService.testId) {
     return {
-      beneficiaryId: 'DF1D02E8-B664-435E-844E-6D90CF1F37DC',
+      beneficiaryId: config.insuranceService.testId,
     };
   }
 
