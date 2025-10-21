@@ -422,6 +422,9 @@ router.get('/doctor/:doctorId/available-slots', authenticate, controller.getDoct
  *         branchId:
  *           type: string
  *           example: "8b9a7c6d-5e4f-4321-a987-6543210fedcb"
+ *         insuranceProgramId:
+ *           type: string
+ *           example: "8b9a7c6d-5e4f-4321-a987-6543210fedcb"
  * /mis/create-appointment:
  *   post:
  *     summary: Create a new appointment

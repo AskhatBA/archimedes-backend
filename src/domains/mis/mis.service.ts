@@ -1,4 +1,5 @@
 import { getPatientById } from '@/domains/patient/patient.service';
+import { isDevelopment } from '@/config';
 
 import {
   MISAppointmentResponse,
@@ -43,6 +44,12 @@ export const getUserInsuranceDetails = async (userId: string, phone: string) => 
       userId: misPatient.id,
     },
   });
+
+  if (isDevelopment) {
+    return {
+      beneficiaryId: 'DF1D02E8-B664-435E-844E-6D90CF1F37DC',
+    };
+  }
 
   return {
     beneficiaryId: misPatientProfile?.profile?.insurance?.beneficiary_external_id || misPatient?.id,
@@ -180,6 +187,7 @@ export const createAppointment = async (newAppointment: CreateAppointmentDto) =>
       start_time: newAppointment.startTime,
       end_time: newAppointment.endTime,
       branch: newAppointment.branchId,
+      insurance: newAppointment.insuranceProgramId,
     },
   });
 };

@@ -3,6 +3,7 @@ import axios, { AxiosError } from 'axios';
 import { ErrorCodes } from '@/shared/constants/error-codes';
 import { config } from '@/config';
 import { AppError } from '@/shared/services/app-error.service';
+import { resolveApiUrlParams } from '@/shared/helpers/resolve-api-url-params';
 
 import { MISDoctorAvailableSlot, MappedAvailableSlots, MisRequestPayload } from './mis.types';
 import { misApiResolvers } from './mis.constants';
@@ -34,10 +35,16 @@ export const parseApiError = (
   defaultErrorMessage: keyof typeof ErrorCodes = ErrorCodes.UNKNOWN_ERROR
 ) => {
   const axiosError = error as AxiosError;
-  const errorMessage = (axiosError?.response?.data as { error: string })?.error;
+  const errorData = axiosError?.response?.data as {
+    error: string;
+    errors: Record<string, string | string[]>;
+  };
+  const errorMessage = errorData?.errors
+    ? Object.values(errorData.errors).join('; ')
+    : errorData?.error || defaultErrorMessage;
 
   return {
-    message: errorMessage || defaultErrorMessage,
+    message: errorMessage,
     status: axiosError?.response?.status || 404,
   };
 };
@@ -56,10 +63,7 @@ export const misRequest = async <T>({
     const apiResolver = misApiResolvers[resolverName as keyof typeof misApiResolvers];
     const response = await misHttp.request<T>({
       method: apiResolver.method,
-      url: Object.entries(params).reduce(
-        (url, [key, value]) => url.replace(`:${key}`, String(value)),
-        resolverName
-      ),
+      url: resolveApiUrlParams(resolverName, params),
       data: {
         ...apiResolver.defaultPayload,
         ...payload,

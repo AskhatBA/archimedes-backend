@@ -1,3 +1,5 @@
+import { insuranceApiResolverDefault } from './insurance.constants';
+
 export interface InsuranceServiceResponse {
   errorCode: number;
   message?: string;
@@ -106,4 +108,12 @@ export interface AppointmentItem {
   amount: number;
   currency: string;
   appointmentDetail: AppointmentDetail[];
+}
+
+export interface InsuranceRequestPayload {
+  resolverName: keyof typeof insuranceApiResolverDefault;
+  beneficiaryId?: string;
+  payload?: any;
+  params?: any;
+  query?: any;
 }

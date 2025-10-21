@@ -28,6 +28,7 @@ export interface CreateAppointmentDto {
   startTime: string;
   endTime: string;
   branchId: string;
+  insuranceProgramId: string;
 }
 
 export interface MISAppointmentResponse {

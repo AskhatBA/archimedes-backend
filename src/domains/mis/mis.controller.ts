@@ -173,6 +173,10 @@ export const createAppointment = async (req: Request, res: Response) => {
   await body('startTime').notEmpty().withMessage('Start time is required').run(req);
   await body('endTime').notEmpty().withMessage('End time is required').run(req);
   await body('branchId').notEmpty().withMessage('Branch ID is required').run(req);
+  await body('insuranceProgramId')
+    .notEmpty()
+    .withMessage('Insurance program ID is required')
+    .run(req);
 
   const errors = validationResult(req);
 
@@ -183,7 +187,7 @@ export const createAppointment = async (req: Request, res: Response) => {
     });
   }
 
-  const { doctorId, startTime, endTime, branchId } = req.body;
+  const { doctorId, startTime, endTime, branchId, insuranceProgramId } = req.body;
   const patient = await patientService.getPatientById(req.user.id);
 
   if (!patient) {
@@ -199,6 +203,7 @@ export const createAppointment = async (req: Request, res: Response) => {
     startTime,
     endTime,
     branchId,
+    insuranceProgramId,
   });
 
   return res.status(200).json({
