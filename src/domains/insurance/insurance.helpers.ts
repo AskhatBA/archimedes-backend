@@ -32,6 +32,7 @@ export const insuranceRequest = async <T>({
   resolverName,
   payload = {},
   params = {},
+  query = {},
   beneficiaryId,
 }: InsuranceRequestPayload) => {
   try {
@@ -44,6 +45,7 @@ export const insuranceRequest = async <T>({
         ...apiResolver.defaultPayload,
         ...payload,
       },
+      params: query,
       headers: {
         Authorization: beneficiaryId || '',
       },

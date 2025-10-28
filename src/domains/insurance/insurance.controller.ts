@@ -166,20 +166,6 @@ export const getRefundRequests = async (req: Request, res: Response) => {
   });
 };
 
-export const checkUserAuthorization = async (req: Request, res: Response) => {
-  if (!req.user) {
-    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
-  }
-
-  const userToken = await insuranceService.checkInsuranceToken(req.user.id);
-  const isUserAuthorized = !!userToken?.accessToken;
-
-  return res.status(200).json({
-    success: true,
-    isUserAuthorized,
-  });
-};
-
 export const getPrograms = async (req: Request, res: Response) => {
   if (!req.user) {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
@@ -217,6 +203,31 @@ export const getProgramById = async (req: Request, res: Response) => {
   }
 
   const program = await insuranceService.getProgramById(
+    misInsurance.beneficiaryId,
+    req.params.programId
+  );
+
+  return res.status(200).json({
+    success: true,
+    program,
+  });
+};
+
+export const getProgramDescription = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+
+  if (!misInsurance?.beneficiaryId) {
+    return res.status(404).json({
+      success: false,
+      message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
+    });
+  }
+
+  const program = await insuranceService.getProgramDescription(
     misInsurance.beneficiaryId,
     req.params.programId
   );
@@ -327,7 +338,7 @@ export const getMedicalNetwork = async (req: Request, res: Response) => {
   }
 
   const clinics = await insuranceService.getMedicalNetwork({
-    token: misInsurance.beneficiaryId,
+    beneficiaryId: misInsurance.beneficiaryId,
     programId: req.query.programId as string,
     cityId: req.query.cityId as string,
     type: req.query.type as string,

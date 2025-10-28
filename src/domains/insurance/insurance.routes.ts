@@ -151,35 +151,6 @@ router.post('/refund-request', authenticate, controller.refundRequest);
  * @openapi
  * components:
  *   schemas:
- *     CheckUserAuthorizationResponse:
- *       type: object
- *       properties:
- *         success:
- *           type: boolean
- *         isUserAuthorized:
- *           type: boolean
- * /insurance/check-user-authorization:
- *   get:
- *     summary: Check if users is authorized in the insurance service successfully
- *     tags: [Insurance]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Response
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/CheckUserAuthorizationResponse'
- *       401:
- *         description: Unauthorized
- */
-router.get('/check-user-authorization', authenticate, controller.checkUserAuthorization);
-
-/**
- * @openapi
- * components:
- *   schemas:
  *     InsuranceProgram:
  *       type: object
  *       required: [id, code, title, status, cardNo, dateStart, dateEnd]
@@ -324,6 +295,41 @@ router.get('/programs', authenticate, controller.getPrograms);
  *         description: Unauthorized
  */
 router.get('/programs/:programId', authenticate, controller.getProgramById);
+
+
+/**
+ * @openapi
+ * /insurance/program-description/{programId}:
+ *   get:
+ *     summary: Get insurance program description by id
+ *     tags: [Insurance]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: programId
+ *         in: path
+ *         description: Program ID
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 description:
+ *                   type: string
+ *                   example: "Program description text"
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/program-description/:programId', authenticate, controller.getProgramDescription);
 
 /**
  * @openapi

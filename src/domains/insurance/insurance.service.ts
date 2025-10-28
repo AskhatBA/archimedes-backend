@@ -1,28 +1,34 @@
-import axios, {AxiosError} from 'axios';
+import axios, { AxiosError } from 'axios';
 
-import {config} from '@/config';
-import {AppError} from '@/shared/services/app-error.service';
-import {ErrorCodes} from '@/shared/constants/error-codes';
+import { config } from '@/config';
+import { AppError } from '@/shared/services/app-error.service';
+import { ErrorCodes } from '@/shared/constants/error-codes';
 import * as db from '@/infrastructure/db';
 
 import {
   AppointmentItem,
   AvailableInsuranceCity,
   Family,
-  InsuranceServiceResponse,
   MedicalNetworkClinic,
   ProfileData,
   Program,
   ProgramExtended,
   RefundRequest,
 } from './insurance.types';
-import {RefundRequestDTO} from './insurance.dto';
-import {insuranceRequest} from './insurance.helpers';
+import { RefundRequestDTO } from './insurance.dto';
+import { insuranceRequest } from './insurance.helpers';
 import {
   INSURANCE_API_GET_PROGRAM_BY_ID,
   INSURANCE_API_GET_PROGRAM_CERTIFICATE,
   INSURANCE_API_GET_PROGRAMS,
   INSURANCE_API_GET_USER_FAMILY,
+  INSURANCE_API_GET_CITIES,
+  INSURANCE_API_GET_USER_PROFILE,
+  INSURANCE_API_SEND_OTP,
+  INSURANCE_API_REFUND_REQUEST,
+  INSURANCE_API_GET_REFUND_REQUESTS,
+  INSURANCE_API_GET_MEDICAL_NETWORK,
+  INSURANCE_API_GET_PROGRAM_DESCRIPTION,
 } from './insurance.constants';
 
 const insuranceApi = axios.create({
@@ -30,156 +36,58 @@ const insuranceApi = axios.create({
 });
 
 export const sendOtp = async (phone: string, iin: string) => {
-  try {
-    const response = await insuranceApi.post<InsuranceServiceResponse>('/v3/auth/sendOtp', {
-      phoneNumber: phone,
-      iin: iin,
-    });
-
-    if (response.data.errorCode === -1) {
-      throw new AppError(ErrorCodes.INSURANCE_USER_NOT_FOUND, 400);
-    }
-  } catch (error) {
-    const axiosError = error as AxiosError;
-    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
-    const errorStatus = axiosError?.response?.status === 401 ? 404 : axiosError?.response?.status;
-
-    if (errorMessage) {
-      throw new AppError(errorMessage, errorStatus);
-    }
-
-    throw new AppError(ErrorCodes.INSURANCE_USER_NOT_FOUND, errorStatus);
-  }
+  return insuranceRequest({
+    resolverName: INSURANCE_API_SEND_OTP,
+    payload: { phoneNumber: phone, iin: iin },
+  });
 };
 
 export const verifyOtp = async (phone: string, otp: string, userId: string) => {
-  try {
-    const response = await insuranceApi.post<{
-      errorCode: number;
-      access_token: string;
-    }>('/v3/auth/verifyOtp', { phoneNumber: phone, otp });
+  const { access_token } = await insuranceRequest<{
+    errorCode: number;
+    access_token: string;
+  }>({
+    resolverName: INSURANCE_API_GET_PROGRAM_BY_ID,
+    payload: { phoneNumber: phone, otp },
+  });
 
-    if (response.data.errorCode === -1) {
-      throw new AppError(ErrorCodes.INVALID_OTP, 400);
-    }
-
-    return db.prismaClient.insuranceServiceToken.create({
-      data: {
-        userId,
-        accessToken: response.data.access_token,
-      },
-    });
-  } catch (error) {
-    const axiosError = error as AxiosError;
-    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
-    const errorStatus = axiosError?.response?.status === 401 ? 404 : axiosError?.response?.status;
-
-    if (errorMessage) {
-      throw new AppError(errorMessage, errorStatus);
-    }
-
-    throw new AppError(ErrorCodes.INSURANCE_USER_NOT_FOUND, errorStatus);
-  }
+  return db.prismaClient.insuranceServiceToken.create({
+    data: {
+      userId,
+      accessToken: access_token,
+    },
+  });
 };
 
-export const requestRefund = async (refundRequestBody: RefundRequestDTO, token: string) => {
-  try {
-    const userProfile = await getProfile(token);
+export const requestRefund = async (refundRequestBody: RefundRequestDTO, beneficiaryId: string) => {
+  const userProfile = await getProfile(beneficiaryId);
 
-    await insuranceApi.post(
-      '/v3/client/refundRequest',
-      {
-        ...refundRequestBody,
-        id: 0,
-        senderId: refundRequestBody.programId,
-        personId: refundRequestBody.personId || refundRequestBody.programId,
-        phoneNo: userProfile.phoneNumber,
-      },
-      {
-        headers: {
-          Authorization: token || '',
-        },
-      }
-    );
-  } catch (error) {
-    const axiosError = error as AxiosError;
-    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
-    const errorStatus = axiosError?.response?.status === 401 ? 404 : axiosError?.response?.status;
-
-    if (errorMessage) {
-      throw new AppError(errorMessage, errorStatus);
-    }
-
-    throw new AppError(ErrorCodes.INSURANCE_REFUND_FAILED, errorStatus);
-  }
+  return insuranceRequest({
+    resolverName: INSURANCE_API_REFUND_REQUEST,
+    beneficiaryId,
+    payload: {
+      ...refundRequestBody,
+      senderId: refundRequestBody.programId,
+      personId: refundRequestBody.personId || refundRequestBody.programId,
+      phoneNo: userProfile.phoneNumber,
+    },
+  });
 };
 
-export const getRefundRequests = async (token: string) => {
-  try {
-    const response = await insuranceApi.get<{ errorCode: number; data: RefundRequest[] }>(
-      '/v3/client/refundRequests',
-      {
-        headers: {
-          Authorization: token || '',
-        },
-      }
-    );
-
-    return response.data?.data;
-  } catch (error) {
-    const axiosError = error as AxiosError;
-    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
-    const errorStatus = axiosError?.response?.status === 401 ? 404 : axiosError?.response?.status;
-
-    if (errorMessage) {
-      throw new AppError(errorMessage, errorStatus);
-    }
-
-    throw new AppError(ErrorCodes.INSURANCE_REFUND_REQUESTS, errorStatus);
-  }
+export const getRefundRequests = async (beneficiaryId: string) => {
+  const response = await insuranceRequest<{ errorCode: number; data: RefundRequest[] }>({
+    resolverName: INSURANCE_API_GET_REFUND_REQUESTS,
+    beneficiaryId,
+  });
+  return response.data;
 };
 
-export const checkInsuranceToken = async (userId: string) => {
-  try {
-    return db.prismaClient.insuranceServiceToken.findUnique({
-      where: { userId },
-    });
-  } catch (error) {
-    const axiosError = error as AxiosError;
-    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
-    const errorStatus = axiosError?.response?.status === 401 ? 404 : axiosError?.response?.status;
-
-    if (errorMessage) {
-      throw new AppError(errorMessage, errorStatus);
-    }
-
-    throw new AppError(ErrorCodes.INSURANCE_SERVICE_TOKEN_NOT_FOUND, errorStatus);
-  }
-};
-
-export const getProfile = async (token: string) => {
-  try {
-    const response = await insuranceApi.get<{ errorCode: number; data: ProfileData }>(
-      '/v3/client/profile',
-      {
-        headers: {
-          Authorization: token,
-        },
-      }
-    );
-
-    return response.data.data;
-  } catch (error) {
-    const axiosError = error as AxiosError;
-    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
-    const errorStatus = axiosError?.response?.status === 401 ? 404 : axiosError?.response?.status;
-
-    if (errorMessage) {
-      throw new AppError(errorMessage, errorStatus);
-    }
-
-    throw new AppError(ErrorCodes.INSURANCE_SERVICE_TOKEN_NOT_FOUND, errorStatus);
-  }
+export const getProfile = async (beneficiaryId: string) => {
+  const response = await insuranceRequest<{ errorCode: number; data: ProfileData }>({
+    resolverName: INSURANCE_API_GET_USER_PROFILE,
+    beneficiaryId,
+  });
+  return response.data;
 };
 
 export const getPrograms = async (beneficiaryId: string) => {
@@ -199,11 +107,21 @@ export const getProgramById = async (beneficiaryId: string, programId: string) =
   return program;
 };
 
+export const getProgramDescription = async (beneficiaryId: string, programId: string) => {
+  const response = await insuranceRequest({
+    resolverName: INSURANCE_API_GET_PROGRAM_DESCRIPTION,
+    beneficiaryId,
+    params: { programId },
+  });
+
+  console.log('getProgramDescription', response);
+};
+
 export const getFamily = async (beneficiaryId: string, programId: string) => {
   const { data: family } = await insuranceRequest<{ errorCode: number; data: Family[] }>({
     resolverName: INSURANCE_API_GET_USER_FAMILY,
     beneficiaryId,
-    params: { programId },
+    query: { programId },
   });
   return family;
 };
@@ -216,56 +134,32 @@ export const getInsuranceCertificate = async (beneficiaryId: string, programId: 
   });
 };
 
-export const getAvailableCities = async (token: string) => {
-  try {
-    const response = await insuranceApi.get<{ errorCode: number; data: AvailableInsuranceCity[] }>(
-      '/v3/cities',
-      { headers: { Authorization: token || '' } }
-    );
-
-    return response.data.data;
-  } catch (error) {
-    const axiosError = error as AxiosError;
-    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
-    const errorStatus = axiosError?.response?.status === 401 ? 404 : axiosError?.response?.status;
-
-    if (errorMessage) {
-      throw new AppError(errorMessage, errorStatus);
-    }
-
-    throw new AppError(ErrorCodes.INSURANCE_FAMILY_INFO_NOT_FOUND, errorStatus);
-  }
+export const getAvailableCities = async (beneficiaryId: string) => {
+  const response = await insuranceRequest<{ errorCode: number; data: AvailableInsuranceCity[] }>({
+    resolverName: INSURANCE_API_GET_CITIES,
+    beneficiaryId,
+  });
+  return response.data;
 };
 
 export const getMedicalNetwork = async ({
-  token,
+  beneficiaryId,
   programId,
   cityId,
   type,
 }: {
-  token: string;
+  beneficiaryId: string;
   programId: string;
   cityId: string;
   type?: string;
 }) => {
-  try {
-    const response = await insuranceApi.get<{ errorCode: number; data: MedicalNetworkClinic[] }>(
-      `/v3/medical_network/${programId}`,
-      { headers: { Authorization: token || '' }, params: { cityId, type } }
-    );
-
-    return response.data.data;
-  } catch (error) {
-    const axiosError = error as AxiosError;
-    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
-    const errorStatus = axiosError?.response?.status === 401 ? 404 : axiosError?.response?.status;
-
-    if (errorMessage) {
-      throw new AppError(errorMessage, errorStatus);
-    }
-
-    throw new AppError(ErrorCodes.INSURANCE_FAMILY_INFO_NOT_FOUND, errorStatus);
-  }
+  const response = await insuranceRequest<{ errorCode: number; data: MedicalNetworkClinic[] }>({
+    resolverName: INSURANCE_API_GET_MEDICAL_NETWORK,
+    beneficiaryId,
+    params: { programId },
+    query: { cityId, type },
+  });
+  return response.data;
 };
 
 export const getElectronicReferrals = async (token: string, programId: string) => {
