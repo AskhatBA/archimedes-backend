@@ -296,7 +296,6 @@ router.get('/programs', authenticate, controller.getPrograms);
  */
 router.get('/programs/:programId', authenticate, controller.getProgramById);
 
-
 /**
  * @openapi
  * /insurance/program-description/{programId}:

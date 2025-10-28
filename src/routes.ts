@@ -10,4 +10,7 @@ export const setupRoutes = (app: Express) => {
   app.use('/v1/api/patient', patientRoutes);
   app.use('/v1/api/mis', misRoutes);
   app.use('/v1/api/insurance', insuranceRoutes);
+  app.get('/v1/api/debug-sentry', function mainHandler() {
+    throw new Error('My first Sentry error!');
+  });
 };

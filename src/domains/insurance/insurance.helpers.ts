@@ -1,4 +1,5 @@
 import axios, { AxiosError } from 'axios';
+import Sentry from '@sentry/node';
 
 import { config } from '@/config';
 import { resolveApiUrlParams } from '@/shared/helpers/resolve-api-url-params';
@@ -53,6 +54,7 @@ export const insuranceRequest = async <T>({
     return response.data;
   } catch (error) {
     const errorData = parseApiError(error);
+    Sentry.captureException(error);
     throw new AppError(errorData.message, errorData.status);
   }
 };

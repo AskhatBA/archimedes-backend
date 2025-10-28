@@ -40,6 +40,10 @@ export const config = {
     apiUrl: process.env.INSURANCE_SERVICE_API_URL!,
     testId: process.env.INSURANCE_TEST_ID,
   },
+
+  sentry: {
+    dsn: process.env.SENTRY_DSN,
+  },
 };
 
 export const isDevelopment = config.nodeEnv === 'development';
