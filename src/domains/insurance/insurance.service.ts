@@ -5,6 +5,8 @@ import { AppError } from '@/shared/services/app-error.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
 import * as db from '@/infrastructure/db';
 
+import { RefundRequestDTO } from './insurance.dto';
+import { insuranceRequest } from './insurance.helpers';
 import {
   AppointmentItem,
   AvailableInsuranceCity,
@@ -14,9 +16,8 @@ import {
   Program,
   ProgramExtended,
   RefundRequest,
+  ContactInfo,
 } from './insurance.types';
-import { RefundRequestDTO } from './insurance.dto';
-import { insuranceRequest } from './insurance.helpers';
 import {
   INSURANCE_API_GET_PROGRAM_BY_ID,
   INSURANCE_API_GET_PROGRAM_CERTIFICATE,
@@ -28,7 +29,7 @@ import {
   INSURANCE_API_REFUND_REQUEST,
   INSURANCE_API_GET_REFUND_REQUESTS,
   INSURANCE_API_GET_MEDICAL_NETWORK,
-  INSURANCE_API_GET_PROGRAM_DESCRIPTION,
+  INSURANCE_API_GET_CONTACTS,
 } from './insurance.constants';
 
 const insuranceApi = axios.create({
@@ -107,16 +108,6 @@ export const getProgramById = async (beneficiaryId: string, programId: string) =
   return program;
 };
 
-export const getProgramDescription = async (beneficiaryId: string, programId: string) => {
-  const response = await insuranceRequest({
-    resolverName: INSURANCE_API_GET_PROGRAM_DESCRIPTION,
-    beneficiaryId,
-    params: { programId },
-  });
-
-  console.log('getProgramDescription', response);
-};
-
 export const getFamily = async (beneficiaryId: string, programId: string) => {
   const { data: family } = await insuranceRequest<{ errorCode: number; data: Family[] }>({
     resolverName: INSURANCE_API_GET_USER_FAMILY,
@@ -158,6 +149,14 @@ export const getMedicalNetwork = async ({
     beneficiaryId,
     params: { programId },
     query: { cityId, type },
+  });
+  return response.data;
+};
+
+export const getContacts = async (beneficiaryId: string) => {
+  const response = await insuranceRequest<{ errorCode: number; data: ContactInfo[] }>({
+    resolverName: INSURANCE_API_GET_CONTACTS,
+    beneficiaryId,
   });
   return response.data;
 };

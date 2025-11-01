@@ -187,7 +187,7 @@ export const createAppointment = async (req: Request, res: Response) => {
     });
   }
 
-  const { doctorId, startTime, endTime, branchId, insuranceProgramId } = req.body;
+  const { doctorId, startTime, endTime, branchId, insuranceProgramId, patientId } = req.body;
   const patient = await patientService.getPatientById(req.user.id);
 
   if (!patient) {
@@ -199,7 +199,7 @@ export const createAppointment = async (req: Request, res: Response) => {
 
   const appointment = await misService.createAppointment({
     doctorId,
-    patientId: patient.misPatientId,
+    patientId: patientId || patient.misPatientId,
     startTime,
     endTime,
     branchId,

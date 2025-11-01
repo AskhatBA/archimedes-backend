@@ -405,7 +405,6 @@ router.get('/doctor/:doctorId/available-slots', authenticate, controller.getDoct
  *       type: object
  *       required:
  *         - doctorId
- *         - patientId
  *         - startTime
  *         - endTime
  *         - branchId
@@ -422,6 +421,9 @@ router.get('/doctor/:doctorId/available-slots', authenticate, controller.getDoct
  *         branchId:
  *           type: string
  *           example: "8b9a7c6d-5e4f-4321-a987-6543210fedcb"
+ *         patientId:
+ *           type: string
+ *           example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
  *         insuranceProgramId:
  *           type: string
  *           example: "8b9a7c6d-5e4f-4321-a987-6543210fedcb"

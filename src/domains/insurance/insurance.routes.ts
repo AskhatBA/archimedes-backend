@@ -298,40 +298,6 @@ router.get('/programs/:programId', authenticate, controller.getProgramById);
 
 /**
  * @openapi
- * /insurance/program-description/{programId}:
- *   get:
- *     summary: Get insurance program description by id
- *     tags: [Insurance]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - name: programId
- *         in: path
- *         description: Program ID
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Response
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 description:
- *                   type: string
- *                   example: "Program description text"
- *       401:
- *         description: Unauthorized
- */
-router.get('/program-description/:programId', authenticate, controller.getProgramDescription);
-
-/**
- * @openapi
  * components:
  *   schemas:
  *     InsuranceFamily:
@@ -638,5 +604,47 @@ router.get('/medical-network', authenticate, controller.getMedicalNetwork);
  *         description: Bad Request - Missing required parameters
  */
 router.get('/electronic-referrals', authenticate, controller.getElectronicReferrals);
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     ContactInfo:
+ *       type: object
+ *       required: [city, phones]
+ *       properties:
+ *         city:
+ *           type: string
+ *           example: "Астана"
+ *         phones:
+ *           type: array
+ *           items:
+ *             type: string
+ *           example: ["+7 (7172) 123-456", "+7 (7172) 654-321"]
+ * /insurance/contacts:
+ *   get:
+ *     summary: Get insurance contact information
+ *     tags: [Insurance]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 contacts:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/ContactInfo'
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/contacts', authenticate, controller.getContacts);
 
 export default router;

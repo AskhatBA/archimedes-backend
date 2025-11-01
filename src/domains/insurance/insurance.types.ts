@@ -117,3 +117,8 @@ export interface InsuranceRequestPayload {
   params?: any;
   query?: any;
 }
+
+export interface ContactInfo {
+  city: string;
+  phones: string[];
+}

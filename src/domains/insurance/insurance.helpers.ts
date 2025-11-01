@@ -20,6 +20,8 @@ export const parseApiError = (
   const axiosError = error as AxiosError;
   const errorMessage = (axiosError?.response?.data as { error: string })?.error;
 
+  console.log('parseApiError', axiosError.response);
+
   return {
     message: errorMessage || defaultErrorMessage,
     status:

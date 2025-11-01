@@ -213,31 +213,6 @@ export const getProgramById = async (req: Request, res: Response) => {
   });
 };
 
-export const getProgramDescription = async (req: Request, res: Response) => {
-  if (!req.user) {
-    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
-  }
-
-  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
-
-  if (!misInsurance?.beneficiaryId) {
-    return res.status(404).json({
-      success: false,
-      message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
-    });
-  }
-
-  const program = await insuranceService.getProgramDescription(
-    misInsurance.beneficiaryId,
-    req.params.programId
-  );
-
-  return res.status(200).json({
-    success: true,
-    program,
-  });
-};
-
 export const getFamily = async (req: Request, res: Response) => {
   if (!req.user) {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
@@ -347,6 +322,28 @@ export const getMedicalNetwork = async (req: Request, res: Response) => {
   return res.status(200).json({
     success: true,
     clinics,
+  });
+};
+
+export const getContacts = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+
+  if (!misInsurance?.beneficiaryId) {
+    return res.status(404).json({
+      success: false,
+      message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
+    });
+  }
+
+  const contacts = await insuranceService.getContacts(misInsurance.beneficiaryId);
+
+  return res.status(200).json({
+    success: true,
+    contacts,
   });
 };
 
