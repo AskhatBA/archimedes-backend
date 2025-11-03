@@ -234,6 +234,28 @@ export const getAppointments = async (req: Request, res: Response) => {
   });
 };
 
+export const getAppointmentHistory = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  const patient = await patientService.getPatientById(req.user.id);
+
+  if (!patient) {
+    return res.status(400).json({
+      success: false,
+      message: 'Patient not found',
+    });
+  }
+
+  const appointmentHistory = await misService.getAppointmentHistory(patient.misPatientId);
+
+  return res.status(200).json({
+    success: true,
+    appointmentHistory,
+  });
+};
+
 export const removeAppointment = async (req: Request, res: Response) => {
   if (!req.user) {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);

@@ -135,3 +135,22 @@ export interface MisRequestPayload {
   params?: any;
   query?: any;
 }
+
+export interface MISDocument {
+  id: string;
+  document_type_name: string;
+  file_url: string;
+  status: string;
+  created_at: string;
+}
+
+export interface MISAppointmentHistory {
+  id: string;
+  doctor: MISDoctor;
+  actual_start_time: string;
+  diagnosis: null;
+  documents: MISDocument[];
+  template_type: string;
+  appointment_type: string;
+  appointment_type_display: string;
+}

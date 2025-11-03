@@ -11,6 +11,7 @@ export const MIS_API_GET_DOCTOR_AVAILABLE_SLOTS = '/beneficiary/doctors/:doctorI
 export const MIS_API_CREATE_APPOINTMENT = `/beneficiary/appointments/create/`;
 export const MIS_API_GET_USER_APPOINTMENTS = '/beneficiary/:userId/appointments/';
 export const MIS_API_REMOVE_USER_APPOINTMENT = '/beneficiary/:userId/appointments/:appointmentId';
+export const MIS_API_GET_APPOINTMENT_HISTORY = '/beneficiary/:userId/appointment-history/';
 
 export const misApiResolvers = {
   [MIS_API_GET_USER_BY_PHONE]: {
@@ -61,6 +62,10 @@ export const misApiResolvers = {
   },
   [MIS_API_REMOVE_USER_APPOINTMENT]: {
     method: 'DELETE',
+    defaultPayload: {},
+  },
+  [MIS_API_GET_APPOINTMENT_HISTORY]: {
+    method: 'GET',
     defaultPayload: {},
   },
 };

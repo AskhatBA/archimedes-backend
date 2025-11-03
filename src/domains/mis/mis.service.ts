@@ -1,34 +1,41 @@
 import { getPatientById } from '@/domains/patient/patient.service';
-import { isDevelopment, config } from '@/config';
+import { config, isDevelopment } from '@/config';
 
 import {
-  MISAppointmentResponse,
-  FindPatientResponse,
-  CreatePatientDto,
   CreateAppointmentDto,
+  CreatePatientDto,
+  FindPatientResponse,
+  MISAppointmentResponse,
   MISCreatePatientResponse,
   MISFindPatientResponse,
 } from './mis.dto';
-import { availableSlotsMapper, parsePatientFullName, misRequest } from './mis.helpers';
 import {
+  availableSlotsMapper,
+  mapAppointmentHistory,
+  misRequest,
+  parsePatientFullName,
+} from './mis.helpers';
+import {
+  MIS_API_BRANCH_LIST,
+  MIS_API_CREATE_APPOINTMENT,
+  MIS_API_CREATE_USER,
+  MIS_API_GET_APPOINTMENT_HISTORY,
+  MIS_API_GET_DOCTOR_AVAILABLE_SLOTS,
+  MIS_API_GET_DOCTOR_BY_ID,
+  MIS_API_GET_DOCTOR_LIST,
+  MIS_API_GET_SPECIALIZATION_BY_BRANCH_ID,
+  MIS_API_GET_USER_APPOINTMENTS,
   MIS_API_GET_USER_BY_PHONE,
   MIS_API_GET_USER_PROFILE_BY_ID,
-  MIS_API_BRANCH_LIST,
-  MIS_API_CREATE_USER,
-  MIS_API_GET_SPECIALIZATION_BY_BRANCH_ID,
-  MIS_API_GET_DOCTOR_LIST,
-  MIS_API_GET_DOCTOR_BY_ID,
-  MIS_API_GET_DOCTOR_AVAILABLE_SLOTS,
-  MIS_API_CREATE_APPOINTMENT,
-  MIS_API_GET_USER_APPOINTMENTS,
 } from './mis.constants';
 import {
   MISBranchesResponse,
-  MISSpecializationsResponse,
-  MISDoctorsResponse,
-  MISDoctorDetailsResponse,
   MISDoctorAvailableSlotsResponse,
+  MISDoctorDetailsResponse,
+  MISDoctorsResponse,
   MISPatientBeneficiary,
+  MISSpecializationsResponse,
+  MISAppointmentHistory,
 } from './mis.types';
 
 export const getUserInsuranceDetails = async (userId: string, phone: string) => {
@@ -199,6 +206,21 @@ export const getAppointments = async (misPatientId: string) => {
   });
 
   return response.appointments;
+};
+
+export const getAppointmentHistory = async (misPatientId: string) => {
+  console.log('misPatientId: ', misPatientId);
+  const response = await misRequest<{
+    status: string;
+    beneficiary_id: string;
+    count: number;
+    history: MISAppointmentHistory[];
+  }>({
+    resolverName: MIS_API_GET_APPOINTMENT_HISTORY,
+    params: { userId: '4cb21009-5a2b-4166-9f90-020b28d7ed2c' },
+  });
+
+  return mapAppointmentHistory(response.history || []);
 };
 
 export const removeAppointment = async (misPatientId: string, appointmentId: string) => {

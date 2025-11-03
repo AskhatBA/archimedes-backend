@@ -5,7 +5,12 @@ import { config } from '@/config';
 import { AppError } from '@/shared/services/app-error.service';
 import { resolveApiUrlParams } from '@/shared/helpers/resolve-api-url-params';
 
-import { MISDoctorAvailableSlot, MappedAvailableSlots, MisRequestPayload } from './mis.types';
+import {
+  MISDoctorAvailableSlot,
+  MappedAvailableSlots,
+  MisRequestPayload,
+  MISAppointmentHistory,
+} from './mis.types';
 import { misApiResolvers } from './mis.constants';
 
 export const availableSlotsMapper = (slots: MISDoctorAvailableSlot) => {
@@ -78,4 +83,30 @@ export const misRequest = async <T>({
     const errorData = parseApiError(error);
     throw new AppError(errorData.message, errorData.status);
   }
+};
+
+export const mapAppointmentHistory = (appointmentHistory: MISAppointmentHistory[]) => {
+  return appointmentHistory.map((appointment) => ({
+    id: appointment.id,
+    doctor: {
+      id: appointment.doctor.id,
+      name: appointment.doctor.name,
+      specialtyName: appointment.doctor.specialty_name,
+      branchName: appointment.doctor.branch_name,
+      position: appointment.doctor.position,
+      appointmentDurationMinutes: appointment.doctor.appointment_duration_minutes,
+    },
+    actualStartTime: appointment.actual_start_time,
+    diagnosis: appointment.diagnosis,
+    documents: appointment.documents.map((document) => ({
+      id: document.id,
+      documentTypeName: document.document_type_name,
+      fileUrl: document.file_url,
+      status: document.status,
+      createdAt: document.created_at,
+    })),
+    templateType: appointment.template_type,
+    appointmentType: appointment.appointment_type,
+    appointmentTypeDisplay: appointment.appointment_type_display,
+  }));
 };

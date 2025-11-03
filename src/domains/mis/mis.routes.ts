@@ -519,6 +519,86 @@ router.get('/appointments', authenticate, controller.getAppointments);
 
 /**
  * @openapi
+ * components:
+ *   schemas:
+ *     MISAppointmentHistoryDoctor:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *         name:
+ *           type: string
+ *         specialtyName:
+ *           type: string
+ *         branchName:
+ *           type: string
+ *         position:
+ *           type: string
+ *         appointmentDurationMinutes:
+ *           type: number
+ *     MISAppointmentHistoryDocument:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *         documentTypeName:
+ *           type: string
+ *         fileUrl:
+ *           type: string
+ *         status:
+ *           type: string
+ *         createdAt:
+ *           type: string
+ *     MISAppointmentHistory:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *         doctor:
+ *           $ref: '#/components/schemas/MISAppointmentHistoryDoctor'
+ *         actualStartTime:
+ *           type: string
+ *         diagnosis:
+ *           type: string
+ *           nullable: true
+ *         documents:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/MISAppointmentHistoryDocument'
+ *         templateType:
+ *           type: string
+ *         appointmentType:
+ *           type: string
+ *         appointmentTypeDisplay:
+ *           type: string
+ * /mis/appointment-history:
+ *   get:
+ *     summary: Get patient appointment history from MIS
+ *     tags: [MIS]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Appointment history fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 appointmentHistory:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/MISAppointmentHistory'
+ *       401:
+ *         description: User not found or unauthorized
+ */
+router.get('/appointment-history', authenticate, controller.getAppointmentHistory);
+
+/**
+ * @openapi
  * /mis/appointments/{appointmentId}:
  *   delete:
  *     summary: Delete an appointment
