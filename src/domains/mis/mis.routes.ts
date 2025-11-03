@@ -599,6 +599,68 @@ router.get('/appointment-history', authenticate, controller.getAppointmentHistor
 
 /**
  * @openapi
+ * components:
+ *   schemas:
+ *     MISLaboratoryResult:
+ *       type: object
+ *       required:
+ *         - registrationDate
+ *         - number
+ *         - patientFullName
+ *         - birthDate
+ *         - pdfBase64
+ *         - departmentName
+ *         - biomaterialName
+ *       properties:
+ *         registrationDate:
+ *           type: string
+ *           description: Registration date of laboratory result
+ *         number:
+ *           type: string
+ *           description: Laboratory result number
+ *         patientFullName:
+ *           type: string
+ *           description: Full name of the patient
+ *         birthDate:
+ *           type: string
+ *           description: Birth date of the patient
+ *         pdfBase64:
+ *           type: string
+ *           description: Base64 encoded PDF document
+ *         departmentName:
+ *           type: string
+ *           description: Name of the department
+ *         biomaterialName:
+ *           type: string
+ *           description: Name of the biomaterial
+ * /mis/laboratory-results:
+ *   get:
+ *     summary: Get laboratory results from MIS
+ *     tags: [MIS]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Laboratory results fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 laboratoryResults:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/MISLaboratoryResult'
+ *       401:
+ *         description: User not found or unauthorized
+ */
+router.get('/laboratory-results', authenticate, controller.getLaboratoryResults);
+
+/**
+ * @openapi
  * /mis/appointments/{appointmentId}:
  *   delete:
  *     summary: Delete an appointment

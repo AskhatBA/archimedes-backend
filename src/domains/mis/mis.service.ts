@@ -14,6 +14,7 @@ import {
   mapAppointmentHistory,
   misRequest,
   parsePatientFullName,
+  mapLaboratoryResults,
 } from './mis.helpers';
 import {
   MIS_API_BRANCH_LIST,
@@ -27,6 +28,7 @@ import {
   MIS_API_GET_USER_APPOINTMENTS,
   MIS_API_GET_USER_BY_PHONE,
   MIS_API_GET_USER_PROFILE_BY_ID,
+  MIS_API_LABORATORY_RESULTS,
 } from './mis.constants';
 import {
   MISBranchesResponse,
@@ -36,6 +38,7 @@ import {
   MISPatientBeneficiary,
   MISSpecializationsResponse,
   MISAppointmentHistory,
+  MISLaboratoryResult,
 } from './mis.types';
 
 export const getUserInsuranceDetails = async (userId: string, phone: string) => {
@@ -209,7 +212,6 @@ export const getAppointments = async (misPatientId: string) => {
 };
 
 export const getAppointmentHistory = async (misPatientId: string) => {
-  console.log('misPatientId: ', misPatientId);
   const response = await misRequest<{
     status: string;
     beneficiary_id: string;
@@ -217,10 +219,31 @@ export const getAppointmentHistory = async (misPatientId: string) => {
     history: MISAppointmentHistory[];
   }>({
     resolverName: MIS_API_GET_APPOINTMENT_HISTORY,
-    params: { userId: '4cb21009-5a2b-4166-9f90-020b28d7ed2c' },
+    params: { userId: misPatientId },
   });
 
   return mapAppointmentHistory(response.history || []);
+};
+
+export const getLaboratoryResults = async (misPatientId: string) => {
+  const response = await misRequest<{
+    status: string;
+    data: {
+      err: string;
+      info: string;
+      results: MISLaboratoryResult[];
+    };
+    beneficiary_info: {
+      id: string;
+      name: string;
+      iin: string;
+    };
+  }>({
+    resolverName: MIS_API_LABORATORY_RESULTS,
+    params: { userId: misPatientId },
+  });
+
+  return mapLaboratoryResults(response?.data?.results || ([] as MISLaboratoryResult[]));
 };
 
 export const removeAppointment = async (misPatientId: string, appointmentId: string) => {

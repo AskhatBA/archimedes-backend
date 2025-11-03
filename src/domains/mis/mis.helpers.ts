@@ -10,6 +10,7 @@ import {
   MappedAvailableSlots,
   MisRequestPayload,
   MISAppointmentHistory,
+  MISLaboratoryResult,
 } from './mis.types';
 import { misApiResolvers } from './mis.constants';
 
@@ -108,5 +109,17 @@ export const mapAppointmentHistory = (appointmentHistory: MISAppointmentHistory[
     templateType: appointment.template_type,
     appointmentType: appointment.appointment_type,
     appointmentTypeDisplay: appointment.appointment_type_display,
+  }));
+};
+
+export const mapLaboratoryResults = (results: MISLaboratoryResult[]) => {
+  return results.map((result) => ({
+    registrationDate: result.reg_date,
+    number: result.number,
+    patientFullName: result.patient_full_name,
+    birthDate: result.birthdate,
+    pdfBase64: result.pdf_base64,
+    departmentName: result.department_name,
+    biomaterialName: result.biomaterial_name,
   }));
 };

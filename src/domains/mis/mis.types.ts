@@ -154,3 +154,13 @@ export interface MISAppointmentHistory {
   appointment_type: string;
   appointment_type_display: string;
 }
+
+export interface MISLaboratoryResult {
+  reg_date: string;
+  number: string;
+  patient_full_name: string;
+  birthdate: string;
+  pdf_base64: string;
+  department_name: string;
+  biomaterial_name: string;
+}
