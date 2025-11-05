@@ -1,8 +1,3 @@
-import axios, { AxiosError } from 'axios';
-
-import { config } from '@/config';
-import { AppError } from '@/shared/services/app-error.service';
-import { ErrorCodes } from '@/shared/constants/error-codes';
 import * as db from '@/infrastructure/db';
 
 import { RefundRequestDTO } from './insurance.dto';
@@ -30,11 +25,8 @@ import {
   INSURANCE_API_GET_REFUND_REQUESTS,
   INSURANCE_API_GET_MEDICAL_NETWORK,
   INSURANCE_API_GET_CONTACTS,
+  INSURANCE_API_GET_ELECTRONIC_REFERRALS,
 } from './insurance.constants';
-
-const insuranceApi = axios.create({
-  baseURL: config.insuranceService.apiUrl,
-});
 
 export const sendOtp = async (phone: string, iin: string) => {
   return insuranceRequest({
@@ -161,23 +153,11 @@ export const getContacts = async (beneficiaryId: string) => {
   return response.data;
 };
 
-export const getElectronicReferrals = async (token: string, programId: string) => {
-  try {
-    const response = await insuranceApi.get<{ errorCode: number; data: AppointmentItem[] }>(
-      '/v3/client/appointments',
-      { headers: { Authorization: token || '' }, params: { programId } }
-    );
-
-    return response.data.data;
-  } catch (error) {
-    const axiosError = error as AxiosError;
-    const errorMessage = (axiosError?.response?.data as { error: string })?.error;
-    const errorStatus = axiosError?.response?.status === 401 ? 404 : axiosError?.response?.status;
-
-    if (errorMessage) {
-      throw new AppError(errorMessage, errorStatus);
-    }
-
-    throw new AppError(ErrorCodes.INSURANCE_FAMILY_INFO_NOT_FOUND, errorStatus);
-  }
+export const getElectronicReferrals = async (beneficiaryId: string, programId: string) => {
+  const response = await insuranceRequest<{ errorCode: number; data: AppointmentItem[] }>({
+    resolverName: INSURANCE_API_GET_ELECTRONIC_REFERRALS,
+    beneficiaryId,
+    query: { programId },
+  });
+  return response.data;
 };
