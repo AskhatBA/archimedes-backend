@@ -118,4 +118,6 @@ router.get('/profile', authenticate, controller.getPatientProfile);
  */
 router.post('/profile', authenticate, controller.createPatientProfile);
 
+router.post('/create-demo-patient', authenticate, controller.createDemoPatient);
+
 export default router;

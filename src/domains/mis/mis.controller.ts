@@ -3,6 +3,7 @@ import { query, param, body, validationResult } from 'express-validator';
 
 import { AppError } from '@/shared/services/app-error.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
+import { useDemoAccount } from '@/shared/helpers';
 
 import * as patientService from '../patient/patient.service';
 
@@ -13,11 +14,19 @@ export const findPatient = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
 
+  const { isDemoAccount } = useDemoAccount();
+
   await query('iin').notEmpty().withMessage('IIN is required').run(req);
+
+  let phone = req.user.phone;
+
+  if (isDemoAccount(req.user.phone, req.query.iin as string)) {
+    phone = '7775710058';
+  }
 
   const patient = await misService.findPatientByIinAndPhone(
     (req.query.iin as string) || '',
-    `8${req.user.phone.slice(1)}`
+    `8${phone}`
   );
 
   return res.status(200).json({
@@ -248,7 +257,9 @@ export const getAppointmentHistory = async (req: Request, res: Response) => {
     });
   }
 
-  const appointmentHistory = await misService.getAppointmentHistory(patient.misPatientId);
+  const appointmentHistory = await misService.getAppointmentHistory(
+    '4cb21009-5a2b-4166-9f90-020b28d7ed2c'
+  );
 
   return res.status(200).json({
     success: true,
@@ -270,7 +281,9 @@ export const getLaboratoryResults = async (req: Request, res: Response) => {
     });
   }
 
-  const laboratoryResults = await misService.getLaboratoryResults(patient.misPatientId);
+  const laboratoryResults = await misService.getLaboratoryResults(
+    '4cb21009-5a2b-4166-9f90-020b28d7ed2c'
+  );
 
   return res.status(200).json({
     success: true,

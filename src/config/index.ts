@@ -27,6 +27,7 @@ export const config = {
 
   mis: {
     apiUrl: `${process.env.MIS_API_URL}${process.env.MIS_API_PREFIX}`,
+    devApiUrl: `${process.env.MIS_DEV_API_URL}${process.env.MIS_API_PREFIX}`,
   },
 
   smsService: {
@@ -38,11 +39,20 @@ export const config = {
 
   insuranceService: {
     apiUrl: process.env.INSURANCE_SERVICE_API_URL!,
+    apiDevUrl: process.env.INSURANCE_SERVICE_DEV_API_URL!,
     testId: process.env.INSURANCE_TEST_ID,
   },
 
   sentry: {
     dsn: process.env.SENTRY_DSN,
+  },
+
+  demoAccount: {
+    phone: process.env.DEMO_ACCOUNT_PHONE,
+    iin: process.env.DEMO_ACCOUNT_IIN,
+    otp: process.env.DEMO_ACCOUNT_OTP,
+    misIin: process.env.DEMO_MIS_ACCOUNT_IIN,
+    misPhone: process.env.DEMO_MIS_ACCOUNT_PHONE,
   },
 };
 

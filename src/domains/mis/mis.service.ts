@@ -1,5 +1,6 @@
 import { getPatientById } from '@/domains/patient/patient.service';
 import { config, isDevelopment } from '@/config';
+import { useDemoAccount } from '@/shared/helpers';
 
 import {
   CreateAppointmentDto,
@@ -45,7 +46,13 @@ export const getUserInsuranceDetails = async (userId: string, phone: string) => 
   const patient = await getPatientById(userId);
   if (!patient) return;
 
-  const misPatient = await findPatientByIinAndPhone(patient.iin, phone);
+  const { isDemoAccount, misIin, misPhone } = useDemoAccount();
+  const showDemo = isDemoAccount(phone, patient.iin);
+
+  const misPatient = await findPatientByIinAndPhone(
+    showDemo ? misIin : patient.iin,
+    showDemo ? misPhone : phone
+  );
   if (!misPatient) return;
 
   const misPatientProfile = await misRequest<MISFindPatientResponse>({
@@ -55,7 +62,7 @@ export const getUserInsuranceDetails = async (userId: string, phone: string) => 
     },
   });
 
-  if (isDevelopment && config.insuranceService.testId) {
+  if ((isDevelopment && config.insuranceService.testId) || showDemo) {
     return {
       beneficiaryId: config.insuranceService.testId,
     };

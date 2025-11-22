@@ -1,18 +1,21 @@
 import { Request, Response } from 'express';
 import { Role } from '@prisma/client';
 
-import { isProduction } from '@/config';
+import { isProduction, config } from '@/config';
 import { ErrorCodes } from '@/shared/constants/error-codes';
 import { AppError } from '@/shared/services/app-error.service';
 import * as otpService from '@/shared/services/otp.service';
 import * as jwtService from '@/shared/services/jwt.service';
 import * as smsService from '@/infrastructure/sms/sms.service';
+import { useDemoAccount } from '@/shared/helpers';
 
 import * as authService from './auth.service';
 
 export const requestOtp = async (req: Request, res: Response) => {
   const { phone, email } = req.body;
-  const otp = otpService.generateOTPCode();
+  const { otp: demoOtp, phone: demoPhone } = useDemoAccount();
+
+  const otp = phone === demoPhone ? demoOtp : otpService.generateOTPCode();
   const hashedOTP = await otpService.hashOTP(otp);
   const user = await authService.findUserByPhone(phone);
   const isUserExists = !!user?.id;
@@ -22,7 +25,7 @@ export const requestOtp = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.INVALID_PHONE, 400);
   }
 
-  if (isProduction) {
+  if (isProduction && phone !== demoPhone) {
     await smsService.sendSMS(phone, `Код для авторизации: ${otp}`);
   }
 
@@ -62,5 +65,19 @@ export const verifyOtp = async (req: Request, res: Response) => {
     success: true,
     accessToken: tokens.accessToken,
     refreshToken: tokens.refreshToken,
+  });
+};
+
+export const createDemoAccount = async (_: Request, res: Response) => {
+  const { demoAccount } = config;
+
+  const createdUser = await authService.createUser({
+    phone: demoAccount.phone || '',
+  });
+
+  return res.status(200).json({
+    id: createdUser?.id,
+    phone: demoAccount.phone,
+    otp: demoAccount.otp,
   });
 };

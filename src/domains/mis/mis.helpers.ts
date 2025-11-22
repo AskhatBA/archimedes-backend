@@ -67,10 +67,12 @@ export const misRequest = async <T>({
   payload = {},
   params = {},
   query = {},
+  options = {},
 }: MisRequestPayload) => {
   try {
     const apiResolver = misApiResolvers[resolverName as keyof typeof misApiResolvers];
     const response = await misHttp.request<T>({
+      baseURL: options?.useDev ? config.mis.devApiUrl : config.mis.apiUrl,
       method: apiResolver.method,
       url: resolveApiUrlParams(resolverName, params),
       data: {

@@ -129,11 +129,16 @@ export interface MISInsuranceInfo {
   customer_name: string;
 }
 
+export interface MISOptions {
+  useDev?: boolean;
+}
+
 export interface MisRequestPayload {
   resolverName: keyof typeof misApiResolvers;
   payload?: any;
   params?: any;
   query?: any;
+  options?: MISOptions;
 }
 
 export interface MISDocument {

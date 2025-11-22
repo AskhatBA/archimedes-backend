@@ -103,4 +103,6 @@ router.post('/request-otp', controller.requestOtp);
  */
 router.post('/verify-otp', controller.verifyOtp);
 
+router.post('/create-demo-account', controller.createDemoAccount);
+
 export default router;

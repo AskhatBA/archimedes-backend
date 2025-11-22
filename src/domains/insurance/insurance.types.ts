@@ -116,6 +116,7 @@ export interface InsuranceRequestPayload {
   payload?: any;
   params?: any;
   query?: any;
+  options?: { useDev?: boolean };
 }
 
 export interface ContactInfo {
