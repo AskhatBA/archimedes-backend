@@ -250,16 +250,14 @@ export const getAppointmentHistory = async (req: Request, res: Response) => {
 
   const patient = await patientService.getPatientById(req.user.id);
 
-  if (!patient) {
+  if (!patient?.misPatientId) {
     return res.status(400).json({
       success: false,
       message: 'Patient not found',
     });
   }
 
-  const appointmentHistory = await misService.getAppointmentHistory(
-    '4cb21009-5a2b-4166-9f90-020b28d7ed2c'
-  );
+  const appointmentHistory = await misService.getAppointmentHistory(patient.misPatientId);
 
   return res.status(200).json({
     success: true,
@@ -274,16 +272,14 @@ export const getLaboratoryResults = async (req: Request, res: Response) => {
 
   const patient = await patientService.getPatientById(req.user.id);
 
-  if (!patient) {
+  if (!patient?.misPatientId) {
     return res.status(400).json({
       success: false,
-      message: 'Patient not found',
+      message: 'Patient not found in MIS',
     });
   }
 
-  const laboratoryResults = await misService.getLaboratoryResults(
-    '4cb21009-5a2b-4166-9f90-020b28d7ed2c'
-  );
+  const laboratoryResults = await misService.getLaboratoryResults(patient.misPatientId);
 
   return res.status(200).json({
     success: true,
