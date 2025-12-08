@@ -26,7 +26,7 @@ export const findPatient = async (req: Request, res: Response) => {
 
   const patient = await misService.findPatientByIinAndPhone(
     (req.query.iin as string) || '',
-    `8${phone}`
+    `8${phone.slice(1)}`
   );
 
   return res.status(200).json({
