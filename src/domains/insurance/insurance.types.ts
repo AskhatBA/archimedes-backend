@@ -123,3 +123,8 @@ export interface ContactInfo {
   city: string;
   phones: string[];
 }
+
+export interface ClinicType {
+  id: number;
+  title: string;
+}

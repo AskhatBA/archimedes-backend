@@ -5,27 +5,29 @@ import { insuranceRequest } from './insurance.helpers';
 import {
   AppointmentItem,
   AvailableInsuranceCity,
+  ContactInfo,
   Family,
   MedicalNetworkClinic,
   ProfileData,
   Program,
   ProgramExtended,
   RefundRequest,
-  ContactInfo,
+  ClinicType,
 } from './insurance.types';
 import {
+  INSURANCE_API_GET_CITIES,
+  INSURANCE_API_GET_CLINIC_TYPES,
+  INSURANCE_API_GET_CONTACTS,
+  INSURANCE_API_GET_ELECTRONIC_REFERRALS,
+  INSURANCE_API_GET_MEDICAL_NETWORK,
   INSURANCE_API_GET_PROGRAM_BY_ID,
   INSURANCE_API_GET_PROGRAM_CERTIFICATE,
   INSURANCE_API_GET_PROGRAMS,
-  INSURANCE_API_GET_USER_FAMILY,
-  INSURANCE_API_GET_CITIES,
-  INSURANCE_API_GET_USER_PROFILE,
-  INSURANCE_API_SEND_OTP,
-  INSURANCE_API_REFUND_REQUEST,
   INSURANCE_API_GET_REFUND_REQUESTS,
-  INSURANCE_API_GET_MEDICAL_NETWORK,
-  INSURANCE_API_GET_CONTACTS,
-  INSURANCE_API_GET_ELECTRONIC_REFERRALS,
+  INSURANCE_API_GET_USER_FAMILY,
+  INSURANCE_API_GET_USER_PROFILE,
+  INSURANCE_API_REFUND_REQUEST,
+  INSURANCE_API_SEND_OTP,
 } from './insurance.constants';
 
 export const sendOtp = async (phone: string, iin: string) => {
@@ -158,6 +160,14 @@ export const getElectronicReferrals = async (beneficiaryId: string, programId: s
     resolverName: INSURANCE_API_GET_ELECTRONIC_REFERRALS,
     beneficiaryId,
     query: { programId },
+  });
+  return response.data;
+};
+
+export const getClinicTypes = async (beneficiaryId: string) => {
+  const response = await insuranceRequest<{ errorCode: number; data: ClinicType[] }>({
+    resolverName: INSURANCE_API_GET_CLINIC_TYPES,
+    beneficiaryId,
   });
   return response.data;
 };

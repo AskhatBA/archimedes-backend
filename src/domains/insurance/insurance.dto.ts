@@ -6,4 +6,5 @@ export interface RefundRequestDTO {
   files: FileType[];
   personId: string;
   programId: string;
+  category: number;
 }

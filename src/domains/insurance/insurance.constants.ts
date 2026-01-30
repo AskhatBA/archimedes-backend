@@ -12,6 +12,7 @@ export const INSURANCE_API_GET_MEDICAL_NETWORK = '/v3/medical_network/:programId
 export const INSURANCE_API_GET_PROGRAM_DESCRIPTION = '/v3/client/productdescription/:programId';
 export const INSURANCE_API_GET_CONTACTS = '/v3/contacts';
 export const INSURANCE_API_GET_ELECTRONIC_REFERRALS = '/v3/client/appointments';
+export const INSURANCE_API_GET_CLINIC_TYPES = '/v3/clinicTypes';
 
 export const insuranceApiResolverDefault = {
   [INSURANCE_API_GET_PROGRAMS]: {
@@ -69,6 +70,10 @@ export const insuranceApiResolverDefault = {
     defaultPayload: {},
   },
   [INSURANCE_API_GET_ELECTRONIC_REFERRALS]: {
+    method: 'GET',
+    defaultPayload: {},
+  },
+  [INSURANCE_API_GET_CLINIC_TYPES]: {
     method: 'GET',
     defaultPayload: {},
   },

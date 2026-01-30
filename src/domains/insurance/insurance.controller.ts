@@ -116,7 +116,7 @@ export const refundRequest = async (req: Request, res: Response) => {
   //   });
   // }
 
-  const { date, amount, files, personId, programId } = req.body;
+  const { date, amount, files, personId, programId, category } = req.body;
 
   const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
 
@@ -134,6 +134,7 @@ export const refundRequest = async (req: Request, res: Response) => {
       files,
       personId,
       programId,
+      category,
     },
     misInsurance.beneficiaryId
   );
@@ -378,5 +379,30 @@ export const getElectronicReferrals = async (req: Request, res: Response) => {
     req.query.programId as string
   );
 
-  return res.status(200).json(response);
+  return res.status(200).json({
+    success: true,
+    electronicReferrals: response,
+  });
+};
+
+export const getClinicTypes = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+
+  if (!misInsurance?.beneficiaryId) {
+    return res.status(404).json({
+      success: false,
+      message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
+    });
+  }
+
+  const response = await insuranceService.getClinicTypes(misInsurance.beneficiaryId);
+
+  return res.status(200).json({
+    success: true,
+    clinicTypes: response,
+  });
 };

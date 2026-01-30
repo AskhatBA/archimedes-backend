@@ -83,6 +83,7 @@ export const misRequest = async <T>({
     });
     return response.data;
   } catch (error: unknown) {
+    console.log('misRequest error', error);
     const errorData = parseApiError(error);
     throw new AppError(errorData.message, errorData.status);
   }

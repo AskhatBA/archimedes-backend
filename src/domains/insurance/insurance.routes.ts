@@ -114,6 +114,16 @@ router.post('/verify-otp', authenticate, controller.verifyOtp);
  *         programId:
  *           type: string
  *           example: 'a2f6c7d8-3b1e-4f0a-9c3d-7e5a1b2c3d4e'
+ *         category:
+ *           type: number
+ *           description: |
+ *             Refund category type:
+ *             * 0 - АПП (амбулаторно-поликлиническая помощь)
+ *             * 4 - Стоматология
+ *             * 5 - Медикаменты
+ *             * 2 - Стацинарное лечение
+ *           enum: [0, 2, 4, 5]
+ *           example: 0
  *         files:
  *           $ref: '#/components/schemas/Files'
  * /insurance/refund-request:
@@ -646,5 +656,45 @@ router.get('/electronic-referrals', authenticate, controller.getElectronicReferr
  *         description: Unauthorized
  */
 router.get('/contacts', authenticate, controller.getContacts);
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     ClinicType:
+ *       type: object
+ *       required: [id, title]
+ *       properties:
+ *         id:
+ *           type: number
+ *           example: 1
+ *         title:
+ *           type: string
+ *           example: "Поликлиника"
+ * /insurance/clinic-types:
+ *   get:
+ *     summary: Get clinic types
+ *     tags: [Insurance]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 clinicTypes:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/ClinicType'
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/clinic-types', authenticate, controller.getClinicTypes);
 
 export default router;
