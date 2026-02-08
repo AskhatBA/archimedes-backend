@@ -2,7 +2,7 @@ import * as process from 'node:process';
 
 import dotenv from 'dotenv';
 
-const DEFAULT_PORT = 5050;
+const DEFAULT_PORT = 4000;
 const DEFAULT_NODE_ENV = 'development';
 
 dotenv.config();
@@ -53,6 +53,12 @@ export const config = {
     otp: process.env.DEMO_ACCOUNT_OTP,
     misIin: process.env.DEMO_MIS_ACCOUNT_IIN,
     misPhone: process.env.DEMO_MIS_ACCOUNT_PHONE,
+  },
+
+  zoom: {
+    accountId: process.env.ZOOM_ACCOUNT_ID,
+    clientId: process.env.ZOOM_CLIENT_ID,
+    clientSecret: process.env.ZOOM_CLIENT_SECRET,
   },
 };
 
