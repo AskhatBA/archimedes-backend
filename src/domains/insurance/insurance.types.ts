@@ -35,6 +35,7 @@ export interface Family {
   fullName: string;
   relationship: string;
   dateBirth: string;
+  benId: string;
 }
 
 export interface RefundRequest {

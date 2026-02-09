@@ -316,7 +316,7 @@ router.get('/programs/:programId', authenticate, controller.getProgramById);
  *       properties:
  *         id:
  *           type: string
- *           example: "1234"
+ *           example: "3f7c2a6b-8e3d-4f5b-b9f4-1b2a9c8e6d21"
  *         fullName:
  *           type: string
  *           example: "John Doe"
@@ -327,6 +327,9 @@ router.get('/programs/:programId', authenticate, controller.getProgramById);
  *           type: string
  *           format: date
  *           example: "1990-01-01"
+ *         benId:
+ *           type: string
+ *           example: "a1c4f9d2-6b7e-4a13-9f82-5d3e8b6a4c70"
  *     InsuranceFamilyResponse:
  *       type: object
  *       properties:

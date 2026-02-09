@@ -196,15 +196,6 @@ export const getDoctorAvailableSlots = async (
 };
 
 export const createAppointment = async (newAppointment: CreateAppointmentDto) => {
-  console.log('familyMemberId', {
-    doctor: newAppointment.doctorId,
-    beneficiary: newAppointment.familyMemberId ? undefined : newAppointment.patientId,
-    beneficiary_external_id: newAppointment.familyMemberId,
-    start_time: newAppointment.startTime,
-    end_time: newAppointment.endTime,
-    branch: newAppointment.branchId,
-    insurance: newAppointment.insuranceProgramId,
-  });
   return misRequest<MISDoctorAvailableSlotsResponse>({
     resolverName: MIS_API_CREATE_APPOINTMENT,
     payload: {

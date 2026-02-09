@@ -59,6 +59,8 @@ export const config = {
     accountId: process.env.ZOOM_ACCOUNT_ID,
     clientId: process.env.ZOOM_CLIENT_ID,
     clientSecret: process.env.ZOOM_CLIENT_SECRET,
+    tokenUrl: process.env.ZOOM_TOKEN_URL || 'https://zoom.us/oauth/token',
+    apiUrl: process.env.ZOOM_API_URL || 'https://api.zoom.us/v2',
   },
 };
 
