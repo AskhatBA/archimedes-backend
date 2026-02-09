@@ -690,4 +690,39 @@ router.get('/laboratory-results', authenticate, controller.getLaboratoryResults)
  */
 router.delete('/appointments/:appointmentId', authenticate, controller.removeAppointment);
 
+/**
+ * @openapi
+ * /mis/appointments/{appointmentId}:
+ *   get:
+ *     summary: Get detailed information about a specific appointment
+ *     tags: [MIS]
+ *     parameters:
+ *       - name: appointmentId
+ *         in: path
+ *         description: Appointment ID to get details for
+ *         required: true
+ *         schema:
+ *           type: string
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Appointment details fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 appointment:
+ *                   $ref: '#/components/schemas/MISAppointment'
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: User not found or unauthorized
+ */
+router.get('/appointments/:appointmentId', authenticate, controller.getAppointmentDetails);
+
 export default router;

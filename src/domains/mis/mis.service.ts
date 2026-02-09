@@ -30,6 +30,7 @@ import {
   MIS_API_GET_USER_BY_PHONE,
   MIS_API_GET_USER_PROFILE_BY_ID,
   MIS_API_LABORATORY_RESULTS,
+  MIS_API_GET_APPOINTMENT_DETAILS,
 } from './mis.constants';
 import {
   MISBranchesResponse,
@@ -40,6 +41,7 @@ import {
   MISSpecializationsResponse,
   MISAppointmentHistory,
   MISLaboratoryResult,
+  MISAppointmentDetailsResponse,
 } from './mis.types';
 
 export const getUserInsuranceDetails = async (userId: string, phone: string) => {
@@ -259,4 +261,13 @@ export const removeAppointment = async (misPatientId: string, appointmentId: str
     resolverName: MIS_API_GET_USER_APPOINTMENTS,
     params: { userId: misPatientId, appointmentId },
   });
+};
+
+export const getAppointmentDetails = async (beneficiaryId: string, appointmentId: string) => {
+  const response = await misRequest<MISAppointmentDetailsResponse>({
+    resolverName: MIS_API_GET_APPOINTMENT_DETAILS,
+    params: { beneficiaryId, appointmentId },
+  });
+
+  return response.appointment;
 };

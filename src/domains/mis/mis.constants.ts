@@ -13,6 +13,8 @@ export const MIS_API_GET_USER_APPOINTMENTS = '/beneficiary/:userId/appointments/
 export const MIS_API_REMOVE_USER_APPOINTMENT = '/beneficiary/:userId/appointments/:appointmentId';
 export const MIS_API_GET_APPOINTMENT_HISTORY = '/beneficiary/:userId/appointment-history/';
 export const MIS_API_LABORATORY_RESULTS = '/beneficiary/:userId/laboratory-results/';
+export const MIS_API_GET_APPOINTMENT_DETAILS =
+  '/beneficiary/:beneficiaryId/appointments/:appointmentId/';
 
 export const misApiResolvers = {
   [MIS_API_GET_USER_BY_PHONE]: {
@@ -70,6 +72,10 @@ export const misApiResolvers = {
     defaultPayload: {},
   },
   [MIS_API_LABORATORY_RESULTS]: {
+    method: 'GET',
+    defaultPayload: {},
+  },
+  [MIS_API_GET_APPOINTMENT_DETAILS]: {
     method: 'GET',
     defaultPayload: {},
   },

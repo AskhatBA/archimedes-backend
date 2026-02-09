@@ -123,6 +123,11 @@ export interface MISAppointment {
   notes: string;
 }
 
+export interface MISAppointmentDetailsResponse {
+  status: string;
+  appointment: MISAppointment;
+}
+
 export interface MISInsuranceInfo {
   beneficiary_external_id: string | null;
   card_number: string;
