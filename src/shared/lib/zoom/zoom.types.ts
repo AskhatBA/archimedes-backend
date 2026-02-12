@@ -28,3 +28,41 @@ export interface MeetingOutput {
   joinUrl: string;
   startUrl: string;
 }
+
+export interface RecordingFile {
+  id: string;
+  meeting_id: string;
+  recording_start: string;
+  recording_end: string;
+  file_type: string;
+  file_size: number;
+  download_url: string;
+  status: string;
+  recording_type: string;
+}
+
+export interface ZoomRecordingResponse {
+  id: string;
+  uuid: string;
+  host_id: string;
+  topic: string;
+  start_time: string;
+  duration: number;
+  total_size: number;
+  recording_count: number;
+  recording_files: RecordingFile[];
+}
+
+export interface RecordingOutput {
+  meetingId: string;
+  topic: string;
+  startTime: string;
+  duration: number;
+  files: Array<{
+    id: string;
+    fileType: string;
+    fileSize: number;
+    downloadUrl: string;
+    recordingType: string;
+  }>;
+}

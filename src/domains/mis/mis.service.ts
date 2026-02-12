@@ -1,6 +1,7 @@
 import { getPatientById } from '@/domains/patient/patient.service';
 import { config, isDevelopment } from '@/config';
 import { useDemoAccount } from '@/shared/helpers';
+import { zoomService } from '@/shared/lib/zoom/zoom.service';
 
 import {
   CreateAppointmentDto,
@@ -198,6 +199,15 @@ export const getDoctorAvailableSlots = async (
 };
 
 export const createAppointment = async (newAppointment: CreateAppointmentDto) => {
+  if (newAppointment.isTelemedicine) {
+    const meeting = await zoomService.createMeeting({
+      start_time: newAppointment.startTime,
+      duration: 60, //mins
+      topic: `Прием ${newAppointment.startTime}`,
+    });
+    console.log('meeting zoom: ', meeting);
+  }
+
   return misRequest<MISDoctorAvailableSlotsResponse>({
     resolverName: MIS_API_CREATE_APPOINTMENT,
     payload: {

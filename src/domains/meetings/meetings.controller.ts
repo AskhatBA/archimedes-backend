@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { body, validationResult } from 'express-validator';
+import { body, param, validationResult } from 'express-validator';
 
 import { AppError } from '@/shared/services/app-error.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
@@ -43,5 +43,31 @@ export const createMeeting = async (req: Request, res: Response) => {
   return res.status(200).json({
     success: true,
     meeting,
+  });
+};
+
+export const getMeetingRecordings = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  await param('meetingId').notEmpty().withMessage('Meeting ID is required').run(req);
+
+  const errors = validationResult(req);
+
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: errors.array(),
+    });
+  }
+
+  const { meetingId } = req.params;
+
+  const recordings = await meetingsService.getMeetingRecordings(meetingId);
+
+  return res.status(200).json({
+    success: true,
+    recordings,
   });
 };

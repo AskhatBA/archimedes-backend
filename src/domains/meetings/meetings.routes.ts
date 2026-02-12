@@ -38,6 +38,42 @@ const router = Router();
  *         startUrl:
  *           type: string
  *           example: "https://zoom.us/s/123456789"
+ *     RecordingFile:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *         fileType:
+ *           type: string
+ *           example: "MP4"
+ *         fileSize:
+ *           type: number
+ *           example: 52428800
+ *         downloadUrl:
+ *           type: string
+ *           example: "https://zoom.us/rec/download/..."
+ *         recordingType:
+ *           type: string
+ *           example: "shared_screen_with_speaker_view"
+ *     RecordingResponse:
+ *       type: object
+ *       properties:
+ *         meetingId:
+ *           type: string
+ *           example: "123456789"
+ *         topic:
+ *           type: string
+ *           example: "Patient Consultation"
+ *         startTime:
+ *           type: string
+ *           format: date-time
+ *         duration:
+ *           type: number
+ *           example: 30
+ *         files:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/RecordingFile'
  * /meetings:
  *   post:
  *     summary: Create a Zoom meeting
@@ -67,7 +103,40 @@ const router = Router();
  *         description: Bad Request - Invalid input
  *       401:
  *         description: Unauthorized
+ * /meetings/{meetingId}/recordings:
+ *   get:
+ *     summary: Get recordings for a Zoom meeting
+ *     tags: [Meetings]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: meetingId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The Zoom meeting ID
+ *     responses:
+ *       200:
+ *         description: Recordings retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 recordings:
+ *                   $ref: '#/components/schemas/RecordingResponse'
+ *       400:
+ *         description: Bad Request - Invalid meeting ID
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Recording not found
  */
 router.post('/', authenticate, controller.createMeeting);
+router.get('/:meetingId/recordings', authenticate, controller.getMeetingRecordings);
 
 export default router;

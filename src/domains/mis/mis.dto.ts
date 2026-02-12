@@ -30,6 +30,7 @@ export interface CreateAppointmentDto {
   branchId: string;
   insuranceProgramId: string;
   familyMemberId?: string;
+  isTelemedicine?: boolean;
 }
 
 export interface MISAppointmentResponse {

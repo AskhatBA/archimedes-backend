@@ -7,6 +7,8 @@ import {
   MeetingOutput,
   ZoomMeetingResponse,
   ZoomAccessToken,
+  ZoomRecordingResponse,
+  RecordingOutput,
 } from './zoom.types';
 
 class ZoomService {
@@ -95,8 +97,9 @@ class ZoomService {
           duration: input.duration,
           timezone: 'UTC',
           settings: {
-            waiting_room: true,
-            join_before_host: false,
+            waiting_room: false,
+            join_before_host: true,
+            auto_recording: 'cloud',
           },
         },
         {
@@ -128,6 +131,99 @@ class ZoomService {
 
         throw new Error(
           `Failed to create Zoom meeting: ${error.response?.data?.message || error.message}`
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Gets cloud recordings for a meeting
+   * @param meetingId - The Zoom meeting ID
+   * @returns Recording details with download URLs
+   */
+  async getRecordings(meetingId: string): Promise<RecordingOutput> {
+    const accessToken = await this.getAccessToken();
+
+    try {
+      const response = await axios.get<ZoomRecordingResponse>(
+        `${this.apiUrl}/meetings/${meetingId}/recordings`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      return {
+        meetingId: response.data.id,
+        topic: response.data.topic,
+        startTime: response.data.start_time,
+        duration: response.data.duration,
+        files: response.data.recording_files.map((file) => ({
+          id: file.id,
+          fileType: file.file_type,
+          fileSize: file.file_size,
+          downloadUrl: file.download_url,
+          recordingType: file.recording_type,
+        })),
+      };
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.error('Zoom recordings API error:', {
+          status: error.response?.status,
+          data: error.response?.data,
+        });
+
+        if (error.response?.status === 401) {
+          this.accessToken = null;
+          this.tokenExpiresAt = 0;
+          throw new Error('Zoom authentication failed. Token may have expired.');
+        }
+
+        if (error.response?.status === 404) {
+          throw new Error('Recording not found. It may not be ready yet.');
+        }
+
+        throw new Error(
+          `Failed to get Zoom recordings: ${error.response?.data?.message || error.message}`
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Downloads a recording file from Zoom
+   * @param downloadUrl - The download URL from the recording file
+   * @returns Buffer containing the video file data
+   */
+  async downloadRecording(downloadUrl: string): Promise<Buffer> {
+    const accessToken = await this.getAccessToken();
+
+    try {
+      const response = await axios.get(downloadUrl, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+        responseType: 'arraybuffer',
+      });
+
+      return Buffer.from(response.data);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.error('Zoom download error:', {
+          status: error.response?.status,
+        });
+
+        if (error.response?.status === 401) {
+          this.accessToken = null;
+          this.tokenExpiresAt = 0;
+          throw new Error('Zoom authentication failed. Token may have expired.');
+        }
+
+        throw new Error(
+          `Failed to download Zoom recording: ${error.response?.data?.message || error.message}`
         );
       }
       throw error;
