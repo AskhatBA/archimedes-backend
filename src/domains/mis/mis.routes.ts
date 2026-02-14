@@ -408,6 +408,7 @@ router.get('/doctor/:doctorId/available-slots', authenticate, controller.getDoct
  *         - startTime
  *         - endTime
  *         - branchId
+ *         - isTelemedicine
  *       properties:
  *         doctorId:
  *           type: string
@@ -427,6 +428,9 @@ router.get('/doctor/:doctorId/available-slots', authenticate, controller.getDoct
  *         insuranceProgramId:
  *           type: string
  *           example: "8b9a7c6d-5e4f-4321-a987-6543210fedcb"
+ *         isTelemedicine:
+ *           type: boolean
+ *           example: false
  * /mis/create-appointment:
  *   post:
  *     summary: Create a new appointment

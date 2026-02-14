@@ -108,7 +108,6 @@ export const getFamily = async (beneficiaryId: string, programId: string) => {
     beneficiaryId,
     query: { programId },
   });
-  console.log('family', family);
   return family;
 };
 

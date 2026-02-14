@@ -186,6 +186,12 @@ export const createAppointment = async (req: Request, res: Response) => {
     .notEmpty()
     .withMessage('Insurance program ID is required')
     .run(req);
+  await body('isTelemedicine')
+    .notEmpty()
+    .withMessage('isTelemedicine is required')
+    .isBoolean()
+    .withMessage('isTelemedicine must be a boolean')
+    .run(req);
 
   const errors = validationResult(req);
 
@@ -196,7 +202,8 @@ export const createAppointment = async (req: Request, res: Response) => {
     });
   }
 
-  const { doctorId, startTime, endTime, branchId, insuranceProgramId, patientId } = req.body;
+  const { doctorId, startTime, endTime, branchId, insuranceProgramId, patientId, isTelemedicine } =
+    req.body;
   const patient = await patientService.getPatientById(req.user.id);
 
   if (!patient) {
@@ -214,6 +221,7 @@ export const createAppointment = async (req: Request, res: Response) => {
     endTime,
     branchId,
     insuranceProgramId,
+    isTelemedicine,
   });
 
   return res.status(200).json({

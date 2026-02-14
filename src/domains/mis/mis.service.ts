@@ -199,13 +199,14 @@ export const getDoctorAvailableSlots = async (
 };
 
 export const createAppointment = async (newAppointment: CreateAppointmentDto) => {
+  let meeting;
+
   if (newAppointment.isTelemedicine) {
-    const meeting = await zoomService.createMeeting({
+    meeting = await zoomService.createMeeting({
       start_time: newAppointment.startTime,
       duration: 60, //mins
       topic: `Прием ${newAppointment.startTime}`,
     });
-    console.log('meeting zoom: ', meeting);
   }
 
   return misRequest<MISDoctorAvailableSlotsResponse>({
@@ -218,6 +219,8 @@ export const createAppointment = async (newAppointment: CreateAppointmentDto) =>
       end_time: newAppointment.endTime,
       branch: newAppointment.branchId,
       insurance: newAppointment.insuranceProgramId,
+      meeting: meeting,
+      is_telemedicine: newAppointment.isTelemedicine,
     },
   });
 };
