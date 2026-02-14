@@ -121,6 +121,9 @@ export interface MISAppointment {
   appointment_type: string;
   appointment_type_display: string;
   notes: string;
+  meeting_id: string;
+  meeting_join_url: string;
+  meeting_start_url: string;
 }
 
 export interface MISAppointmentDetailsResponse {
