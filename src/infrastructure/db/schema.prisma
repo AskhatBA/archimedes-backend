@@ -40,7 +40,6 @@ model Patient {
   gender       String
   iin          String        @unique
   misPatientId String        @unique
-  appointments Appointment[]
 }
 
 model Doctor {
@@ -54,7 +53,6 @@ model Doctor {
   specialization String
   licenseNumber  String        @unique
   phone          String?
-  appointments Appointment[]
 }
 
 enum AppointmentStatus {
@@ -64,16 +62,17 @@ enum AppointmentStatus {
 }
 
 model Appointment {
-  id        String            @id @default(uuid()) @db.Uuid
-  patientId String            @db.Uuid
-  doctorId  String            @db.Uuid
-  dateTime  DateTime
-  status    AppointmentStatus @default(SCHEDULED)
-  notes     String?
-  patient   Patient           @relation(fields: [patientId], references: [id])
-  doctor    Doctor            @relation(fields: [doctorId], references: [id])
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
+  id             String            @id @default(uuid()) @db.Uuid
+  patientId      String            @db.Uuid
+  doctorId       String            @db.Uuid
+  externalId     String            @db.Uuid
+  dateTime       DateTime
+  status         AppointmentStatus @default(SCHEDULED)
+  isTelemedicine Boolean           @default(false)
+  meetingUrl     String?
+  notes          String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 }
 
 model OTP {

@@ -1,12 +1,14 @@
 import { getPatientById } from '@/domains/patient/patient.service';
-import { config, isDevelopment } from '@/config';
+// import { config, isDevelopment } from '@/config';
 import { useDemoAccount } from '@/shared/helpers';
 import { zoomService } from '@/shared/lib/zoom/zoom.service';
+import * as appointmentService from '@/domains/appointments/appointments.service';
 
 import {
   CreateAppointmentDto,
   CreatePatientDto,
   FindPatientResponse,
+  MISAppointmentCreateResponse,
   MISAppointmentResponse,
   MISCreatePatientResponse,
   MISFindPatientResponse,
@@ -65,11 +67,11 @@ export const getUserInsuranceDetails = async (userId: string, phone: string) => 
     },
   });
 
-  if ((isDevelopment && config.insuranceService.testId) || showDemo) {
-    return {
-      beneficiaryId: config.insuranceService.testId,
-    };
-  }
+  // if ((isDevelopment && config.insuranceService.testId) || showDemo) {
+  //   return {
+  //     beneficiaryId: config.insuranceService.testId,
+  //   };
+  // }
 
   return {
     beneficiaryId: misPatientProfile?.profile?.insurance?.beneficiary_external_id || misPatient?.id,
@@ -209,7 +211,7 @@ export const createAppointment = async (newAppointment: CreateAppointmentDto) =>
     });
   }
 
-  return misRequest<MISDoctorAvailableSlotsResponse>({
+  const response = await misRequest<MISAppointmentCreateResponse>({
     resolverName: MIS_API_CREATE_APPOINTMENT,
     payload: {
       doctor: newAppointment.doctorId,
@@ -223,6 +225,19 @@ export const createAppointment = async (newAppointment: CreateAppointmentDto) =>
       is_telemedicine: newAppointment.isTelemedicine,
     },
   });
+
+  await appointmentService.createAppointment({
+    patientId: newAppointment.familyMemberId || newAppointment.patientId,
+    doctorId: newAppointment.doctorId,
+    status: 'SCHEDULED',
+    notes: '',
+    externalId: response.request.id,
+    meetingUrl: meeting?.joinUrl || '',
+    isTelemedicine: !!newAppointment.isTelemedicine,
+    dateTime: new Date(new Date(newAppointment.startTime).toISOString()),
+  });
+
+  return response.request;
 };
 
 export const getAppointments = async (misPatientId: string) => {
