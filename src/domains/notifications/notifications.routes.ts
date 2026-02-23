@@ -73,7 +73,6 @@ const router = Router();
  *     SendNotificationBody:
  *       type: object
  *       required:
- *         - userId
  *         - message
  *       properties:
  *         userId:
