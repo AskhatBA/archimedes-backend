@@ -62,6 +62,11 @@ export const config = {
     tokenUrl: process.env.ZOOM_TOKEN_URL || 'https://zoom.us/oauth/token',
     apiUrl: process.env.ZOOM_API_URL || 'https://api.zoom.us/v2',
   },
+
+  oneSignal: {
+    appId: process.env.ONE_SIGNAL_APP_ID,
+    apiAuthKey: process.env.ONE_SIGNAL_API_AUTH_KEY,
+  },
 };
 
 export const isDevelopment = config.nodeEnv === 'development';
