@@ -26,6 +26,7 @@ model User {
   doctor                Doctor?
   otp                   OTP?
   insuranceServiceToken InsuranceServiceToken?
+  deviceTokens          DeviceToken[]
 }
 
 model Patient {
@@ -92,4 +93,21 @@ model InsuranceServiceToken {
   userId      String   @db.Uuid @unique
   accessToken String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum Platform {
+  IOS
+  ANDROID
+  WEB
+}
+
+model DeviceToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  deviceId  String   @unique
+  platform  Platform
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
