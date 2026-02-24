@@ -227,6 +227,7 @@ export const createAppointment = async (newAppointment: CreateAppointmentDto) =>
   });
 
   await appointmentService.createAppointment({
+    userId: newAppointment.userId,
     patientId: newAppointment.familyMemberId || newAppointment.patientId,
     doctorId: newAppointment.doctorId,
     status: 'SCHEDULED',

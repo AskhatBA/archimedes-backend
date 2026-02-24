@@ -69,6 +69,7 @@ export const createAppointment = async (req: Request, res: Response) => {
 
   const appointment = await appointmentsService
     .createAppointment({
+      userId: req.user.id,
       patientId: req.body.patientId,
       doctorId: req.body.doctorId,
       externalId: req.body.externalId,
@@ -105,16 +106,11 @@ export const updateAppointment = async (req: Request, res: Response) => {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const result = await appointmentsService.updateAppointment(
-    req.params.id,
-    req.user.id,
-    req.user.role as Role,
-    {
-      dateTime: new Date(req.body.dateTime),
-      status: req.body.status,
-      notes: req.body.notes,
-    }
-  );
+  const result = await appointmentsService.updateAppointment(req.params.id, req.user.id, {
+    dateTime: new Date(req.body.dateTime),
+    status: req.body.status,
+    notes: req.body.notes,
+  });
 
   if (result.count === 0) {
     return res.status(404).json({
@@ -172,11 +168,7 @@ export const cancelAppointment = async (req: Request, res: Response) => {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const result = await appointmentsService.cancelAppointment(
-    req.params.id,
-    req.user.id,
-    req.user.role as Role
-  );
+  const result = await appointmentsService.cancelAppointment(req.params.id, req.user.id);
 
   if (result.count === 0) {
     return res.status(404).json({
