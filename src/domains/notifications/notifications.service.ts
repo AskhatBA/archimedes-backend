@@ -103,6 +103,8 @@ export const sendPushNotification = async (
     data: data || {},
   };
 
+  console.log('Send notification via OneSignal: ', notification);
+
   await sendOneSignalPushNotification(notification);
 };
 

@@ -214,6 +214,7 @@ export const createAppointment = async (req: Request, res: Response) => {
   }
 
   const appointment = await misService.createAppointment({
+    userId: req.user.id,
     doctorId,
     patientId: patient.misPatientId,
     familyMemberId: patientId,

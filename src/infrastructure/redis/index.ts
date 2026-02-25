@@ -1,0 +1,1 @@
+export { redisConnection } from './redis';
