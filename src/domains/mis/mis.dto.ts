@@ -23,6 +23,7 @@ export interface CreatePatientDto {
 }
 
 export interface CreateAppointmentDto {
+  userId: string;
   doctorId: string;
   patientId: string;
   startTime: string;

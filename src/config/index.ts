@@ -47,6 +47,10 @@ export const config = {
     dsn: process.env.SENTRY_DSN,
   },
 
+  redis: {
+    host: process.env.REDIS_HOST,
+  },
+
   demoAccount: {
     phone: process.env.DEMO_ACCOUNT_PHONE,
     iin: process.env.DEMO_ACCOUNT_IIN,

@@ -1,6 +1,11 @@
 import { AppointmentStatus, Role } from '@prisma/client';
 
 import * as db from '@/infrastructure/db';
+import {
+  scheduleAppointmentNotification,
+  cancelAppointmentNotification,
+  rescheduleAppointmentNotification,
+} from '@/shared/queues/notification.queue';
 
 export const getAllAppointments = (userId: string) => {
   return db.prismaClient.appointment.findMany({
@@ -20,7 +25,8 @@ export const getAppointmentById = (id: string, userId: string) => {
   });
 };
 
-export const createAppointment = (data: {
+export const createAppointment = async (data: {
+  userId: string;
   patientId: string;
   doctorId: string;
   externalId: string;
@@ -30,7 +36,7 @@ export const createAppointment = (data: {
   meetingUrl?: string;
   isTelemedicine?: boolean;
 }) => {
-  return db.prismaClient.appointment.create({
+  const appointment = await db.prismaClient.appointment.create({
     data: {
       patientId: data.patientId,
       doctorId: data.doctorId,
@@ -40,46 +46,83 @@ export const createAppointment = (data: {
       status: data.status || AppointmentStatus.SCHEDULED,
       isTelemedicine: data.isTelemedicine || false,
       meetingUrl: data.meetingUrl || '',
+      userId: data.userId,
     },
   });
+
+  // Schedule notification 10 minutes before appointment
+  if (appointment.status === AppointmentStatus.SCHEDULED) {
+    await scheduleAppointmentNotification(
+      appointment.id,
+      appointment.userId,
+      appointment.dateTime
+    ).catch((error) => {
+      console.error('Failed to schedule appointment notification:', error);
+      // Don't fail the appointment creation if notification scheduling fails
+    });
+  }
+
+  return appointment;
 };
 
-export const updateAppointment = (
+export const updateAppointment = async (
   id: string,
   userId: string,
-  role: Role,
   data: {
     dateTime?: Date;
     status?: AppointmentStatus;
     notes?: string;
   }
 ) => {
-  const whereClause =
-    role === Role.PATIENT
-      ? {
-          id: id,
-          patient: {
-            userId: userId,
-          },
-        }
-      : {
-          id: id,
-          doctor: {
-            userId: userId,
-          },
-        };
+  // Get appointment before update to check if we need to reschedule notification
+  const existingAppointment = await db.prismaClient.appointment.findFirst({
+    where: { id, userId },
+  });
 
-  return db.prismaClient.appointment.updateMany({
-    where: whereClause,
+  const result = await db.prismaClient.appointment.updateMany({
+    where: { id, userId },
     data: {
       ...(data.dateTime && { dateTime: data.dateTime }),
       ...(data.status && { status: data.status }),
       ...(data.notes !== undefined && { notes: data.notes }),
     },
   });
+
+  // Handle notification rescheduling/cancellation if appointment was updated
+  if (result.count > 0 && existingAppointment) {
+    try {
+      // If appointment was cancelled or completed, cancel notification
+      if (
+        data.status === AppointmentStatus.CANCELLED ||
+        data.status === AppointmentStatus.COMPLETED
+      ) {
+        await cancelAppointmentNotification(id);
+      }
+      // If date/time changed and appointment is still scheduled, reschedule notification
+      else if (data.dateTime && (!data.status || data.status === AppointmentStatus.SCHEDULED)) {
+        await rescheduleAppointmentNotification(id, existingAppointment.userId, data.dateTime);
+      }
+      // If status changed to scheduled (e.g., from cancelled), schedule notification
+      else if (
+        data.status === AppointmentStatus.SCHEDULED &&
+        existingAppointment.status !== AppointmentStatus.SCHEDULED
+      ) {
+        await scheduleAppointmentNotification(
+          id,
+          existingAppointment.userId,
+          data.dateTime || existingAppointment.dateTime
+        );
+      }
+    } catch (error) {
+      console.error('Failed to update appointment notification:', error);
+      // Don't fail the appointment update if notification update fails
+    }
+  }
+
+  return result;
 };
 
-export const deleteAppointment = (id: string, userId: string, role: Role) => {
+export const deleteAppointment = async (id: string, userId: string, role: Role) => {
   const whereClause =
     role === Role.PATIENT
       ? {
@@ -95,11 +138,20 @@ export const deleteAppointment = (id: string, userId: string, role: Role) => {
           },
         };
 
-  return db.prismaClient.appointment.deleteMany({
+  const result = await db.prismaClient.appointment.deleteMany({
     where: whereClause,
   });
+
+  // Cancel notification if appointment was deleted
+  if (result.count > 0) {
+    await cancelAppointmentNotification(id).catch((error) => {
+      console.error('Failed to cancel appointment notification:', error);
+    });
+  }
+
+  return result;
 };
 
-export const cancelAppointment = (id: string, userId: string, role: Role) => {
-  return updateAppointment(id, userId, role, { status: AppointmentStatus.CANCELLED });
+export const cancelAppointment = (id: string, userId: string) => {
+  return updateAppointment(id, userId, { status: AppointmentStatus.CANCELLED });
 };
