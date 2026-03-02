@@ -1,11 +1,12 @@
 import { Request, Response } from 'express';
-import { query, body, validationResult } from 'express-validator';
+import { query, body, validationResult, param } from 'express-validator';
 
 import { AppError } from '@/shared/services/app-error.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
 import * as misService from '@/domains/mis/mis.service';
 
 import * as insuranceService from './insurance.service';
+import { updateElectronicReferralServiceStatus } from './insurance.service';
 
 export const sendOtp = async (req: Request, res: Response) => {
   if (!req.user) {
@@ -404,5 +405,39 @@ export const getClinicTypes = async (req: Request, res: Response) => {
   return res.status(200).json({
     success: true,
     clinicTypes: response,
+  });
+};
+
+export const updateElectronicReferralServiceStatus = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  await param('electronicReferralId')
+    .notEmpty()
+    .withMessage('Electronic referral id is required')
+    .run(req);
+  await body('serviceStatus')
+    .notEmpty()
+    .withMessage('Service status referral id is required')
+    .run(req);
+
+  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+
+  if (!misInsurance?.beneficiaryId) {
+    return res.status(404).json({
+      success: false,
+      message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
+    });
+  }
+
+  await insuranceService.updateElectronicReferralServiceStatus(
+    misInsurance.beneficiaryId,
+    req.body.electronicReferralId,
+    req.body.serviceStatus
+  );
+
+  return res.status(200).json({
+    success: true,
   });
 };

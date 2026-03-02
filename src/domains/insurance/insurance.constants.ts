@@ -12,6 +12,7 @@ export const INSURANCE_API_GET_MEDICAL_NETWORK = '/v3/medical_network/:programId
 export const INSURANCE_API_GET_PROGRAM_DESCRIPTION = '/v3/client/productdescription/:programId';
 export const INSURANCE_API_GET_CONTACTS = '/v3/contacts';
 export const INSURANCE_API_GET_ELECTRONIC_REFERRALS = '/v3/client/appointments';
+export const INSURANCE_API_UPDATE_ELECTRONIC_REFERRALS = '/v3/client/updateAppointment';
 export const INSURANCE_API_GET_CLINIC_TYPES = '/v3/clinicTypes';
 
 export const insuranceApiResolverDefault = {
@@ -77,4 +78,14 @@ export const insuranceApiResolverDefault = {
     method: 'GET',
     defaultPayload: {},
   },
+  [INSURANCE_API_UPDATE_ELECTRONIC_REFERRALS]: {
+    method: 'POST',
+    defaultPayload: {},
+  },
 };
+
+export enum ElectronicReferralServiceStatus {
+  NOT_RECEIVED = 0,
+  RECEIVED = 1,
+  DECLINED = 2,
+}

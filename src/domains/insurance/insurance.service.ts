@@ -28,6 +28,8 @@ import {
   INSURANCE_API_GET_USER_PROFILE,
   INSURANCE_API_REFUND_REQUEST,
   INSURANCE_API_SEND_OTP,
+  INSURANCE_API_UPDATE_ELECTRONIC_REFERRALS,
+  ElectronicReferralServiceStatus,
 } from './insurance.constants';
 
 export const sendOtp = async (phone: string, iin: string) => {
@@ -160,6 +162,19 @@ export const getElectronicReferrals = async (beneficiaryId: string, programId: s
     resolverName: INSURANCE_API_GET_ELECTRONIC_REFERRALS,
     beneficiaryId,
     query: { programId },
+  });
+  return response.data;
+};
+
+export const updateElectronicReferralServiceStatus = async (
+  beneficiaryId: string,
+  appointmentId: string,
+  satisfactionLevel: ElectronicReferralServiceStatus
+) => {
+  const response = await insuranceRequest<{ errorCode: number; data: AppointmentItem }>({
+    resolverName: INSURANCE_API_UPDATE_ELECTRONIC_REFERRALS,
+    beneficiaryId,
+    query: { AppointmentId: appointmentId, SatisfactionLevel: satisfactionLevel },
   });
   return response.data;
 };
