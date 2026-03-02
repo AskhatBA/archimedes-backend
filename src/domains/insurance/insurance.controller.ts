@@ -6,7 +6,6 @@ import { ErrorCodes } from '@/shared/constants/error-codes';
 import * as misService from '@/domains/mis/mis.service';
 
 import * as insuranceService from './insurance.service';
-import { updateElectronicReferralServiceStatus } from './insurance.service';
 
 export const sendOtp = async (req: Request, res: Response) => {
   if (!req.user) {

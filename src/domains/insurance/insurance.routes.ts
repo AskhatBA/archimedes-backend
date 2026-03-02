@@ -700,4 +700,76 @@ router.get('/contacts', authenticate, controller.getContacts);
  */
 router.get('/clinic-types', authenticate, controller.getClinicTypes);
 
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     UpdateElectronicReferralServiceStatusBody:
+ *       type: object
+ *       required: [electronicReferralId, serviceStatus]
+ *       properties:
+ *         electronicReferralId:
+ *           type: string
+ *           example: "123"
+ *         serviceStatus:
+ *           type: number
+ *           description: |
+ *             Service status:
+ *             * 0 - NOT_RECEIVED
+ *             * 1 - RECEIVED
+ *             * 2 - DECLINED
+ *           enum: [0, 1, 2]
+ *           example: 1
+ * /insurance/electronic-referrals/{electronicReferralId}/service-status:
+ *   patch:
+ *     summary: Update electronic referral service status
+ *     tags: [Insurance]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: electronicReferralId
+ *         in: path
+ *         description: Electronic referral ID
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [serviceStatus]
+ *             properties:
+ *               serviceStatus:
+ *                 type: number
+ *                 description: |
+ *                   Service status:
+ *                   * 0 - NOT_RECEIVED
+ *                   * 1 - RECEIVED
+ *                   * 2 - DECLINED
+ *                 enum: [0, 1, 2]
+ *                 example: 1
+ *     responses:
+ *       200:
+ *         description: Service status updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Insurance not found in MIS
+ */
+router.patch(
+  '/electronic-referrals/:electronicReferralId/service-status',
+  authenticate,
+  controller.updateElectronicReferralServiceStatus
+);
+
 export default router;
