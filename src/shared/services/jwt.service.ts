@@ -5,8 +5,8 @@ import { config } from '@/config';
 import { AppError } from '@/shared/services/app-error.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
 
-const defaultAccessExpiresIn = '1d';
-const defaultRefreshExpiresIn = '7d';
+const defaultAccessExpiresIn = '300d';
+const defaultRefreshExpiresIn = '360d';
 
 interface TokenPayload {
   userId: string;
