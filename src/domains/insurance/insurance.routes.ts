@@ -704,22 +704,17 @@ router.get('/clinic-types', authenticate, controller.getClinicTypes);
  * @openapi
  * components:
  *   schemas:
+ *     ElectronicReferralServiceStatus:
+ *       type: number
+ *       description: Service status
+ *       enum: [0, 1, 2]
+ *       example: 1
  *     UpdateElectronicReferralServiceStatusBody:
  *       type: object
- *       required: [electronicReferralId, serviceStatus]
+ *       required: [serviceStatus]
  *       properties:
- *         electronicReferralId:
- *           type: string
- *           example: "123"
  *         serviceStatus:
- *           type: number
- *           description: |
- *             Service status:
- *             * 0 - NOT_RECEIVED
- *             * 1 - RECEIVED
- *             * 2 - DECLINED
- *           enum: [0, 1, 2]
- *           example: 1
+ *           $ref: '#/components/schemas/ElectronicReferralServiceStatus'
  * /insurance/electronic-referrals/{electronicReferralId}/service-status:
  *   patch:
  *     summary: Update electronic referral service status
@@ -738,18 +733,7 @@ router.get('/clinic-types', authenticate, controller.getClinicTypes);
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required: [serviceStatus]
- *             properties:
- *               serviceStatus:
- *                 type: number
- *                 description: |
- *                   Service status:
- *                   * 0 - NOT_RECEIVED
- *                   * 1 - RECEIVED
- *                   * 2 - DECLINED
- *                 enum: [0, 1, 2]
- *                 example: 1
+ *             $ref: '#/components/schemas/UpdateElectronicReferralServiceStatusBody'
  *     responses:
  *       200:
  *         description: Service status updated successfully

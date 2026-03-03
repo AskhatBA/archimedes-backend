@@ -174,7 +174,7 @@ export const updateElectronicReferralServiceStatus = async (
   const response = await insuranceRequest<{ errorCode: number; data: AppointmentItem }>({
     resolverName: INSURANCE_API_UPDATE_ELECTRONIC_REFERRALS,
     beneficiaryId,
-    query: { AppointmentId: appointmentId, SatisfactionLevel: satisfactionLevel },
+    query: { AppointmentId: Number(appointmentId), SatisfactionLevel: Number(satisfactionLevel) },
   });
   return response.data;
 };

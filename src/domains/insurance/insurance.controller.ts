@@ -432,7 +432,7 @@ export const updateElectronicReferralServiceStatus = async (req: Request, res: R
 
   await insuranceService.updateElectronicReferralServiceStatus(
     misInsurance.beneficiaryId,
-    req.body.electronicReferralId,
+    req.params.electronicReferralId,
     req.body.serviceStatus
   );
 
