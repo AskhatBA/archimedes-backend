@@ -9,5 +9,7 @@ export const sendOneSignalPushNotification = (notification: OneSignalPushNotific
     include_player_ids: notification.playerIds,
     headings: notification.heading,
     contents: notification.content,
+    ios_badgeType: 'Increase',
+    ios_badgeCount: 1,
   });
 };
