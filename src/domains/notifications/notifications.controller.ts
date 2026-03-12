@@ -79,3 +79,62 @@ export const sendNotification = async (req: Request, res: Response) => {
     message: 'Notification sent successfully',
   });
 };
+
+export const getNotifications = async (req: Request, res: Response) => {
+  if (!req?.user) {
+    throw new AppError('User not found', 401);
+  }
+
+  const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+  const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
+
+  const notifications = await notificationService.getUserNotifications(req.user.id, limit, offset);
+
+  return res.status(200).json({
+    success: true,
+    data: notifications,
+  });
+};
+
+export const markNotificationAsRead = async (req: Request, res: Response) => {
+  if (!req?.user) {
+    throw new AppError('User not found', 401);
+  }
+
+  await param('notificationId').notEmpty().withMessage('Notification ID is required').run(req);
+
+  const { notificationId } = req.params;
+
+  await notificationService.markNotificationAsRead(req.user.id, notificationId);
+
+  return res.status(200).json({
+    success: true,
+    message: 'Notification marked as read',
+  });
+};
+
+export const markAllNotificationsAsRead = async (req: Request, res: Response) => {
+  if (!req?.user) {
+    throw new AppError('User not found', 401);
+  }
+
+  await notificationService.markAllNotificationsAsRead(req.user.id);
+
+  return res.status(200).json({
+    success: true,
+    message: 'All notifications marked as read',
+  });
+};
+
+export const getUnreadCount = async (req: Request, res: Response) => {
+  if (!req?.user) {
+    throw new AppError('User not found', 401);
+  }
+
+  const count = await notificationService.getUnreadNotificationCount(req.user.id);
+
+  return res.status(200).json({
+    success: true,
+    data: { count },
+  });
+};

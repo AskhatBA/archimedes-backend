@@ -1,5 +1,5 @@
 import { getPatientById } from '@/domains/patient/patient.service';
-// import { config, isDevelopment } from '@/config';
+import { config, isDevelopment } from '@/config';
 import { useDemoAccount } from '@/shared/helpers';
 import { zoomService } from '@/shared/lib/zoom/zoom.service';
 import * as appointmentService from '@/domains/appointments/appointments.service';
@@ -67,11 +67,11 @@ export const getUserInsuranceDetails = async (userId: string, phone: string) => 
     },
   });
 
-  // if ((isDevelopment && config.insuranceService.testId) || showDemo) {
-  //   return {
-  //     beneficiaryId: config.insuranceService.testId,
-  //   };
-  // }
+  if ((isDevelopment && config.insuranceService.testId) || showDemo) {
+    return {
+      beneficiaryId: config.insuranceService.testId,
+    };
+  }
 
   return {
     beneficiaryId: misPatientProfile?.profile?.insurance?.beneficiary_external_id || misPatient?.id,

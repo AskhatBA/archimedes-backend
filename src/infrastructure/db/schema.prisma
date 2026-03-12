@@ -27,7 +27,8 @@ model User {
   otp                   OTP?
   insuranceServiceToken InsuranceServiceToken?
   deviceTokens          DeviceToken[]
-  appointments Appointment[]
+  appointments          Appointment[]
+  notifications         Notification[]
 }
 
 model Patient {
@@ -115,4 +116,30 @@ model DeviceToken {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+enum NotificationStatus {
+  SENT
+  DELIVERED
+  FAILED
+}
+
+model Notification {
+  id               String             @id @default(uuid()) @db.Uuid
+  userId           String             @db.Uuid
+  title            String
+  message          String
+  data             Json?
+  status           NotificationStatus @default(SENT)
+  isRead           Boolean            @default(false)
+  readAt           DateTime?
+  oneSignalId      String?
+  oneSignalResponse Json?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([userId, isRead])
 }

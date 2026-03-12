@@ -10,6 +10,41 @@ const router = Router();
  * @openapi
  * components:
  *   schemas:
+ *     NotificationItem:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *         title:
+ *           type: string
+ *         message:
+ *           type: string
+ *         data:
+ *           type: object
+ *           additionalProperties: true
+ *         status:
+ *           type: string
+ *           enum: [SENT, DELIVERED, FAILED]
+ *         isRead:
+ *           type: boolean
+ *         readAt:
+ *           type: string
+ *           format: date-time
+ *           nullable: true
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *     NotificationListResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         data:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/NotificationItem'
  *     RegisterDeviceBody:
  *       type: object
  *       required:
@@ -183,11 +218,108 @@ const router = Router();
  *         description: Invalid request body
  *       401:
  *         description: Unauthorized
+ * /notifications:
+ *   get:
+ *     summary: Get notification history for authenticated user
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *         description: Number of notifications to return
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *         description: Number of notifications to skip
+ *     responses:
+ *       200:
+ *         description: List of notifications
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/NotificationListResponse'
+ *       401:
+ *         description: Unauthorized
+ * /notifications/{notificationId}/read:
+ *   patch:
+ *     summary: Mark a notification as read
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: notificationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Notification ID to mark as read
+ *     responses:
+ *       200:
+ *         description: Notification marked as read
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SuccessResponse'
+ *       404:
+ *         description: Notification not found
+ *       401:
+ *         description: Unauthorized
+ * /notifications/read-all:
+ *   patch:
+ *     summary: Mark all notifications as read
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: All notifications marked as read
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SuccessResponse'
+ *       401:
+ *         description: Unauthorized
+ * /notifications/unread-count:
+ *   get:
+ *     summary: Get unread notification count
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Unread notification count
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     count:
+ *                       type: integer
+ *                       example: 5
+ *       401:
+ *         description: Unauthorized
  */
 
 router.post('/devices', authenticate, controller.registerDevice);
 router.get('/devices', authenticate, controller.getUserDevices);
 router.delete('/devices/:deviceId', authenticate, controller.unregisterDevice);
 router.post('/send', authenticate, controller.sendNotification);
+router.get('/', authenticate, controller.getNotifications);
+router.patch('/:notificationId/read', authenticate, controller.markNotificationAsRead);
+router.patch('/read-all', authenticate, controller.markAllNotificationsAsRead);
+router.get('/unread-count', authenticate, controller.getUnreadCount);
 
 export default router;
