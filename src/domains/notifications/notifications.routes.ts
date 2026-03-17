@@ -110,10 +110,6 @@ const router = Router();
  *       required:
  *         - message
  *       properties:
- *         userId:
- *           type: string
- *           format: uuid
- *           description: Target user ID
  *         title:
  *           type: string
  *           description: Notification title

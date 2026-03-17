@@ -68,8 +68,6 @@ export const sendNotification = async (req: Request, res: Response) => {
     throw new AppError('User not found', 401);
   }
 
-  await body('message').withMessage('Message is required').run(req);
-
   const { title, message, data } = req.body;
 
   await notificationService.sendPushNotification(req.user.id, title, message, data);
