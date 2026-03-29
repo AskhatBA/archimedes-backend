@@ -7,4 +7,5 @@ export interface RefundRequestDTO {
   personId: string;
   programId: string;
   category: number;
+  comments: string;
 }

@@ -59,6 +59,8 @@ export const verifyOtp = async (phone: string, otp: string, userId: string) => {
 export const requestRefund = async (refundRequestBody: RefundRequestDTO, beneficiaryId: string) => {
   const userProfile = await getProfile(beneficiaryId);
 
+  console.log('refund request body:', refundRequestBody);
+
   return insuranceRequest({
     resolverName: INSURANCE_API_REFUND_REQUEST,
     beneficiaryId,

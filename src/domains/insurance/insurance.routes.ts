@@ -114,6 +114,9 @@ router.post('/verify-otp', authenticate, controller.verifyOtp);
  *         programId:
  *           type: string
  *           example: 'a2f6c7d8-3b1e-4f0a-9c3d-7e5a1b2c3d4e'
+ *         comments:
+ *           type: string
+ *           example: 'Пример комментария'
  *         category:
  *           type: number
  *           description: |
@@ -394,6 +397,9 @@ router.get('/family', authenticate, controller.getFamily);
  *         status:
  *           type: string
  *           example: "pending"
+ *         comments:
+ *           type: string
+ *           example: "Request for refund due to policy violation"
  *     InsuranceRefundRequestsResponse:
  *       type: object
  *       properties:

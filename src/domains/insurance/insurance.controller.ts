@@ -116,7 +116,7 @@ export const refundRequest = async (req: Request, res: Response) => {
   //   });
   // }
 
-  const { date, amount, files, personId, programId, category } = req.body;
+  const { date, amount, files, personId, programId, category, comments } = req.body;
 
   const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
 
@@ -135,6 +135,7 @@ export const refundRequest = async (req: Request, res: Response) => {
       personId,
       programId,
       category,
+      comments,
     },
     misInsurance.beneficiaryId
   );
