@@ -232,7 +232,7 @@ export const createAppointment = async (newAppointment: CreateAppointmentDto) =>
     doctorId: newAppointment.doctorId,
     status: 'SCHEDULED',
     notes: '',
-    externalId: response.request.id,
+    externalId: response.request?.id || response.appointment?.id || '',
     meetingUrl: meeting?.joinUrl || '',
     isTelemedicine: !!newAppointment.isTelemedicine,
     dateTime: new Date(new Date(newAppointment.startTime).toISOString()),
@@ -270,8 +270,8 @@ export const getLaboratoryResults = async (misPatientId: string) => {
     data: {
       err: string;
       info: string;
-      results: MISLaboratoryResult[];
     };
+    results: MISLaboratoryResult[];
     beneficiary_info: {
       id: string;
       name: string;
@@ -282,7 +282,7 @@ export const getLaboratoryResults = async (misPatientId: string) => {
     params: { userId: misPatientId },
   });
 
-  return mapLaboratoryResults(response?.data?.results || ([] as MISLaboratoryResult[]));
+  return mapLaboratoryResults(response?.results || ([] as MISLaboratoryResult[]));
 };
 
 export const removeAppointment = async (misPatientId: string, appointmentId: string) => {

@@ -41,23 +41,30 @@ export interface MISAppointmentResponse {
   appointments: MISAppointment[];
 }
 
+export interface MISAppointmentDetails {
+  id: string;
+  doctor_name: string;
+  beneficiary_name: string;
+  branch_name: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  status_display: string;
+  record_type: string;
+  record_type_display: string;
+  appointment_type: string;
+  appointment_type_display: string;
+  notes: string;
+}
+
 export interface MISAppointmentCreateResponse {
   status: string;
   message: string;
-  request: {
-    id: string;
-    doctor_name: string;
-    beneficiary_name: string;
-    branch_name: string;
-    start_time: string;
-    end_time: string;
-    status: string;
-    status_display: string;
-    record_type: string;
-    record_type_display: string;
-    appointment_type: string;
-    appointment_type_display: string;
-    notes: string;
+  request?: MISAppointmentDetails;
+  appointment?: MISAppointmentDetails & {
+    meeting_id: string;
+    meeting_join_url: string;
+    meeting_start_url: string;
   };
 }
 
