@@ -127,6 +127,8 @@ export const refundRequest = async (req: Request, res: Response) => {
     });
   }
 
+  console.log('refundRequest beneficiaryId', misInsurance.beneficiaryId);
+
   await insuranceService.requestRefund(
     {
       amount,

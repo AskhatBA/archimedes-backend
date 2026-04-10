@@ -55,6 +55,7 @@ export const insuranceRequest = async <T>({
     });
     return response.data;
   } catch (error) {
+    console.log('insurance error', error, '; ', 'resolver', resolverName);
     const errorData = parseApiError(error);
     Sentry.captureException(error);
     throw new AppError(errorData.message, errorData.status);
