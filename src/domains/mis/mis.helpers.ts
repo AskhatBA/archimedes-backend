@@ -83,7 +83,7 @@ export const misRequest = async <T>({
     });
     return response.data;
   } catch (error: unknown) {
-    console.log('misRequest error', error);
+    console.log('mis error', error);
     const errorData = parseApiError(error);
     throw new AppError(errorData.message, errorData.status);
   }
@@ -92,6 +92,8 @@ export const misRequest = async <T>({
 export const mapAppointmentHistory = (appointmentHistory: MISAppointmentHistory[]) => {
   return appointmentHistory.map((appointment) => ({
     id: appointment.id,
+    startTime: appointment.start_time,
+    endTime: appointment.end_time,
     doctor: {
       id: appointment.doctor.id,
       name: appointment.doctor.name,
@@ -112,6 +114,12 @@ export const mapAppointmentHistory = (appointmentHistory: MISAppointmentHistory[
     templateType: appointment.template_type,
     appointmentType: appointment.appointment_type,
     appointmentTypeDisplay: appointment.appointment_type_display,
+    status: appointment.status,
+    branch: {
+      id: appointment.branch.id,
+      name: appointment.branch.name,
+      address: appointment.branch.address,
+    },
   }));
 };
 

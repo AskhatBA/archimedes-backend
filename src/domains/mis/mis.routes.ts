@@ -562,6 +562,15 @@ router.get('/appointments', authenticate, controller.getAppointments);
  *           type: string
  *         createdAt:
  *           type: string
+ *     MISAppointmentHistoryBranch:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *         name:
+ *           type: string
+ *         address:
+ *           type: string
  *     MISAppointmentHistory:
  *       type: object
  *       properties:
@@ -569,8 +578,17 @@ router.get('/appointments', authenticate, controller.getAppointments);
  *           type: string
  *         doctor:
  *           $ref: '#/components/schemas/MISAppointmentHistoryDoctor'
+ *         startTime:
+ *           type: string
+ *         endTime:
+ *           type: string
  *         actualStartTime:
  *           type: string
+ *         status:
+ *           type: string
+ *           enum: [scheduled, in_progress, completed]
+ *         branch:
+ *           $ref: '#/components/schemas/MISAppointmentHistoryBranch'
  *         diagnosis:
  *           type: string
  *           nullable: true

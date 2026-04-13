@@ -3,6 +3,9 @@ import { misApiResolvers } from '@/domains/mis/mis.constants';
 export interface MISPatientBeneficiary {
   id: string;
   name: string;
+  last_name: string;
+  first_name: string;
+  middle_name: string;
   phone_number: string;
   gender: 0 | 1;
   iin: string;
@@ -166,6 +169,14 @@ export interface MISAppointmentHistory {
   template_type: string;
   appointment_type: string;
   appointment_type_display: string;
+  start_time: string;
+  end_time: string;
+  status: 'scheduled' | 'in_progress' | 'completed';
+  branch: {
+    id: string;
+    name: string;
+    address: string;
+  };
 }
 
 export interface MISLaboratoryResult {

@@ -17,7 +17,6 @@ import {
   availableSlotsMapper,
   mapAppointmentHistory,
   misRequest,
-  parsePatientFullName,
   mapLaboratoryResults,
 } from './mis.helpers';
 import {
@@ -86,6 +85,7 @@ export const findPatientByIinAndPhone = async (
     resolverName: MIS_API_GET_USER_BY_PHONE,
     payload: {
       phone_number: phone,
+      iin,
     },
   });
   if (!misPatientDetail) return;
@@ -104,13 +104,11 @@ export const findPatientByIinAndPhone = async (
 
   if (!currentBeneficiary) return;
 
-  const { firstName, lastName, patronymic } = parsePatientFullName(currentBeneficiary.name);
-
   return {
     id: currentBeneficiary.id || '',
-    firstName,
-    lastName,
-    patronymic,
+    firstName: currentBeneficiary.first_name,
+    lastName: currentBeneficiary.last_name,
+    patronymic: currentBeneficiary.middle_name,
     birthDate: currentBeneficiary.birth_date || '',
     iin: currentBeneficiary.iin || '',
     gender: currentBeneficiary.gender === 0 ? 'M' : 'F',
