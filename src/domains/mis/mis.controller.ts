@@ -159,12 +159,13 @@ export const getDoctorAvailableSlots = async (req: Request, res: Response) => {
   }
 
   const { doctorId } = req.params;
-  const { startDate, endDate } = req.query;
+  const { startDate, endDate, branchId } = req.query;
 
   const availableSlots = await misService.getDoctorAvailableSlots(
     doctorId as string,
     startDate as string,
-    endDate as string
+    endDate as string,
+    branchId as string | undefined
   );
 
   return res.status(200).json({

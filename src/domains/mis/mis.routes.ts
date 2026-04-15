@@ -376,6 +376,12 @@ router.get('/doctor/:id', authenticate, controller.getDoctor);
  *         required: true
  *         schema:
  *           type: string
+ *       - name: branchId
+ *         in: query
+ *         description: Branch ID from MIS
+ *         required: false
+ *         schema:
+ *           type: string
  *     security:
  *       - bearerAuth: []
  *     responses:

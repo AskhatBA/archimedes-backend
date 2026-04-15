@@ -190,12 +190,16 @@ export const getDoctorDetailsById = async (doctorId: string) => {
 export const getDoctorAvailableSlots = async (
   doctorId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  branchId?: string
 ) => {
+  const query: Record<string, string> = { start_date: startDate, end_date: endDate };
+  if (branchId) query.branch_id = branchId;
+
   const response = await misRequest<MISDoctorAvailableSlotsResponse>({
     resolverName: MIS_API_GET_DOCTOR_AVAILABLE_SLOTS,
     params: { doctorId },
-    query: { start_date: startDate, end_date: endDate },
+    query,
   });
 
   return availableSlotsMapper(response.available_slots);
