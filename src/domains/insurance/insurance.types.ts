@@ -129,3 +129,9 @@ export interface ClinicType {
   id: number;
   title: string;
 }
+
+export interface CheckIinResponse {
+  errorCode: number;
+  phone?: string;
+  message?: string;
+}

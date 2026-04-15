@@ -14,6 +14,7 @@ export const INSURANCE_API_GET_CONTACTS = '/v3/contacts';
 export const INSURANCE_API_GET_ELECTRONIC_REFERRALS = '/v3/client/appointments';
 export const INSURANCE_API_UPDATE_ELECTRONIC_REFERRALS = '/v3/client/updateAppointment';
 export const INSURANCE_API_GET_CLINIC_TYPES = '/v3/clinicTypes';
+export const INSURANCE_API_CHECK_IIN = '/v3/checkPhone';
 
 export const insuranceApiResolverDefault = {
   [INSURANCE_API_GET_PROGRAMS]: {
@@ -80,6 +81,10 @@ export const insuranceApiResolverDefault = {
   },
   [INSURANCE_API_UPDATE_ELECTRONIC_REFERRALS]: {
     method: 'POST',
+    defaultPayload: {},
+  },
+  [INSURANCE_API_CHECK_IIN]: {
+    method: 'GET',
     defaultPayload: {},
   },
 };

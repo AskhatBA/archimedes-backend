@@ -13,6 +13,7 @@ import {
   ProgramExtended,
   RefundRequest,
   ClinicType,
+  CheckIinResponse,
 } from './insurance.types';
 import {
   INSURANCE_API_GET_CITIES,
@@ -29,6 +30,7 @@ import {
   INSURANCE_API_REFUND_REQUEST,
   INSURANCE_API_SEND_OTP,
   INSURANCE_API_UPDATE_ELECTRONIC_REFERRALS,
+  INSURANCE_API_CHECK_IIN,
   ElectronicReferralServiceStatus,
 } from './insurance.constants';
 
@@ -187,4 +189,12 @@ export const getClinicTypes = async (beneficiaryId: string) => {
     beneficiaryId,
   });
   return response.data;
+};
+
+export const checkIin = async (iin: string) => {
+  const response = await insuranceRequest<CheckIinResponse>({
+    resolverName: INSURANCE_API_CHECK_IIN,
+    query: { iin },
+  });
+  return response;
 };

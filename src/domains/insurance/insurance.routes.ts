@@ -762,4 +762,43 @@ router.patch(
   controller.updateElectronicReferralServiceStatus
 );
 
+/**
+ * @openapi
+ * /insurance/check-iin:
+ *   get:
+ *     summary: Check if IIN is registered in the insurance service
+ *     tags: [Insurance]
+ *     parameters:
+ *       - name: iin
+ *         in: query
+ *         description: Individual Identification Number
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: IIN check result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required:
+ *                 - errorCode
+ *               properties:
+ *                 errorCode:
+ *                   type: number
+ *                   example: 0
+ *                 phone:
+ *                   type: string
+ *                   example: "77772114452"
+ *                 message:
+ *                   type: string
+ *                   example: "Пользователь не найден"
+ *       400:
+ *         description: IIN is required
+ *       401:
+ *         description: User not found or unauthorized
+ */
+router.get('/check-iin', controller.checkIin);
+
 export default router;

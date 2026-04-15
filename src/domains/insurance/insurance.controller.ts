@@ -410,6 +410,23 @@ export const getClinicTypes = async (req: Request, res: Response) => {
   });
 };
 
+export const checkIin = async (req: Request, res: Response) => {
+  await query('iin').notEmpty().withMessage('IIN is required').run(req);
+
+  const errors = validationResult(req);
+
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: errors.array(),
+    });
+  }
+
+  const result = await insuranceService.checkIin(req.query.iin as string);
+
+  return res.status(200).json(result);
+};
+
 export const updateElectronicReferralServiceStatus = async (req: Request, res: Response) => {
   if (!req.user) {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
