@@ -1,5 +1,5 @@
 import { getPatientById } from '@/domains/patient/patient.service';
-import { config, isDevelopment } from '@/config';
+// import { config, isDevelopment } from '@/config';
 import { useDemoAccount } from '@/shared/helpers';
 import { zoomService } from '@/shared/lib/zoom/zoom.service';
 import * as appointmentService from '@/domains/appointments/appointments.service';
@@ -33,6 +33,8 @@ import {
   MIS_API_GET_USER_PROFILE_BY_ID,
   MIS_API_LABORATORY_RESULTS,
   MIS_API_GET_APPOINTMENT_DETAILS,
+  MIS_API_GET_APPOINTMENT_REQUESTS,
+  MIS_API_REMOVE_USER_APPOINTMENT,
 } from './mis.constants';
 import {
   MISBranchesResponse,
@@ -44,6 +46,7 @@ import {
   MISAppointmentHistory,
   MISLaboratoryResult,
   MISAppointmentDetailsResponse,
+  MISAppointmentRequestsResponse,
 } from './mis.types';
 
 export const getUserInsuranceDetails = async (userId: string, phone: string) => {
@@ -66,11 +69,11 @@ export const getUserInsuranceDetails = async (userId: string, phone: string) => 
     },
   });
 
-  if ((isDevelopment && config.insuranceService.testId) || showDemo) {
-    return {
-      beneficiaryId: config.insuranceService.testId,
-    };
-  }
+  // if ((isDevelopment && config.insuranceService.testId) || showDemo) {
+  //   return {
+  //     beneficiaryId: config.insuranceService.testId,
+  //   };
+  // }
 
   return {
     beneficiaryId: misPatientProfile?.profile?.insurance?.beneficiary_external_id || misPatient?.id,
@@ -285,9 +288,26 @@ export const getLaboratoryResults = async (misPatientId: string) => {
 
 export const removeAppointment = async (misPatientId: string, appointmentId: string) => {
   return misRequest({
-    resolverName: MIS_API_GET_USER_APPOINTMENTS,
+    resolverName: MIS_API_REMOVE_USER_APPOINTMENT,
     params: { userId: misPatientId, appointmentId },
   });
+};
+
+export const getAppointmentRequests = async (
+  misPatientId: string,
+  options: { includePast?: boolean; status?: string } = {}
+) => {
+  const query: Record<string, string> = {};
+  if (options.includePast) query.include_past = 'true';
+  if (options.status) query.status = options.status;
+
+  const response = await misRequest<MISAppointmentRequestsResponse>({
+    resolverName: MIS_API_GET_APPOINTMENT_REQUESTS,
+    params: { userId: misPatientId },
+    query,
+  });
+
+  return response.requests;
 };
 
 export const getAppointmentDetails = async (beneficiaryId: string, appointmentId: string) => {

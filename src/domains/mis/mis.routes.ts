@@ -501,6 +501,8 @@ router.post('/create-appointment', authenticate, controller.createAppointment);
  *         meeting_join_url:
  *           type: string
  *           example: "https://us05web.zoom.us/j/82621241232?pwd=4o5c456vxgrrCQaUroAbGISNB3zkb5.1"
+ *         branch:
+ *           $ref: '#/components/schemas/MISBranch'
  *         meeting_start_url:
  *           type: string
  *           example: "https://us05web.zoom.us/s/82621241232?zak=eyJ0eXAiOiJKV1QiLCJzdiI6IjAwMDAwMiIsInptX3NrbSI6InptX28ybSIsImFsZyI6IkhTMjU2In0.eyJpc3MiOiJ3ZWIiLCJjbHQiOjAsIm1udW0iOiI4MjYyMTI0MjYxMiIsImF1ZCI6ImNsaWVudHNtIiwidWlkIjoiMlJpRjZWLVhRaHlXNDBkaVpOV3NsZyIsInppZCI6ImE0MmUyMTVlMzU0MDRhZTc4NWFjMzc0YjgyMzBjNDQ3Iiwic2siOiIwIiwic3R5IjoxMDAsIndjZCI6InVzMDUiLCJleHAiOjE3NzExMDEzMDc3ImlhdCI6Mfc3MTA5NDEwNywigWlkIjoiNkpDNWlsRFfTY3k4RmVGYmZZQUVuZyIsIrNpZCI6IiJ9.wfFK-x91l1FFedCFgquu7fYq4zxlmrDi-e80OH08zkI"
@@ -755,5 +757,115 @@ router.delete('/appointments/:appointmentId', authenticate, controller.removeApp
  *         description: User not found or unauthorized
  */
 router.get('/appointments/:appointmentId', authenticate, controller.getAppointmentDetails);
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     MISAppointmentRequest:
+ *       type: object
+ *       properties:
+ *         item_type:
+ *           type: string
+ *           example: appointment_request
+ *         id:
+ *           type: string
+ *         doctor_name:
+ *           type: string
+ *         beneficiary_name:
+ *           type: string
+ *         branch:
+ *           $ref: '#/components/schemas/MISBranch'
+ *         branch_name:
+ *           type: string
+ *         phone_number:
+ *           type: string
+ *         address:
+ *           type: string
+ *         start_time:
+ *           type: string
+ *           format: date-time
+ *         end_time:
+ *           type: string
+ *           format: date-time
+ *         status:
+ *           type: string
+ *           example: rejected
+ *         status_display:
+ *           type: string
+ *         record_type:
+ *           type: string
+ *         record_type_display:
+ *           type: string
+ *         appointment_type:
+ *           type: string
+ *         appointment_type_display:
+ *           type: string
+ *         notes:
+ *           type: string
+ *         is_archived:
+ *           type: boolean
+ *         rejection_reason:
+ *           type: string
+ *           nullable: true
+ *         appointment_id:
+ *           type: string
+ *           nullable: true
+ *         created_at:
+ *           type: string
+ *           format: date-time
+ *         processed_at:
+ *           type: string
+ *           format: date-time
+ *           nullable: true
+ *         meeting_id:
+ *           type: string
+ *           nullable: true
+ *         meeting_join_url:
+ *           type: string
+ *           nullable: true
+ *         meeting_start_url:
+ *           type: string
+ *           nullable: true
+ * /mis/appointment-requests:
+ *   get:
+ *     summary: Get patient appointment requests from MIS
+ *     tags: [MIS]
+ *     parameters:
+ *       - name: include_past
+ *         in: query
+ *         description: Include past requests
+ *         required: false
+ *         schema:
+ *           type: boolean
+ *       - name: status
+ *         in: query
+ *         description: Filter by request status (e.g. rejected)
+ *         required: false
+ *         schema:
+ *           type: string
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Appointment requests fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 requests:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/MISAppointmentRequest'
+ *       400:
+ *         description: Patient not found
+ *       401:
+ *         description: User not found or unauthorized
+ */
+router.get('/appointment-requests', authenticate, controller.getAppointmentRequests);
 
 export default router;

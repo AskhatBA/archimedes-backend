@@ -115,6 +115,7 @@ export interface MISAppointment {
   doctor_name: string;
   beneficiary_name: string;
   branch_name: string;
+  branch?: MISBranch;
   start_time: string;
   end_time: string;
   status: string;
@@ -177,6 +178,41 @@ export interface MISAppointmentHistory {
     name: string;
     address: string;
   };
+}
+
+export interface MISAppointmentRequest {
+  item_type: string;
+  id: string;
+  doctor_name: string;
+  beneficiary_name: string;
+  branch: MISBranch;
+  branch_name: string;
+  phone_number: string;
+  address: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  status_display: string;
+  record_type: string;
+  record_type_display: string;
+  appointment_type: string;
+  appointment_type_display: string;
+  notes: string;
+  is_archived: boolean;
+  rejection_reason: string | null;
+  appointment_id: string | null;
+  created_at: string;
+  processed_at: string | null;
+  meeting_id: string | null;
+  meeting_join_url: string | null;
+  meeting_start_url: string | null;
+}
+
+export interface MISAppointmentRequestsResponse {
+  status: string;
+  beneficiary_id: string;
+  count: number;
+  requests: MISAppointmentRequest[];
 }
 
 export interface MISLaboratoryResult {
