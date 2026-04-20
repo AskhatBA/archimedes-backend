@@ -45,6 +45,8 @@ const router = Router();
  *               type: string
  *             gender:
  *               type: string
+ *             misPatientId:
+ *               type: string
  * /patient/profile:
  *   get:
  *     summary: Get patient profile

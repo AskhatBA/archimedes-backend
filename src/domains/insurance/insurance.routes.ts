@@ -333,6 +333,9 @@ router.get('/programs/:programId', authenticate, controller.getProgramById);
  *         benId:
  *           type: string
  *           example: "a1c4f9d2-6b7e-4a13-9f82-5d3e8b6a4c70"
+ *         cardNo:
+ *           type: string
+ *           example: "1234567890"
  *     InsuranceFamilyResponse:
  *       type: object
  *       properties:

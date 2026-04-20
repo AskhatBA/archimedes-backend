@@ -36,6 +36,7 @@ export interface Family {
   relationship: string;
   dateBirth: string;
   benId: string;
+  cardNo: string;
 }
 
 export interface RefundRequest {

@@ -1,8 +1,9 @@
 import { getPatientById } from '@/domains/patient/patient.service';
-// import { config, isDevelopment } from '@/config';
+import { config, isDevelopment } from '@/config';
 import { useDemoAccount } from '@/shared/helpers';
 import { zoomService } from '@/shared/lib/zoom/zoom.service';
 import * as appointmentService from '@/domains/appointments/appointments.service';
+import * as insuranceService from '@/domains/insurance/insurance.service';
 
 import {
   CreateAppointmentDto,
@@ -69,11 +70,11 @@ export const getUserInsuranceDetails = async (userId: string, phone: string) => 
     },
   });
 
-  // if ((isDevelopment && config.insuranceService.testId) || showDemo) {
-  //   return {
-  //     beneficiaryId: config.insuranceService.testId,
-  //   };
-  // }
+  if ((isDevelopment && config.insuranceService.testId) || showDemo) {
+    return {
+      beneficiaryId: config.insuranceService.testId,
+    };
+  }
 
   return {
     beneficiaryId: misPatientProfile?.profile?.insurance?.beneficiary_external_id || misPatient?.id,
@@ -207,6 +208,7 @@ export const getDoctorAvailableSlots = async (
 
 export const createAppointment = async (newAppointment: CreateAppointmentDto) => {
   let meeting;
+  let familyMemberProgramId;
 
   if (newAppointment.isTelemedicine) {
     meeting = await zoomService.createMeeting({
@@ -214,6 +216,22 @@ export const createAppointment = async (newAppointment: CreateAppointmentDto) =>
       duration: 60, //mins
       topic: `Прием ${newAppointment.startTime}`,
     });
+  }
+
+  if (newAppointment.familyMemberId) {
+    const family = await insuranceService.getFamily(
+      newAppointment.patientId,
+      newAppointment.insuranceProgramId
+    );
+    const familyMemberInsuranceCardNo = family.find(
+      (member) => member.benId === newAppointment.familyMemberId
+    )?.cardNo;
+    if (familyMemberInsuranceCardNo) {
+      const programs = await insuranceService.getPrograms(newAppointment.familyMemberId);
+      familyMemberProgramId = programs.find(
+        (program) => program.cardNo === familyMemberInsuranceCardNo && program.status === 'ACTIVE'
+      )?.id;
+    }
   }
 
   const response = await misRequest<MISAppointmentCreateResponse>({
@@ -225,7 +243,7 @@ export const createAppointment = async (newAppointment: CreateAppointmentDto) =>
       start_time: newAppointment.startTime,
       end_time: newAppointment.endTime,
       branch: newAppointment.branchId,
-      insurance: newAppointment.insuranceProgramId,
+      insurance: familyMemberProgramId || newAppointment.insuranceProgramId,
       meeting: meeting,
       is_telemedicine: newAppointment.isTelemedicine,
     },
