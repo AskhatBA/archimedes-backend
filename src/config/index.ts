@@ -71,6 +71,11 @@ export const config = {
     appId: process.env.ONE_SIGNAL_APP_ID,
     apiAuthKey: process.env.ONE_SIGNAL_API_AUTH_KEY,
   },
+
+  appVersion: {
+    iosUrl: process.env.APP_VERSION_IOS_URL || '',
+    androidUrl: process.env.APP_VERSION_ANDROID_URL || '',
+  },
 };
 
 export const isDevelopment = config.nodeEnv === 'development';

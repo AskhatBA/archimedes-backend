@@ -7,9 +7,11 @@ import insuranceRoutes from '@/domains/insurance/insurance.routes';
 import meetingsRoutes from '@/domains/meetings/meetings.routes';
 import appointmentsRoutes from '@/domains/appointments/appointments.routes';
 import notificationsRoutes from '@/domains/notifications/notifications.routes';
+import appVersionRoutes from '@/domains/app-version/app-version.routes';
 
 export const setupRoutes = (app: Express) => {
   app.use('/v1/api/appointments', appointmentsRoutes);
+  app.use('/v1/api/app', appVersionRoutes);
   app.use('/v1/api/auth', authRoutes);
   app.use('/v1/api/patient', patientRoutes);
   app.use('/v1/api/mis', misRoutes);

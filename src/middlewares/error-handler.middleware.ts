@@ -4,6 +4,7 @@ import Sentry from '@sentry/node';
 import { AppError } from '@/shared/services/app-error.service';
 
 export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction) {
+  console.log('global error handler: ', err);
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
       success: false,

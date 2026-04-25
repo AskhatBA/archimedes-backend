@@ -107,6 +107,24 @@ enum Platform {
   WEB
 }
 
+enum AppVersionPlatform {
+  IOS
+  ANDROID
+  ALL
+}
+
+model AppVersion {
+  id                 String             @id @default(uuid()) @db.Uuid
+  platform           AppVersionPlatform
+  latestVersion      String
+  minSupportedVersion String
+  forceUpdate        Boolean            @default(false)
+  changelog          String?
+  createdAt          DateTime           @default(now())
+
+  @@index([platform, createdAt])
+}
+
 model DeviceToken {
   id        String   @id @default(uuid()) @db.Uuid
   userId    String   @db.Uuid

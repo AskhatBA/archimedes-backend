@@ -53,6 +53,7 @@ export const insuranceRequest = async <T>({
         Authorization: beneficiaryId || '',
       },
     });
+    console.log('response', response);
     return response.data;
   } catch (error) {
     console.log('insurance error', error, '; ', 'resolver', resolverName);
