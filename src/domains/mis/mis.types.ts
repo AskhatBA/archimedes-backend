@@ -12,6 +12,7 @@ export interface MISPatientBeneficiary {
   birth_date: string;
   address: string;
   address_details: string;
+  external_id: string;
   profile: {
     insurance: MISInsuranceInfo;
   };

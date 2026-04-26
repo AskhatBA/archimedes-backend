@@ -77,7 +77,8 @@ export const getUserInsuranceDetails = async (userId: string, phone: string) => 
   // }
 
   return {
-    beneficiaryId: misPatientProfile?.profile?.insurance?.beneficiary_external_id || misPatient?.id,
+    beneficiaryId:
+      misPatientProfile?.profile?.insurance?.beneficiary_external_id || misPatient?.externalId,
   };
 };
 
@@ -116,6 +117,7 @@ export const findPatientByIinAndPhone = async (
     birthDate: currentBeneficiary.birth_date || '',
     iin: currentBeneficiary.iin || '',
     gender: currentBeneficiary.gender === 0 ? 'M' : 'F',
+    externalId: currentBeneficiary.external_id || '',
   };
 };
 

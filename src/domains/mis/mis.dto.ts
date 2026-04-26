@@ -10,6 +10,7 @@ export type FindPatientResponse = {
   birthDate: string;
   gender: Gender;
   iin: string;
+  externalId: string;
 };
 
 export interface CreatePatientDto {
