@@ -30,16 +30,19 @@ export const appointmentNotificationWorker = new Worker<AppointmentNotificationJ
         return { success: false, reason: 'Appointment not scheduled' };
       }
 
-      // Format date and time
+      // Format date and time in user's local zone (Asia/Almaty, UTC+5)
       const appointmentDate = new Date(appointment.dateTime);
+      const timeZone = 'Asia/Almaty';
       const timeString = appointmentDate.toLocaleTimeString('ru-RU', {
         hour: '2-digit',
         minute: '2-digit',
+        timeZone,
       });
       const dateString = appointmentDate.toLocaleDateString('ru-RU', {
         day: 'numeric',
         month: 'long',
         year: 'numeric',
+        timeZone,
       });
 
       // Prepare notification content
