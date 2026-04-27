@@ -5,7 +5,7 @@ import { startNotificationWorker } from './shared/queues/notification.worker';
 // Start the notification worker
 startNotificationWorker();
 
-app.listen(+config.port, '0.0.0.0', () => {
+app.listen(config.port, () => {
   console.log(`Server is running on port ${config.port}`);
 });
 
