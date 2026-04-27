@@ -29,6 +29,7 @@ model User {
   deviceTokens          DeviceToken[]
   appointments          Appointment[]
   notifications         Notification[]
+  insuranceRefundRequests InsuranceRefundRequest[]
 }
 
 model Patient {
@@ -99,6 +100,25 @@ model InsuranceServiceToken {
   userId      String   @db.Uuid @unique
   accessToken String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model InsuranceRefundRequest {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @db.Uuid
+  beneficiaryId    String
+  personId         String
+  programId        String
+  category         Int
+  date             String
+  amount           Float
+  comments         String?
+  files            Json
+  externalResponse Json?
+  createdAt        DateTime @default(now())
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
 enum Platform {

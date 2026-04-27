@@ -430,6 +430,78 @@ router.get('/family', authenticate, controller.getFamily);
  */
 router.get('/refund-requests', authenticate, controller.getRefundRequests);
 
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     LocalInsuranceRefundRequestFile:
+ *       type: object
+ *       properties:
+ *         fileType:
+ *           type: string
+ *           example: 'Кассовый чек'
+ *         fileName:
+ *           type: string
+ *           example: 'cheque.pdf'
+ *     LocalInsuranceRefundRequest:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *         beneficiaryId:
+ *           type: string
+ *         personId:
+ *           type: string
+ *         personName:
+ *           type: string
+ *           example: 'Иванов Иван Иванович'
+ *         programId:
+ *           type: string
+ *         category:
+ *           type: number
+ *         date:
+ *           type: string
+ *           example: '2025-09-01'
+ *         amount:
+ *           type: number
+ *         comments:
+ *           type: string
+ *           nullable: true
+ *         files:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/LocalInsuranceRefundRequestFile'
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *     LocalInsuranceRefundRequestsResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *         refundRequests:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/LocalInsuranceRefundRequest'
+ * /insurance/local-refund-requests:
+ *   get:
+ *     summary: Get list of refund requests stored in local DB for the authenticated user
+ *     tags: [Insurance]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LocalInsuranceRefundRequestsResponse'
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/local-refund-requests', authenticate, controller.getLocalRefundRequests);
+
 router.get('/certificate/:programId', authenticate, controller.getInsuranceCertificate);
 
 /**

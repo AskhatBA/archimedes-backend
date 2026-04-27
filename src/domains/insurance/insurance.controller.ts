@@ -127,8 +127,6 @@ export const refundRequest = async (req: Request, res: Response) => {
     });
   }
 
-  console.log('refundRequest beneficiaryId', misInsurance.beneficiaryId);
-
   await insuranceService.requestRefund(
     {
       amount,
@@ -139,7 +137,8 @@ export const refundRequest = async (req: Request, res: Response) => {
       category,
       comments,
     },
-    misInsurance.beneficiaryId
+    misInsurance.beneficiaryId,
+    req.user.id
   );
 
   return res.status(200).json({
@@ -163,6 +162,19 @@ export const getRefundRequests = async (req: Request, res: Response) => {
   }
 
   const refundRequests = await insuranceService.getRefundRequests(misInsurance.beneficiaryId);
+
+  return res.status(200).json({
+    success: true,
+    refundRequests,
+  });
+};
+
+export const getLocalRefundRequests = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  const refundRequests = await insuranceService.getLocalRefundRequests(req.user.id);
 
   return res.status(200).json({
     success: true,

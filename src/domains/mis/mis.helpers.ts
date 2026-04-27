@@ -95,12 +95,12 @@ export const mapAppointmentHistory = (appointmentHistory: MISAppointmentHistory[
     startTime: appointment.start_time,
     endTime: appointment.end_time,
     doctor: {
-      id: appointment.doctor.id,
-      name: appointment.doctor.name,
-      specialtyName: appointment.doctor.specialty_name,
-      branchName: appointment.doctor.branch_name,
-      position: appointment.doctor.position,
-      appointmentDurationMinutes: appointment.doctor.appointment_duration_minutes,
+      id: appointment.doctor?.id,
+      name: appointment.doctor?.name,
+      specialtyName: appointment.doctor?.specialty_name,
+      branchName: appointment.doctor?.branch_name,
+      position: appointment.doctor?.position,
+      appointmentDurationMinutes: appointment.doctor?.appointment_duration_minutes,
     },
     actualStartTime: appointment.actual_start_time,
     diagnosis: appointment.diagnosis,
@@ -116,9 +116,9 @@ export const mapAppointmentHistory = (appointmentHistory: MISAppointmentHistory[
     appointmentTypeDisplay: appointment.appointment_type_display,
     status: appointment.status,
     branch: {
-      id: appointment.branch.id,
-      name: appointment.branch.name,
-      address: appointment.branch.address,
+      id: appointment.branch?.id,
+      name: appointment.branch?.name,
+      address: appointment.branch?.address,
     },
   }));
 };

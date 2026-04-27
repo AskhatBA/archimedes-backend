@@ -58,12 +58,14 @@ export const verifyOtp = async (phone: string, otp: string, userId: string) => {
   });
 };
 
-export const requestRefund = async (refundRequestBody: RefundRequestDTO, beneficiaryId: string) => {
+export const requestRefund = async (
+  refundRequestBody: RefundRequestDTO,
+  beneficiaryId: string,
+  userId: string
+) => {
   const userProfile = await getProfile(beneficiaryId);
 
-  console.log('refund request body:', refundRequestBody);
-
-  return insuranceRequest({
+  const externalResponse = await insuranceRequest({
     resolverName: INSURANCE_API_REFUND_REQUEST,
     beneficiaryId,
     payload: {
@@ -73,6 +75,23 @@ export const requestRefund = async (refundRequestBody: RefundRequestDTO, benefic
       phoneNo: userProfile.phoneNumber,
     },
   });
+
+  await db.prismaClient.insuranceRefundRequest.create({
+    data: {
+      userId,
+      beneficiaryId,
+      personId: refundRequestBody.personId || refundRequestBody.programId,
+      programId: refundRequestBody.programId,
+      category: refundRequestBody.category,
+      date: refundRequestBody.date,
+      amount: refundRequestBody.amount,
+      comments: refundRequestBody.comments,
+      files: refundRequestBody.files.map(({ fileType, fileName }) => ({ fileType, fileName })),
+      externalResponse: externalResponse as object,
+    },
+  });
+
+  return externalResponse;
 };
 
 export const getRefundRequests = async (beneficiaryId: string) => {
@@ -81,6 +100,40 @@ export const getRefundRequests = async (beneficiaryId: string) => {
     beneficiaryId,
   });
   return response.data;
+};
+
+export const getLocalRefundRequests = async (userId: string) => {
+  const refundRequests = await db.prismaClient.insuranceRefundRequest.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      beneficiaryId: true,
+      personId: true,
+      programId: true,
+      category: true,
+      date: true,
+      amount: true,
+      comments: true,
+      files: true,
+      createdAt: true,
+      externalResponse: true,
+    },
+  });
+
+  const profilesMap = new Map<string, ProfileData>();
+
+  const uniqueBeneficiaryIds = [...new Set(refundRequests.map((req) => req.beneficiaryId))];
+  const profiles = await Promise.all(uniqueBeneficiaryIds.map((id) => getProfile(id)));
+
+  uniqueBeneficiaryIds.forEach((id, index) => {
+    profilesMap.set(id, profiles[index]);
+  });
+
+  return refundRequests.map((refundReq) => ({
+    ...refundReq,
+    personName: profilesMap.get(refundReq.beneficiaryId)?.fullname,
+  }));
 };
 
 export const getProfile = async (beneficiaryId: string) => {
