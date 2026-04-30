@@ -69,6 +69,69 @@ router.get('/profile', authenticate, controller.getPatientProfile);
  * @openapi
  * components:
  *   schemas:
+ *     GetPatientByIinResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *         patient:
+ *           type: object
+ *           properties:
+ *             id:
+ *               type: string
+ *             userId:
+ *               type: string
+ *             firstName:
+ *               type: string
+ *             lastName:
+ *               type: string
+ *             patronymic:
+ *               type: string
+ *             fullName:
+ *               type: string
+ *             birthDate:
+ *               type: string
+ *             gender:
+ *               type: string
+ *             iin:
+ *               type: string
+ *             misPatientId:
+ *               type: string
+ * /patient/by-iin/{iin}:
+ *   get:
+ *     summary: Get patient info by IIN
+ *     tags: [Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: iin
+ *         in: path
+ *         description: 12-digit IIN
+ *         required: true
+ *         schema:
+ *           type: string
+ *           minLength: 12
+ *           maxLength: 12
+ *     responses:
+ *       200:
+ *         description: Patient found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/GetPatientByIinResponse'
+ *       400:
+ *         description: Invalid IIN
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Patient not found
+ */
+router.get('/by-iin/:iin', authenticate, controller.getPatientByIin);
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
  *     CreatePatientBody:
  *       type: object
  *       required:

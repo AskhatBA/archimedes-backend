@@ -8,6 +8,12 @@ export const getPatientById = (userId: string) => {
   });
 };
 
+export const getPatientByIin = (iin: string) => {
+  return db.prismaClient.patient.findUnique({
+    where: { iin },
+  });
+};
+
 export const createPatient = (patient: PatientDto) => {
   return db.prismaClient.patient.create({
     data: {
