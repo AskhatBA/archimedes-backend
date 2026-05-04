@@ -31,3 +31,10 @@ export const saveRefreshToken = async (userId: string, token: string) => {
     data: { refreshToken: token },
   });
 };
+
+export const updateUserPhone = async (userId: string, phone: string) => {
+  return db.prismaClient.user.update({
+    where: { id: userId },
+    data: { phone },
+  });
+};

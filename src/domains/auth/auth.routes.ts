@@ -1,5 +1,7 @@
 import { Router } from 'express';
 
+import { authenticate } from '@/middlewares/auth.middleware';
+
 import * as controller from './auth.controller';
 
 const router = Router();
@@ -15,8 +17,12 @@ const router = Router();
  *       properties:
  *         phone:
  *           type: string
- *           description: Phone number starting with 7 followed by 10 digits
+ *           description: Phone number starting with 7 followed by 10 digits. Ignored if `iin` is supplied and resolves to a phone in the insurance service.
  *           example: "77771400962"
+ *         iin:
+ *           type: string
+ *           description: Optional 12-digit IIN. When supplied, the authoritative phone is fetched from the insurance service and the local user's phone is synced if it has changed.
+ *           example: "630301350211"
  *     RequestOTPResponse:
  *        type: object
  *        properties:
@@ -102,6 +108,59 @@ router.post('/request-otp', controller.requestOtp);
  *         description: Invalid or expired OTP
  */
 router.post('/verify-otp', controller.verifyOtp);
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     ChangePhoneBody:
+ *       type: object
+ *       required:
+ *         - phone
+ *       properties:
+ *         phone:
+ *           type: string
+ *           description: New phone number starting with 7 followed by 10 digits
+ *           example: "77051234567"
+ *     ChangePhoneResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *         user:
+ *           type: object
+ *           properties:
+ *             id:
+ *               type: string
+ *             phone:
+ *               type: string
+ *             role:
+ *               type: string
+ * /auth/change-phone:
+ *   post:
+ *     summary: Update authenticated user's phone number
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ChangePhoneBody'
+ *     responses:
+ *       200:
+ *         description: Phone updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ChangePhoneResponse'
+ *       400:
+ *         description: Invalid phone or already in use
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/change-phone', authenticate, controller.changePhone);
 
 router.post('/create-demo-account', controller.createDemoAccount);
 
