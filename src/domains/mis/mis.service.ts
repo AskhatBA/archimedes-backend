@@ -78,7 +78,9 @@ export const getUserInsuranceDetails = async (userId: string, phone: string) => 
 
   return {
     beneficiaryId:
-      misPatientProfile?.profile?.insurance?.beneficiary_external_id || misPatient?.externalId,
+      misPatientProfile?.profile?.insurance?.beneficiary_external_id ||
+      misPatient?.externalId ||
+      misPatient?.id,
   };
 };
 
