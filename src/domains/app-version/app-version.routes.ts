@@ -1,7 +1,5 @@
 import { Router } from 'express';
 
-import { authenticate } from '@/middlewares/auth.middleware';
-
 import * as controller from './app-version.controller';
 
 const router = Router();
@@ -130,6 +128,6 @@ const router = Router();
  *         description: Forbidden — admin role required
  */
 router.get('/version', controller.getVersion);
-router.post('/version', authenticate, controller.createVersion);
+router.post('/version', controller.createVersion);
 
 export default router;
