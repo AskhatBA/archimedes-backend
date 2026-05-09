@@ -136,3 +136,11 @@ export interface CheckIinResponse {
   phone?: string;
   message?: string;
 }
+
+export interface News {
+  image: string;
+  title: string;
+  date: string;
+  message: string;
+  url: string;
+}

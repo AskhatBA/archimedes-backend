@@ -198,6 +198,8 @@ export const getPrograms = async (req: Request, res: Response) => {
 
   const programs = await insuranceService.getPrograms(misInsurance.beneficiaryId);
 
+  console.log('programs::::', programs);
+
   return res.status(200).json({
     success: true,
     programs,
@@ -419,6 +421,15 @@ export const getClinicTypes = async (req: Request, res: Response) => {
   return res.status(200).json({
     success: true,
     clinicTypes: response,
+  });
+};
+
+export const getNews = async (_req: Request, res: Response) => {
+  const news = await insuranceService.getNews();
+
+  return res.status(200).json({
+    success: true,
+    news,
   });
 };
 

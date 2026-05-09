@@ -876,4 +876,51 @@ router.patch(
  */
 router.get('/check-iin', controller.checkIin);
 
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     InsuranceNewsItem:
+ *       type: object
+ *       required: [image, title, date, message, url]
+ *       properties:
+ *         image:
+ *           type: string
+ *           description: Base64-encoded image content
+ *           example: "/9j/4AAQSkZJRgABAQEBLAEsAAD..."
+ *         title:
+ *           type: string
+ *           example: "Объявление касательно рассылки результатов анализов"
+ *         date:
+ *           type: string
+ *           format: date-time
+ *           example: "2025-08-27T00:00:00"
+ *         message:
+ *           type: string
+ *           example: "Уважаемые клиенты! ..."
+ *         url:
+ *           type: string
+ *           example: "https://archimedes.kz/"
+ * /insurance/news:
+ *   get:
+ *     summary: Get list of news from insurance service
+ *     tags: [Insurance]
+ *     responses:
+ *       200:
+ *         description: Response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 news:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/InsuranceNewsItem'
+ */
+router.get('/news', controller.getNews);
+
 export default router;
