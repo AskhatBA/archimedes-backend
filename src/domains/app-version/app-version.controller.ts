@@ -37,15 +37,6 @@ export const getVersion = async (req: Request, res: Response) => {
 };
 
 export const createVersion = async (req: Request, res: Response) => {
-  console.log('createversion');
-  if (!req.user) {
-    throw new AppError('Unauthorized', 401);
-  }
-
-  // if (req.user.role !== 'ADMIN') {
-  //   throw new AppError('Forbidden', 403);
-  // }
-
   await body('platform')
     .isIn(['ios', 'android', 'all'])
     .withMessage('platform must be "ios", "android", or "all"')
