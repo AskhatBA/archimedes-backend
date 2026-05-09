@@ -2,7 +2,6 @@ import { Request, Response } from 'express';
 import { body, query, validationResult } from 'express-validator';
 
 import { config } from '@/config';
-import { AppError } from '@/shared/services/app-error.service';
 
 import * as appVersionService from './app-version.service';
 import type { AppVersionPlatformParam, AppVersionResponse } from './app-version.dto';
