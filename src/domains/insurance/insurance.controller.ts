@@ -463,6 +463,10 @@ export const updateElectronicReferralServiceStatus = async (req: Request, res: R
     .notEmpty()
     .withMessage('Service status referral id is required')
     .run(req);
+  await body('satisfactionLevel')
+    .notEmpty()
+    .withMessage('Service status referral id is required')
+    .run(req);
 
   const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
 
@@ -476,7 +480,8 @@ export const updateElectronicReferralServiceStatus = async (req: Request, res: R
   await insuranceService.updateElectronicReferralServiceStatus(
     misInsurance.beneficiaryId,
     req.params.electronicReferralId,
-    req.body.serviceStatus
+    req.body.serviceStatus,
+    req.body.satisfactionLevel
   );
 
   return res.status(200).json({

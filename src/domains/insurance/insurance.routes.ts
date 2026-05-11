@@ -792,10 +792,14 @@ router.get('/clinic-types', authenticate, controller.getClinicTypes);
  *       example: 1
  *     UpdateElectronicReferralServiceStatusBody:
  *       type: object
- *       required: [serviceStatus]
+ *       required: [serviceStatus, satisfactionLevel]
  *       properties:
  *         serviceStatus:
  *           $ref: '#/components/schemas/ElectronicReferralServiceStatus'
+ *         satisfactionLevel:
+ *           type: string
+ *           description: User-provided satisfaction level for the appointment
+ *           example: "5"
  * /insurance/electronic-referrals/{electronicReferralId}/service-status:
  *   patch:
  *     summary: Update electronic referral service status

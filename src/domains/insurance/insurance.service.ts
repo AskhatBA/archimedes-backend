@@ -228,12 +228,17 @@ export const getElectronicReferrals = async (beneficiaryId: string, programId: s
 export const updateElectronicReferralServiceStatus = async (
   beneficiaryId: string,
   appointmentId: string,
-  satisfactionLevel: ElectronicReferralServiceStatus
+  status: ElectronicReferralServiceStatus,
+  satisfactionLevel: string
 ) => {
   const response = await insuranceRequest<{ errorCode: number; data: AppointmentItem }>({
     resolverName: INSURANCE_API_UPDATE_ELECTRONIC_REFERRALS,
     beneficiaryId,
-    query: { AppointmentId: Number(appointmentId), SatisfactionLevel: Number(satisfactionLevel) },
+    query: {
+      AppointmentId: Number(appointmentId),
+      SatisfactionLevel: Number(satisfactionLevel),
+      Status: Number(status),
+    },
   });
   return response.data;
 };
