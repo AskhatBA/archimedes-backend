@@ -89,20 +89,13 @@ export const createPatientProfile = async (req: Request, res: Response) => {
     .withMessage('Gender must be either M or F')
     .run(req);
 
-  const { isDemoAccount } = useDemoAccount();
   const errors = validationResult(req);
 
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  let phone = req.user.phone.slice(1);
-
-  if (isDemoAccount(req.user.phone, req.body.iin)) {
-    phone = '7775710058';
-  }
-
-  const misPatient = await misService.findPatientByIinAndPhone(req.body.iin, `8${phone}`);
+  const misPatient = await misService.findPatientByIinAndPhone(req.body.iin);
 
   if (!misPatient) {
     return res.status(400).json({

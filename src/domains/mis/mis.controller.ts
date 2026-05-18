@@ -3,7 +3,6 @@ import { query, param, body, validationResult } from 'express-validator';
 
 import { AppError } from '@/shared/services/app-error.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
-import { useDemoAccount } from '@/shared/helpers';
 
 import * as patientService from '../patient/patient.service';
 
@@ -14,20 +13,9 @@ export const findPatient = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
 
-  const { isDemoAccount } = useDemoAccount();
-
   await query('iin').notEmpty().withMessage('IIN is required').run(req);
 
-  let phone = req.user.phone;
-
-  if (isDemoAccount(req.user.phone, req.query.iin as string)) {
-    phone = '7775710058';
-  }
-
-  const patient = await misService.findPatientByIinAndPhone(
-    (req.query.iin as string) || '',
-    `8${phone.slice(1)}`
-  );
+  const patient = await misService.findPatientByIinAndPhone((req.query.iin as string) || '');
 
   return res.status(200).json({
     success: true,

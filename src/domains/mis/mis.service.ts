@@ -54,13 +54,10 @@ export const getUserInsuranceDetails = async (userId: string, phone: string) => 
   const patient = await getPatientById(userId);
   if (!patient) return;
 
-  const { isDemoAccount, misIin, misPhone } = useDemoAccount();
+  const { isDemoAccount, misIin } = useDemoAccount();
   const showDemo = isDemoAccount(phone, patient.iin);
 
-  const misPatient = await findPatientByIinAndPhone(
-    showDemo ? misIin : patient.iin,
-    showDemo ? misPhone : phone
-  );
+  const misPatient = await findPatientByIinAndPhone(showDemo ? misIin : patient.iin);
   if (!misPatient) return;
 
   const misPatientProfile = await misRequest<MISFindPatientResponse>({
@@ -86,7 +83,7 @@ export const getUserInsuranceDetails = async (userId: string, phone: string) => 
 
 export const findPatientByIinAndPhone = async (
   iin: string,
-  phone: string
+  phone?: string
 ): Promise<FindPatientResponse | undefined> => {
   const misPatientDetail = await misRequest<MISFindPatientResponse>({
     resolverName: MIS_API_GET_USER_BY_PHONE,
