@@ -8,6 +8,7 @@ import meetingsRoutes from '@/domains/meetings/meetings.routes';
 import appointmentsRoutes from '@/domains/appointments/appointments.routes';
 import notificationsRoutes from '@/domains/notifications/notifications.routes';
 import appVersionRoutes from '@/domains/app-version/app-version.routes';
+import userRoutes from '@/domains/user/user.routes';
 
 export const setupRoutes = (app: Express) => {
   app.use('/v1/api/appointments', appointmentsRoutes);
@@ -18,6 +19,7 @@ export const setupRoutes = (app: Express) => {
   app.use('/v1/api/insurance', insuranceRoutes);
   app.use('/v1/api/meetings', meetingsRoutes);
   app.use('/v1/api/notifications', notificationsRoutes);
+  app.use('/v1/api/user', userRoutes);
   app.get('/v1/api/debug-sentry', function mainHandler() {
     throw new Error('My first Sentry error!');
   });
