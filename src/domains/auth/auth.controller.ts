@@ -7,7 +7,6 @@ import { AppError } from '@/shared/services/app-error.service';
 import * as otpService from '@/shared/services/otp.service';
 import * as jwtService from '@/shared/services/jwt.service';
 import * as smsService from '@/infrastructure/sms/sms.service';
-import { useDemoAccount } from '@/shared/helpers';
 import * as insuranceService from '@/domains/insurance/insurance.service';
 import * as patientService from '@/domains/patient/patient.service';
 
@@ -20,15 +19,25 @@ export const requestOtp = async (req: Request, res: Response) => {
 
   if (iin) {
     const checkIin = await insuranceService.checkIin(iin);
+    const patient = await patientService.getPatientByIin(iin);
+
     if (checkIin.errorCode === 0 && checkIin.phone) {
+      if (checkIin.phone !== phone) {
+        throw new AppError(ErrorCodes.INSURANCE_PHONE_IS_NOT_MATCHED, 400);
+      }
+
       phone = checkIin.phone;
 
-      const patient = await patientService.getPatientByIin(iin);
       if (patient) {
         const existingUser = await authService.findUserById(patient.userId);
         if (existingUser && existingUser.phone !== phone) {
           await authService.updateUserPhone(patient.userId, phone);
         }
+      }
+    } else if (patient) {
+      const existingUser = await authService.findUserById(patient.userId);
+      if (existingUser?.phone !== phone) {
+        throw new AppError(ErrorCodes.INSURANCE_PHONE_IS_NOT_MATCHED, 400);
       }
     }
   }
@@ -37,13 +46,12 @@ export const requestOtp = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.INVALID_PHONE, 400);
   }
 
-  const { otp: demoOtp, phone: demoPhone } = useDemoAccount();
-  const otp = phone === demoPhone ? demoOtp : otpService.generateOTPCode();
+  const otp = otpService.generateOTPCode();
   const hashedOTP = await otpService.hashOTP(otp);
   const user = await authService.findUserByPhone(phone);
   const isUserExists = !!user?.id;
 
-  if (isProduction && phone !== demoPhone) {
+  if (isProduction) {
     await smsService.sendSMS(phone, `Код для авторизации: ${otp}`);
   }
 

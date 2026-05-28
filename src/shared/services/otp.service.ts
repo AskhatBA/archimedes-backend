@@ -17,25 +17,12 @@ export const hashOTP = (otp: string) => {
 
 export const saveOTP = async (userId: string, code: string): Promise<void> => {
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes from now
-  const otp = await prismaClient.oTP.findFirst({ where: { userId, used: false } });
 
-  if (!otp) {
-    await prismaClient.oTP.create({
-      data: {
-        userId,
-        code,
-        expiresAt,
-      },
-    });
-  } else {
-    await prismaClient.oTP.update({
-      where: { userId },
-      data: {
-        code,
-        expiresAt,
-      },
-    });
-  }
+  await prismaClient.oTP.upsert({
+    where: { userId },
+    create: { userId, code, expiresAt },
+    update: { code, expiresAt, used: false },
+  });
 };
 
 export const validateOTP = async (phone: string, code: string): Promise<boolean> => {
@@ -56,15 +43,20 @@ export const validateOTP = async (phone: string, code: string): Promise<boolean>
     throw new AppError(ErrorCodes.INVALID_OTP, 400);
   }
 
+  if (otp.expiresAt < new Date()) {
+    throw new AppError(ErrorCodes.OTP_EXPIRED, 400);
+  }
+
   const isValidOTP = await bcrypt.compare(code, otp.code);
 
   if (!isValidOTP) {
     throw new AppError(ErrorCodes.INVALID_OTP, 400);
   }
 
-  if (otp.expiresAt < new Date()) {
-    throw new AppError(ErrorCodes.OTP_EXPIRED, 400);
-  }
+  await prismaClient.oTP.update({
+    where: { id: otp.id },
+    data: { used: true },
+  });
 
   return true;
 };

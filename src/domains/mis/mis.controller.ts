@@ -171,10 +171,6 @@ export const createAppointment = async (req: Request, res: Response) => {
   await body('startTime').notEmpty().withMessage('Start time is required').run(req);
   await body('endTime').notEmpty().withMessage('End time is required').run(req);
   await body('branchId').notEmpty().withMessage('Branch ID is required').run(req);
-  await body('insuranceProgramId')
-    .notEmpty()
-    .withMessage('Insurance program ID is required')
-    .run(req);
   await body('isTelemedicine')
     .notEmpty()
     .withMessage('isTelemedicine is required')
