@@ -144,3 +144,21 @@ export interface News {
   message: string;
   url: string;
 }
+
+export interface QrAppointmentDetail {
+  id: number;
+  service: string;
+  amount: number;
+}
+
+export interface QrAppointmentItem {
+  id: number;
+  code: number;
+  date: string;
+  name: string;
+  medical_institution: string;
+  diagnosis: string;
+  amount: number;
+  currency: string;
+  appointmentDetail: QrAppointmentDetail[];
+}

@@ -843,6 +843,126 @@ router.patch(
 
 /**
  * @openapi
+ * components:
+ *   schemas:
+ *     QrAppointmentDetail:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *           example: 8066666
+ *         service:
+ *           type: string
+ *           example: "Рентгенография поясничного отдела позвоночника"
+ *         amount:
+ *           type: number
+ *           example: 6000
+ *     QrAppointmentItem:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *           example: 2115523
+ *         code:
+ *           type: integer
+ *           example: 0
+ *         date:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-06-16T00:00:00"
+ *         name:
+ *           type: string
+ *           example: "Тохтаев Расул Русланович"
+ *         medical_institution:
+ *           type: string
+ *           example: "Алматы, ТОО \"Orhun Medical\" (Орхун Медикал), апп"
+ *         diagnosis:
+ *           type: string
+ *           example: "Остеохондроз позвоночника"
+ *         amount:
+ *           type: number
+ *           example: 6000
+ *         currency:
+ *           type: string
+ *           example: "KZT"
+ *         appointmentDetail:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/QrAppointmentDetail'
+ * /insurance/qr/appointments:
+ *   get:
+ *     summary: Get QR appointments for a clinic
+ *     tags: [Insurance]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: clinicId
+ *         in: query
+ *         description: Clinic ID (GUID)
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/QrAppointmentItem'
+ */
+router.get('/qr/appointments', authenticate, controller.getQrAppointments);
+
+/**
+ * @openapi
+ * /insurance/qr/submit-appointment:
+ *   get:
+ *     summary: Submit a QR appointment
+ *     tags: [Insurance]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: clinicId
+ *         in: query
+ *         description: Clinic ID (GUID)
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - name: appCode
+ *         in: query
+ *         description: Appointment code
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *       400:
+ *         description: appCode is required
+ */
+router.get('/qr/submit-appointment', authenticate, controller.submitQrAppointment);
+
+/**
+ * @openapi
  * /insurance/check-iin:
  *   get:
  *     summary: Check if IIN is registered in the insurance service

@@ -16,6 +16,11 @@ export const INSURANCE_API_UPDATE_ELECTRONIC_REFERRALS = '/v3/client/updateAppoi
 export const INSURANCE_API_GET_CLINIC_TYPES = '/v3/clinicTypes';
 export const INSURANCE_API_CHECK_IIN = '/v3/checkPhone';
 export const INSURANCE_API_GET_NEWS = '/v3/news';
+export const INSURANCE_API_QR_GET_APPOINTMENTS = '/v3/qr/getAppointments';
+export const INSURANCE_API_QR_SUBMIT_APPOINTMENT = '/v3/qr/submitAppointment';
+
+export const HARDCODED_TEST_BENEFICIARY_ID = '4CB21009-5A2B-4166-9F90-020B28D7ED2C';
+export const HARDCODED_TEST_CLINIC_ID = '45089042-F446-4E32-8BE1-B6D281232A91';
 
 export const insuranceApiResolverDefault = {
   [INSURANCE_API_GET_PROGRAMS]: {
@@ -89,6 +94,14 @@ export const insuranceApiResolverDefault = {
     defaultPayload: {},
   },
   [INSURANCE_API_GET_NEWS]: {
+    method: 'GET',
+    defaultPayload: {},
+  },
+  [INSURANCE_API_QR_GET_APPOINTMENTS]: {
+    method: 'GET',
+    defaultPayload: {},
+  },
+  [INSURANCE_API_QR_SUBMIT_APPOINTMENT]: {
     method: 'GET',
     defaultPayload: {},
   },

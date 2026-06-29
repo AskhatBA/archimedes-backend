@@ -433,6 +433,78 @@ export const getNews = async (_req: Request, res: Response) => {
   });
 };
 
+export const getQrAppointments = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  const errors = validationResult(req);
+
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: errors.array(),
+    });
+  }
+
+  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+
+  if (!misInsurance?.beneficiaryId) {
+    return res.status(404).json({
+      success: false,
+      message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
+    });
+  }
+
+  const data = await insuranceService.getQrAppointments(
+    misInsurance.beneficiaryId,
+    req.query.clinicId as string
+  );
+
+  return res.status(200).json({
+    success: true,
+    data,
+  });
+};
+
+export const submitQrAppointment = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  await query('appCode').notEmpty().withMessage('appCode is required').isInt().run(req);
+  await query('clinicId').notEmpty().withMessage('clinicId is required').run(req);
+
+  const errors = validationResult(req);
+
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: errors.array(),
+    });
+  }
+
+  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+
+  if (!misInsurance?.beneficiaryId) {
+    return res.status(404).json({
+      success: false,
+      message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
+    });
+  }
+
+  const data = await insuranceService.submitQrAppointment(
+    misInsurance.beneficiaryId,
+    req.query.clinicId as string,
+    Number(req.query.appCode)
+  );
+
+  return res.status(200).json({
+    success: true,
+    data,
+  });
+};
+
 export const checkIin = async (req: Request, res: Response) => {
   await query('iin').notEmpty().withMessage('IIN is required').run(req);
 
