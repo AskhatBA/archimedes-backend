@@ -6,6 +6,8 @@ import { ErrorCodes } from '@/shared/constants/error-codes';
 import { AppError } from '@/shared/services/app-error.service';
 import * as otpService from '@/shared/services/otp.service';
 import * as jwtService from '@/shared/services/jwt.service';
+import * as auditLogService from '@/shared/services/audit-log.service';
+import { AuditEvent } from '@/shared/services/audit-log.service';
 import * as smsService from '@/infrastructure/sms/sms.service';
 import * as insuranceService from '@/domains/insurance/insurance.service';
 import * as patientService from '@/domains/patient/patient.service';
@@ -77,7 +79,21 @@ export const requestOtp = async (req: Request, res: Response) => {
 export const verifyOtp = async (req: Request, res: Response) => {
   const { phone, otp } = req.body;
 
-  await otpService.validateOTP(phone, otp);
+  try {
+    await otpService.validateOTP(phone, otp);
+  } catch (err) {
+    const user = await authService.findUserByPhone(phone).catch(() => null);
+    await auditLogService.log({
+      event: AuditEvent.AUTH_LOGIN_FAILED,
+      success: false,
+      ...(user?.id !== undefined && { userId: user.id }),
+      phone,
+      req,
+      metadata: { reason: err instanceof AppError ? err.message : 'OTP validation failed' },
+    });
+    throw err;
+  }
+
   const user = await authService.findUserByPhone(phone);
 
   if (!user) {
@@ -87,11 +103,37 @@ export const verifyOtp = async (req: Request, res: Response) => {
   const tokens = jwtService.generateTokenPair({ userId: user.id, role: Role.PATIENT });
   await jwtService.saveRefreshToken(user.id, tokens.refreshToken);
 
+  await auditLogService.log({
+    event: AuditEvent.AUTH_LOGIN_SUCCESS,
+    success: true,
+    userId: user.id,
+    phone,
+    req,
+  });
+
   return res.status(200).json({
     success: true,
     accessToken: tokens.accessToken,
     refreshToken: tokens.refreshToken,
   });
+};
+
+export const logout = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  await authService.clearRefreshToken(req.user.id);
+
+  await auditLogService.log({
+    event: AuditEvent.AUTH_LOGOUT,
+    success: true,
+    userId: req.user.id,
+    phone: req.user.phone,
+    req,
+  });
+
+  return res.status(200).json({ success: true });
 };
 
 export const changePhone = async (req: Request, res: Response) => {

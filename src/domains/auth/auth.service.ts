@@ -38,3 +38,10 @@ export const updateUserPhone = async (userId: string, phone: string) => {
     data: { phone },
   });
 };
+
+export const clearRefreshToken = async (userId: string): Promise<void> => {
+  await db.prismaClient.user.update({
+    where: { id: userId },
+    data: { refreshToken: null },
+  });
+};

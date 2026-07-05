@@ -164,4 +164,28 @@ router.post('/change-phone', authenticate, controller.changePhone);
 
 router.post('/create-demo-account', controller.createDemoAccount);
 
+/**
+ * @openapi
+ * /auth/logout:
+ *   post:
+ *     summary: Invalidate the current session by clearing the refresh token
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logged out successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/logout', authenticate, controller.logout);
+
 export default router;

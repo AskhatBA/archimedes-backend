@@ -32,6 +32,7 @@ model User {
   notifications         Notification[]
   insuranceRefundRequests InsuranceRefundRequest[]
   payments              Payment[]
+  auditLogs             AuditLog[]
 }
 
 model Patient {
@@ -183,6 +184,31 @@ enum NotificationStatus {
   SENT
   DELIVERED
   FAILED
+}
+
+enum AuditEvent {
+  AUTH_OTP_REQUEST
+  AUTH_LOGIN_SUCCESS
+  AUTH_LOGIN_FAILED
+  AUTH_LOGOUT
+}
+
+model AuditLog {
+  id        String     @id @default(uuid()) @db.Uuid
+  event     AuditEvent
+  success   Boolean
+  userId    String?    @db.Uuid
+  user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  phone     String?
+  ipAddress String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime   @default(now())
+
+  @@index([event])
+  @@index([userId])
+  @@index([phone])
+  @@index([createdAt])
 }
 
 model Notification {
