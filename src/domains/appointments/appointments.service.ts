@@ -1,6 +1,8 @@
 import { AppointmentStatus, Role } from '@prisma/client';
 
 import * as db from '@/infrastructure/db';
+import { AppError } from '@/shared/services/app-error.service';
+import { ErrorCodes } from '@/shared/constants/error-codes';
 import {
   scheduleAppointmentNotification,
   cancelAppointmentNotification,
@@ -25,6 +27,42 @@ export const getAppointmentById = (id: string, userId: string) => {
   });
 };
 
+export const checkAppointmentConflicts = async (
+  patientId: string,
+  doctorId: string,
+  dateTime: Date
+): Promise<void> => {
+  const startOfDay = new Date(dateTime);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(dateTime);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const [dateConflict, doctorConflict] = await Promise.all([
+    db.prismaClient.appointment.findFirst({
+      where: {
+        patientId,
+        dateTime: { gte: startOfDay, lte: endOfDay },
+        status: AppointmentStatus.SCHEDULED,
+      },
+    }),
+    db.prismaClient.appointment.findFirst({
+      where: {
+        doctorId,
+        dateTime,
+        status: AppointmentStatus.SCHEDULED,
+      },
+    }),
+  ]);
+
+  if (dateConflict) {
+    throw new AppError(ErrorCodes.APPOINTMENT_DATE_CONFLICT, 409);
+  }
+
+  if (doctorConflict) {
+    throw new AppError(ErrorCodes.APPOINTMENT_DOCTOR_UNAVAILABLE, 409);
+  }
+};
+
 export const createAppointment = async (data: {
   userId: string;
   patientId: string;
@@ -36,6 +74,8 @@ export const createAppointment = async (data: {
   meetingUrl?: string;
   isTelemedicine?: boolean;
 }) => {
+  await checkAppointmentConflicts(data.patientId, data.doctorId, data.dateTime);
+
   const appointment = await db.prismaClient.appointment.create({
     data: {
       patientId: data.patientId,

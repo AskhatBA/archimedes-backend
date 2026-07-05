@@ -3,6 +3,8 @@ import { body, param, validationResult } from 'express-validator';
 import { Role } from '@prisma/client';
 
 import { AppError } from '@/shared/services/app-error.service';
+import * as auditLogService from '@/shared/services/audit-log.service';
+import { AuditEvent } from '@/shared/services/audit-log.service';
 
 import * as appointmentsService from './appointments.service';
 
@@ -34,6 +36,14 @@ export const getAppointmentById = async (req: Request, res: Response) => {
   const appointment = await appointmentsService.getAppointmentById(req.params.id, req.user.id);
 
   if (!appointment) {
+    auditLogService.log({
+      event: AuditEvent.APPOINTMENT_ACCESS_DENIED,
+      success: false,
+      userId: req.user.id,
+      phone: req.user.phone,
+      req,
+      metadata: { action: 'get', appointmentId: req.params.id },
+    });
     return res.status(404).json({
       success: false,
       message: 'Appointment not found',
@@ -67,8 +77,9 @@ export const createAppointment = async (req: Request, res: Response) => {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const appointment = await appointmentsService
-    .createAppointment({
+  let appointment;
+  try {
+    appointment = await appointmentsService.createAppointment({
       userId: req.user.id,
       patientId: req.body.patientId,
       doctorId: req.body.doctorId,
@@ -76,10 +87,22 @@ export const createAppointment = async (req: Request, res: Response) => {
       dateTime: new Date(req.body.dateTime),
       notes: req.body.notes,
       status: req.body.status,
-    })
-    .catch((err) => {
-      console.log(err);
     });
+  } catch (err) {
+    await auditLogService.log({
+      event: AuditEvent.APPOINTMENT_CONFLICT,
+      success: false,
+      userId: req.user.id,
+      phone: req.user.phone,
+      req,
+      metadata: {
+        reason: err instanceof AppError ? err.message : 'Appointment creation failed',
+        doctorId: req.body.doctorId as string,
+        dateTime: req.body.dateTime as string,
+      },
+    });
+    throw err;
+  }
 
   return res.status(201).json({
     success: true,
@@ -113,6 +136,14 @@ export const updateAppointment = async (req: Request, res: Response) => {
   });
 
   if (result.count === 0) {
+    auditLogService.log({
+      event: AuditEvent.APPOINTMENT_ACCESS_DENIED,
+      success: false,
+      userId: req.user.id,
+      phone: req.user.phone,
+      req,
+      metadata: { action: 'update', appointmentId: req.params.id },
+    });
     return res.status(404).json({
       success: false,
       message: 'Appointment not found or you do not have permission to update it',
@@ -144,6 +175,14 @@ export const deleteAppointment = async (req: Request, res: Response) => {
   );
 
   if (result.count === 0) {
+    auditLogService.log({
+      event: AuditEvent.APPOINTMENT_ACCESS_DENIED,
+      success: false,
+      userId: req.user.id,
+      phone: req.user.phone,
+      req,
+      metadata: { action: 'delete', appointmentId: req.params.id },
+    });
     return res.status(404).json({
       success: false,
       message: 'Appointment not found or you do not have permission to delete it',
@@ -171,6 +210,14 @@ export const cancelAppointment = async (req: Request, res: Response) => {
   const result = await appointmentsService.cancelAppointment(req.params.id, req.user.id);
 
   if (result.count === 0) {
+    auditLogService.log({
+      event: AuditEvent.APPOINTMENT_ACCESS_DENIED,
+      success: false,
+      userId: req.user.id,
+      phone: req.user.phone,
+      req,
+      metadata: { action: 'cancel', appointmentId: req.params.id },
+    });
     return res.status(404).json({
       success: false,
       message: 'Appointment not found or you do not have permission to cancel it',
