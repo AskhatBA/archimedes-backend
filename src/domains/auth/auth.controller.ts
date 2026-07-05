@@ -79,6 +79,19 @@ export const requestOtp = async (req: Request, res: Response) => {
 export const verifyOtp = async (req: Request, res: Response) => {
   const { phone, otp } = req.body;
 
+  if (!otp) {
+    const user = await authService.findUserByPhone(phone).catch(() => null);
+    await auditLogService.log({
+      event: AuditEvent.AUTH_LOGIN_FAILED,
+      success: false,
+      ...(user?.id !== undefined && { userId: user.id }),
+      phone,
+      req,
+      metadata: { reason: 'OTP_NOT_PROVIDED' },
+    });
+    throw new AppError(ErrorCodes.INVALID_OTP, 400);
+  }
+
   try {
     await otpService.validateOTP(phone, otp);
   } catch (err) {
