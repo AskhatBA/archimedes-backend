@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { body, param, validationResult } from 'express-validator';
 
 import { AppError } from '@/shared/services/app-error.service';
+import * as auditLogService from '@/shared/services/audit-log.service';
+import { AuditEvent } from '@/shared/services/audit-log.service';
 import { useDemoAccount } from '@/shared/helpers';
 
 import * as misService from '../mis/mis.service';
@@ -117,6 +119,15 @@ export const createPatientProfile = async (req: Request, res: Response) => {
     misPatientId: misPatient.id,
   });
 
+  auditLogService.log({
+    event: AuditEvent.USER_PROFILE_CREATED,
+    success: true,
+    userId: req.user.id,
+    phone: req.user.phone,
+    req,
+    metadata: { iin: req.body.iin as string },
+  });
+
   return res.status(200).json({ success: true, patient: newPatient });
 };
 
@@ -145,6 +156,15 @@ export const createDemoPatient = async (req: Request, res: Response) => {
     gender: 'M',
     iin: demoIin,
     misPatientId: misPatient.id,
+  });
+
+  auditLogService.log({
+    event: AuditEvent.USER_PROFILE_CREATED,
+    success: true,
+    userId: req.user.id,
+    phone: req.user.phone,
+    req,
+    metadata: { iin: demoIin, demo: true },
   });
 
   return res.status(200).json({ success: true, patient: newPatient });

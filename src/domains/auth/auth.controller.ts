@@ -34,6 +34,14 @@ export const requestOtp = async (req: Request, res: Response) => {
         const existingUser = await authService.findUserById(patient.userId);
         if (existingUser && existingUser.phone !== phone) {
           await authService.updateUserPhone(patient.userId, phone);
+          auditLogService.log({
+            event: AuditEvent.USER_PHONE_CHANGED,
+            success: true,
+            userId: patient.userId,
+            phone,
+            req,
+            metadata: { source: 'insurance_sync', previousPhone: existingUser.phone },
+          });
         }
       }
     } else if (patient) {
@@ -70,6 +78,14 @@ export const requestOtp = async (req: Request, res: Response) => {
   });
 
   await otpService.saveOTP(createdUser.id, hashedOTP);
+
+  auditLogService.log({
+    event: AuditEvent.USER_ACCOUNT_CREATED,
+    success: true,
+    userId: createdUser.id,
+    phone,
+    req,
+  });
 
   return res
     .status(200)
@@ -167,6 +183,15 @@ export const changePhone = async (req: Request, res: Response) => {
   }
 
   const updated = await authService.updateUserPhone(req.user.id, phone);
+
+  auditLogService.log({
+    event: AuditEvent.USER_PHONE_CHANGED,
+    success: true,
+    userId: req.user.id,
+    phone,
+    req,
+    metadata: { previousPhone: req.user.phone, newPhone: phone },
+  });
 
   return res.status(200).json({
     success: true,
