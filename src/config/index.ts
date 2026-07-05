@@ -76,6 +76,15 @@ export const config = {
     iosUrl: process.env.APP_VERSION_IOS_URL || '',
     androidUrl: process.env.APP_VERSION_ANDROID_URL || '',
   },
+
+  freedomPay: {
+    merchantId: Number(process.env.FREEDOMPAY_MERCHANT_ID) || 587251,
+    secretKey: process.env.FREEDOMPAY_SECRET_KEY || 'n3EdQzxXq4M0Qcvr',
+    apiUrl: process.env.FREEDOMPAY_API_URL || 'https://api.freedompay.kz',
+    callbackUrl: process.env.FREEDOMPAY_CALLBACK_URL || '',
+    successUrl: process.env.FREEDOMPAY_SUCCESS_URL || '',
+    failureUrl: process.env.FREEDOMPAY_FAILURE_URL || '',
+  },
 };
 
 export const isDevelopment = config.nodeEnv === 'development';
