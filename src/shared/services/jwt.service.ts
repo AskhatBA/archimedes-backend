@@ -11,6 +11,7 @@ const defaultRefreshExpiresIn = '360d';
 interface TokenPayload {
   userId: string;
   role: string;
+  tokenVersion: number;
 }
 
 export const generateTokenPair = (payload: TokenPayload) => {

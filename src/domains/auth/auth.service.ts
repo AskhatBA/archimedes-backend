@@ -45,3 +45,10 @@ export const clearRefreshToken = async (userId: string): Promise<void> => {
     data: { refreshToken: null },
   });
 };
+
+export const incrementTokenVersion = async (userId: string) => {
+  return db.prismaClient.user.update({
+    where: { id: userId },
+    data: { tokenVersion: { increment: 1 } },
+  });
+};

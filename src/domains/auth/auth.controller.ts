@@ -1,6 +1,4 @@
 import { Request, Response } from 'express';
-import { Role } from '@prisma/client';
-
 import { isProduction, config } from '@/config';
 import { ErrorCodes } from '@/shared/constants/error-codes';
 import { AppError } from '@/shared/services/app-error.service';
@@ -129,7 +127,8 @@ export const verifyOtp = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 404);
   }
 
-  const tokens = jwtService.generateTokenPair({ userId: user.id, role: Role.PATIENT });
+  const updatedUser = await authService.incrementTokenVersion(user.id);
+  const tokens = jwtService.generateTokenPair({ userId: user.id, role: user.role, tokenVersion: updatedUser.tokenVersion });
   await jwtService.saveRefreshToken(user.id, tokens.refreshToken);
 
   await auditLogService.log({

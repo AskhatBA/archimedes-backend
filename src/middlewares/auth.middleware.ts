@@ -47,6 +47,10 @@ export const authenticate = asyncHandler(async (req: Request, _: Response, next:
     throw new AppError('User not found', 401);
   }
 
+  if (decoded.tokenVersion !== user.tokenVersion) {
+    throw new AppError(ErrorCodes.SESSION_REPLACED, 401);
+  }
+
   req.user = {
     id: user.id,
     phone: user.phone,
