@@ -3,6 +3,8 @@ import { query, body, validationResult, param } from 'express-validator';
 
 import { AppError } from '@/shared/services/app-error.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
+import * as auditLogService from '@/shared/services/audit-log.service';
+import { AuditEvent } from '@/shared/services/audit-log.service';
 import * as misService from '@/domains/mis/mis.service';
 
 import * as insuranceService from './insurance.service';
@@ -121,6 +123,14 @@ export const refundRequest = async (req: Request, res: Response) => {
   const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
 
   if (!misInsurance?.beneficiaryId) {
+    auditLogService.log({
+      event: AuditEvent.REFUND_ACCESS_DENIED,
+      success: false,
+      userId: req.user.id,
+      phone: req.user.phone,
+      req,
+      metadata: { reason: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS },
+    });
     return res.status(404).json({
       success: false,
       message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
@@ -141,6 +151,15 @@ export const refundRequest = async (req: Request, res: Response) => {
     req.user.id
   );
 
+  auditLogService.log({
+    event: AuditEvent.REFUND_REQUESTED,
+    success: true,
+    userId: req.user.id,
+    phone: req.user.phone,
+    req,
+    metadata: { amount: amount as number, date: date as string, programId: programId as string },
+  });
+
   return res.status(200).json({
     success: true,
     message: 'Refund request successfully sent',
@@ -155,6 +174,14 @@ export const getRefundRequests = async (req: Request, res: Response) => {
   const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
 
   if (!misInsurance?.beneficiaryId) {
+    auditLogService.log({
+      event: AuditEvent.REFUND_ACCESS_DENIED,
+      success: false,
+      userId: req.user.id,
+      phone: req.user.phone,
+      req,
+      metadata: { reason: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS, source: 'mis' },
+    });
     return res.status(404).json({
       success: false,
       message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
@@ -162,6 +189,15 @@ export const getRefundRequests = async (req: Request, res: Response) => {
   }
 
   const refundRequests = await insuranceService.getRefundRequests(misInsurance.beneficiaryId);
+
+  auditLogService.log({
+    event: AuditEvent.REFUND_REQUESTS_VIEWED,
+    success: true,
+    userId: req.user.id,
+    phone: req.user.phone,
+    req,
+    metadata: { source: 'mis' },
+  });
 
   return res.status(200).json({
     success: true,
@@ -175,6 +211,15 @@ export const getLocalRefundRequests = async (req: Request, res: Response) => {
   }
 
   const refundRequests = await insuranceService.getLocalRefundRequests(req.user.id);
+
+  auditLogService.log({
+    event: AuditEvent.REFUND_REQUESTS_VIEWED,
+    success: true,
+    userId: req.user.id,
+    phone: req.user.phone,
+    req,
+    metadata: { source: 'local' },
+  });
 
   return res.status(200).json({
     success: true,

@@ -148,6 +148,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
 };
 
 export const logout = async (req: Request, res: Response) => {
+  console.log('logout: ', req);
   if (!req.user) {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }

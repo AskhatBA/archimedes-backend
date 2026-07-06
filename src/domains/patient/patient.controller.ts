@@ -30,6 +30,14 @@ export const getPatientProfile = async (req: Request, res: Response) => {
     });
   }
 
+  auditLogService.log({
+    event: AuditEvent.PROFILE_VIEWED,
+    success: true,
+    userId: req.user.id,
+    phone: req.user.phone,
+    req,
+  });
+
   return res.status(200).json({
     success: true,
     isProfileComplete: true,

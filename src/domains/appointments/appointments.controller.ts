@@ -15,6 +15,14 @@ export const getAppointments = async (req: Request, res: Response) => {
 
   const appointments = await appointmentsService.getAllAppointments(req.user.id);
 
+  auditLogService.log({
+    event: AuditEvent.APPOINTMENT_LIST_VIEWED,
+    success: true,
+    userId: req.user.id,
+    phone: req.user.phone,
+    req,
+  });
+
   return res.status(200).json({
     success: true,
     appointments,
@@ -49,6 +57,15 @@ export const getAppointmentById = async (req: Request, res: Response) => {
       message: 'Appointment not found',
     });
   }
+
+  auditLogService.log({
+    event: AuditEvent.APPOINTMENT_VIEWED,
+    success: true,
+    userId: req.user.id,
+    phone: req.user.phone,
+    req,
+    metadata: { appointmentId: req.params.id },
+  });
 
   return res.status(200).json({
     success: true,

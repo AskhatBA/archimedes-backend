@@ -3,6 +3,8 @@ import { query, param, body, validationResult } from 'express-validator';
 
 import { AppError } from '@/shared/services/app-error.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
+import * as auditLogService from '@/shared/services/audit-log.service';
+import { AuditEvent } from '@/shared/services/audit-log.service';
 
 import * as patientService from '../patient/patient.service';
 
@@ -232,6 +234,15 @@ export const getAppointments = async (req: Request, res: Response) => {
 
   const appointments = await misService.getAppointments(patient.misPatientId);
 
+  auditLogService.log({
+    event: AuditEvent.APPOINTMENT_LIST_VIEWED,
+    success: true,
+    userId: req.user.id,
+    phone: req.user.phone,
+    req,
+    metadata: { source: 'mis' },
+  });
+
   return res.status(200).json({
     success: true,
     appointments,
@@ -253,6 +264,14 @@ export const getAppointmentHistory = async (req: Request, res: Response) => {
   }
 
   const appointmentHistory = await misService.getAppointmentHistory(patient.misPatientId);
+
+  auditLogService.log({
+    event: AuditEvent.APPOINTMENT_HISTORY_VIEWED,
+    success: true,
+    userId: req.user.id,
+    phone: req.user.phone,
+    req,
+  });
 
   return res.status(200).json({
     success: true,
@@ -326,6 +345,14 @@ export const getAppointmentRequests = async (req: Request, res: Response) => {
     status: status as string,
   });
 
+  auditLogService.log({
+    event: AuditEvent.APPOINTMENT_REQUESTS_VIEWED,
+    success: true,
+    userId: req.user.id,
+    phone: req.user.phone,
+    req,
+  });
+
   return res.status(200).json({
     success: true,
     requests,
@@ -360,6 +387,15 @@ export const getAppointmentDetails = async (req: Request, res: Response) => {
   }
 
   const appointment = await misService.getAppointmentDetails(patient.misPatientId, appointmentId);
+
+  auditLogService.log({
+    event: AuditEvent.APPOINTMENT_VIEWED,
+    success: true,
+    userId: req.user.id,
+    phone: req.user.phone,
+    req,
+    metadata: { appointmentId, source: 'mis' },
+  });
 
   return res.status(200).json({
     success: true,
