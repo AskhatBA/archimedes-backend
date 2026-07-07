@@ -3,6 +3,7 @@ import { isProduction, config } from '@/config';
 import { ErrorCodes } from '@/shared/constants/error-codes';
 import { AppError } from '@/shared/services/app-error.service';
 import * as otpService from '@/shared/services/otp.service';
+import * as pinService from '@/shared/services/pin.service';
 import * as jwtService from '@/shared/services/jwt.service';
 import * as auditLogService from '@/shared/services/audit-log.service';
 import { AuditEvent } from '@/shared/services/audit-log.service';
@@ -147,12 +148,14 @@ export const verifyOtp = async (req: Request, res: Response) => {
 };
 
 export const logout = async (req: Request, res: Response) => {
-  console.log('logout: ', req);
   if (!req.user) {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
 
+  // Clear the refresh token and bump tokenVersion so the outstanding access
+  // token is rejected immediately instead of lingering until it expires.
   await authService.clearRefreshToken(req.user.id);
+  await authService.incrementTokenVersion(req.user.id);
 
   await auditLogService.log({
     event: AuditEvent.AUTH_LOGOUT,
@@ -163,6 +166,195 @@ export const logout = async (req: Request, res: Response) => {
   });
 
   return res.status(200).json({ success: true });
+};
+
+/**
+ * Exchange a valid refresh token for a fresh 15-minute access token.
+ * Called by the app after biometric unlock releases the stored refresh token
+ * from secure device storage (Variant B). Rotates the refresh token on every
+ * use and does NOT bump tokenVersion — this is a continuation of the same
+ * session, not a new login.
+ */
+export const refresh = async (req: Request, res: Response) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken || typeof refreshToken !== 'string') {
+    throw new AppError(ErrorCodes.INVALID_REFRESH_TOKEN, 401);
+  }
+
+  const decoded = jwtService.verifyRefreshToken(refreshToken);
+  const user = await authService.findUserById(decoded.userId);
+
+  if (!user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  if (decoded.tokenVersion !== user.tokenVersion) {
+    await auditLogService.log({
+      event: AuditEvent.AUTH_REFRESH_FAILED,
+      success: false,
+      userId: user.id,
+      phone: user.phone,
+      req,
+      metadata: { reason: 'SESSION_REPLACED' },
+    });
+    throw new AppError(ErrorCodes.SESSION_REPLACED, 401);
+  }
+
+  if (!jwtService.compareTokenHash(refreshToken, user.refreshTokenHash)) {
+    await auditLogService.log({
+      event: AuditEvent.AUTH_REFRESH_FAILED,
+      success: false,
+      userId: user.id,
+      phone: user.phone,
+      req,
+      metadata: { reason: 'REFRESH_TOKEN_REVOKED' },
+    });
+    throw new AppError(ErrorCodes.REFRESH_TOKEN_REVOKED, 401);
+  }
+
+  const tokens = jwtService.generateTokenPair({
+    userId: user.id,
+    role: user.role,
+    tokenVersion: user.tokenVersion,
+  });
+  await jwtService.saveRefreshToken(user.id, tokens.refreshToken);
+
+  await auditLogService.log({
+    event: AuditEvent.AUTH_TOKEN_REFRESHED,
+    success: true,
+    userId: user.id,
+    phone: user.phone,
+    req,
+  });
+
+  return res.status(200).json({
+    success: true,
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+  });
+};
+
+export const setPin = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  const { pin } = req.body;
+  pinService.assertValidPinFormat(pin);
+
+  const pinHash = await pinService.hashPin(pin);
+  await authService.setPin(req.user.id, pinHash);
+
+  await auditLogService.log({
+    event: AuditEvent.USER_PIN_SET,
+    success: true,
+    userId: req.user.id,
+    phone: req.user.phone,
+    req,
+  });
+
+  return res.status(200).json({ success: true });
+};
+
+/**
+ * PIN fallback path used when biometrics are unavailable/declined. Identifies
+ * the user by phone, enforces a lockout after too many failed attempts, and on
+ * success issues a fresh 15-minute session (same tokenVersion).
+ */
+export const verifyPin = async (req: Request, res: Response) => {
+  const { phone, pin } = req.body;
+  const user = phone ? await authService.findUserByPhone(phone) : null;
+
+  if (!user || !user.pinHash) {
+    await auditLogService.log({
+      event: AuditEvent.AUTH_PIN_VERIFY_FAILED,
+      success: false,
+      ...(user?.id !== undefined && { userId: user.id }),
+      phone,
+      req,
+      metadata: { reason: user ? 'PIN_NOT_SET' : 'USER_NOT_FOUND' },
+    });
+    throw new AppError(user ? ErrorCodes.PIN_NOT_SET : ErrorCodes.INVALID_PIN, 400);
+  }
+
+  if (user.pinLockedUntil && user.pinLockedUntil > new Date()) {
+    await auditLogService.log({
+      event: AuditEvent.AUTH_PIN_LOCKED,
+      success: false,
+      userId: user.id,
+      phone: user.phone,
+      req,
+      metadata: { lockedUntil: user.pinLockedUntil.toISOString() },
+    });
+    throw new AppError(ErrorCodes.PIN_LOCKED, 429);
+  }
+
+  const isValid = typeof pin === 'string' && (await pinService.verifyPin(pin, user.pinHash));
+
+  if (!isValid) {
+    const attempts = user.pinFailedAttempts + 1;
+    const shouldLock = attempts >= config.pin.maxAttempts;
+    const lockedUntil = shouldLock
+      ? new Date(Date.now() + config.pin.lockMinutes * 60 * 1000)
+      : null;
+
+    // Reset the counter when locking so the window restarts after it expires.
+    await authService.registerPinFailure(user.id, shouldLock ? 0 : attempts, lockedUntil);
+
+    await auditLogService.log({
+      event: shouldLock ? AuditEvent.AUTH_PIN_LOCKED : AuditEvent.AUTH_PIN_VERIFY_FAILED,
+      success: false,
+      userId: user.id,
+      phone: user.phone,
+      req,
+      metadata: { attempts, ...(lockedUntil && { lockedUntil: lockedUntil.toISOString() }) },
+    });
+
+    throw new AppError(shouldLock ? ErrorCodes.PIN_LOCKED : ErrorCodes.INVALID_PIN, shouldLock ? 429 : 400);
+  }
+
+  await authService.resetPinAttempts(user.id);
+
+  const tokens = jwtService.generateTokenPair({
+    userId: user.id,
+    role: user.role,
+    tokenVersion: user.tokenVersion,
+  });
+  await jwtService.saveRefreshToken(user.id, tokens.refreshToken);
+
+  await auditLogService.log({
+    event: AuditEvent.AUTH_PIN_VERIFY_SUCCESS,
+    success: true,
+    userId: user.id,
+    phone: user.phone,
+    req,
+  });
+
+  return res.status(200).json({
+    success: true,
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+  });
+};
+
+export const setBiometric = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  const enabled = req.body?.enabled === true;
+  await authService.setBiometricEnabled(req.user.id, enabled);
+
+  await auditLogService.log({
+    event: enabled ? AuditEvent.USER_BIOMETRIC_ENABLED : AuditEvent.USER_BIOMETRIC_DISABLED,
+    success: true,
+    userId: req.user.id,
+    phone: req.user.phone,
+    req,
+  });
+
+  return res.status(200).json({ success: true, biometricEnabled: enabled });
 };
 
 export const changePhone = async (req: Request, res: Response) => {

@@ -15,8 +15,13 @@ export const config = {
   token: {
     jwtAccessSecret: process.env.JWT_ACCESS_SECRET,
     jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
-    jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN,
-    jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN,
+    jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
+    jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '90d',
+  },
+
+  pin: {
+    maxAttempts: Number(process.env.PIN_MAX_ATTEMPTS) || 5,
+    lockMinutes: Number(process.env.PIN_LOCK_MINUTES) || 15,
   },
 
   twilio: {

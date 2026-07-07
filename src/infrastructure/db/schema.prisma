@@ -19,10 +19,15 @@ model User {
   id                    String   @id @default(uuid()) @db.Uuid
   phone                 String    @unique
   email                 String?   @unique
-  refreshToken          String?
+  refreshTokenHash      String?
   tokenVersion          Int       @default(0)
   role                  Role      @default(PATIENT)
   balance               Float     @default(0)
+
+  pinHash               String?
+  pinFailedAttempts     Int       @default(0)
+  pinLockedUntil        DateTime?
+  biometricEnabled      Boolean   @default(false)
 
   patient               Patient?
   doctor                Doctor?
@@ -192,9 +197,17 @@ enum AuditEvent {
   AUTH_LOGIN_SUCCESS
   AUTH_LOGIN_FAILED
   AUTH_LOGOUT
+  AUTH_TOKEN_REFRESHED
+  AUTH_REFRESH_FAILED
+  AUTH_PIN_VERIFY_SUCCESS
+  AUTH_PIN_VERIFY_FAILED
+  AUTH_PIN_LOCKED
   USER_ACCOUNT_CREATED
   USER_PHONE_CHANGED
   USER_PROFILE_CREATED
+  USER_PIN_SET
+  USER_BIOMETRIC_ENABLED
+  USER_BIOMETRIC_DISABLED
   APPOINTMENT_ACCESS_DENIED
   APPOINTMENT_CONFLICT
   APPOINTMENT_LIST_VIEWED

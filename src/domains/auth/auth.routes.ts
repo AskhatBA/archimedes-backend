@@ -188,4 +188,156 @@ router.post('/create-demo-account', controller.createDemoAccount);
  */
 router.post('/logout', authenticate, controller.logout);
 
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     RefreshBody:
+ *       type: object
+ *       required:
+ *         - refreshToken
+ *       properties:
+ *         refreshToken:
+ *           type: string
+ *           description: The refresh token stored in the device's secure storage, released after biometric unlock.
+ *     RefreshResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *         accessToken:
+ *           type: string
+ *           description: New 15-minute access token
+ *         refreshToken:
+ *           type: string
+ *           description: New refresh token (the previous one is rotated out and revoked)
+ * /auth/refresh:
+ *   post:
+ *     summary: Exchange a refresh token for a fresh 15-minute access token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/RefreshBody'
+ *     responses:
+ *       200:
+ *         description: Session refreshed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/RefreshResponse'
+ *       401:
+ *         description: Invalid, expired, revoked, or superseded refresh token
+ */
+router.post('/refresh', controller.refresh);
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     SetPinBody:
+ *       type: object
+ *       required:
+ *         - pin
+ *       properties:
+ *         pin:
+ *           type: string
+ *           description: 4-6 digit PIN. Trivial PINs (repeated or sequential digits) are rejected.
+ *           example: "8302"
+ * /auth/pin:
+ *   post:
+ *     summary: Set or replace the authenticated user's PIN
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/SetPinBody'
+ *     responses:
+ *       200:
+ *         description: PIN saved
+ *       400:
+ *         description: Invalid PIN format
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/pin', authenticate, controller.setPin);
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     VerifyPinBody:
+ *       type: object
+ *       required:
+ *         - phone
+ *         - pin
+ *       properties:
+ *         phone:
+ *           type: string
+ *           example: "77771400962"
+ *         pin:
+ *           type: string
+ *           example: "8302"
+ * /auth/pin/verify:
+ *   post:
+ *     summary: Verify a PIN (biometric fallback) and get a fresh session
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/VerifyPinBody'
+ *     responses:
+ *       200:
+ *         description: PIN verified; new tokens issued
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/RefreshResponse'
+ *       400:
+ *         description: Invalid PIN or PIN not set
+ *       429:
+ *         description: Too many failed attempts; PIN temporarily locked
+ */
+router.post('/pin/verify', controller.verifyPin);
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     SetBiometricBody:
+ *       type: object
+ *       required:
+ *         - enabled
+ *       properties:
+ *         enabled:
+ *           type: boolean
+ *           description: Whether biometric login is enabled for this account.
+ * /auth/biometric:
+ *   post:
+ *     summary: Enable or disable biometric login for the authenticated user
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/SetBiometricBody'
+ *     responses:
+ *       200:
+ *         description: Biometric preference updated
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/biometric', authenticate, controller.setBiometric);
+
 export default router;
