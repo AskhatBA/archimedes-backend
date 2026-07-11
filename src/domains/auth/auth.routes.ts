@@ -340,4 +340,69 @@ router.post('/pin/verify', controller.verifyPin);
  */
 router.post('/biometric', authenticate, controller.setBiometric);
 
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     SessionHistoryItem:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *         method:
+ *           type: string
+ *           enum: [OTP, PIN]
+ *           description: How this session was started.
+ *         ipAddress:
+ *           type: string
+ *           nullable: true
+ *         userAgent:
+ *           type: string
+ *           nullable: true
+ *           description: Raw User-Agent of the device that logged in.
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *     SessionHistoryResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *         data:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/SessionHistoryItem'
+ * /auth/sessions:
+ *   get:
+ *     summary: List the authenticated user's login (session) history
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *           minimum: 1
+ *           maximum: 100
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *           minimum: 0
+ *     responses:
+ *       200:
+ *         description: Login history, most recent first
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SessionHistoryResponse'
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/sessions', authenticate, controller.getSessions);
+
 export default router;

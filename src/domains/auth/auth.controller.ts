@@ -391,6 +391,26 @@ export const changePhone = async (req: Request, res: Response) => {
   });
 };
 
+/**
+ * Read-only session (login) history for the authenticated user. Lists past
+ * OTP/PIN logins with device (User-Agent), IP and timestamp, most recent first.
+ */
+export const getSessions = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+  const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
+
+  const safeLimit = Number.isNaN(limit) ? 50 : Math.min(Math.max(limit, 1), 100);
+  const safeOffset = Number.isNaN(offset) ? 0 : Math.max(offset, 0);
+
+  const sessions = await authService.getLoginHistory(req.user.id, safeLimit, safeOffset);
+
+  return res.status(200).json({ success: true, data: sessions });
+};
+
 export const createDemoAccount = async (_: Request, res: Response) => {
   const { demoAccount } = config;
 
