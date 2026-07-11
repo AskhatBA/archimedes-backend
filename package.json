@@ -12,7 +12,8 @@
     "db:migrate-reset": "prisma migrate reset --schema=./src/infrastructure/db/schema.prisma",
     "db:generate": "prisma generate --schema=./src/infrastructure/db/schema.prisma",
     "db:push": "prisma db push --schema=./src/infrastructure/db/schema.prisma",
-    "db:studio": "prisma studio --schema=./src/infrastructure/db/schema.prisma"
+    "db:studio": "prisma studio --schema=./src/infrastructure/db/schema.prisma",
+    "db:encrypt-pii": "ts-node -r tsconfig-paths/register src/infrastructure/db/scripts/encrypt-pii-backfill.ts"
   },
   "keywords": [],
   "author": "",

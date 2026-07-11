@@ -52,6 +52,10 @@ export const config = {
     dsn: process.env.SENTRY_DSN,
   },
 
+  encryption: {
+    key: process.env.FIELD_ENCRYPTION_KEY,
+  },
+
   redis: {
     host: process.env.REDIS_HOST,
   },
