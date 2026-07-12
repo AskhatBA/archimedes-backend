@@ -114,11 +114,9 @@ export const createPatientProfile = async (req: Request, res: Response) => {
     });
   }
 
-  // Изначально в МИС отдавал только fullName там было перепутано Фамилия и Имя.
-  // Теперь lastName - firstName, firstName - lastName
   const newPatient = await patientService.createPatient({
-    firstName: req.body.lastName,
-    lastName: req.body.firstName,
+    firstName: req.body.firstName,
+    lastName: req.body.lastName,
     patronymic: req.body.patronymic,
     userId: req.user.id,
     birthDate: req.body.birthDate,
