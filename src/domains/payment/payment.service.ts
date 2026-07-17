@@ -37,7 +37,9 @@ function buildSignature(
 
 function parseXml(xml: string): FreedomPayXmlResponse {
   const result: FreedomPayXmlResponse = {};
-  const tagRegex = /<([^/>\s]+)>([^<]*)<\/\1>/g;
+  // Bounded quantifiers to avoid super-linear backtracking (ReDoS): tag names
+  // are short and values (URLs, statuses) comfortably fit within these limits.
+  const tagRegex = /<([^/>\s]{1,64})>([^<]{0,4096})<\/\1>/g;
   let match;
   while ((match = tagRegex.exec(xml)) !== null) {
     result[match[1]] = match[2];
