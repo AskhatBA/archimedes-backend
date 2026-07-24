@@ -243,8 +243,6 @@ export const getPrograms = async (req: Request, res: Response) => {
 
   const programs = await insuranceService.getPrograms(misInsurance.beneficiaryId);
 
-  console.log('programs::::', programs);
-
   return res.status(200).json({
     success: true,
     programs,
@@ -269,6 +267,8 @@ export const getProgramById = async (req: Request, res: Response) => {
     misInsurance.beneficiaryId,
     req.params.programId
   );
+
+  console.log('program: ===>', program);
 
   return res.status(200).json({
     success: true,
@@ -547,6 +547,64 @@ export const submitQrAppointment = async (req: Request, res: Response) => {
   return res.status(200).json({
     success: true,
     data,
+  });
+};
+
+export const getPriceList = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  await query('clinicId').notEmpty().withMessage('clinicId is required').run(req);
+
+  const errors = validationResult(req);
+
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: errors.array(),
+    });
+  }
+
+  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+
+  if (!misInsurance?.beneficiaryId) {
+    return res.status(404).json({
+      success: false,
+      message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
+    });
+  }
+
+  const priceList = await insuranceService.getPriceList(
+    misInsurance.beneficiaryId,
+    req.query.clinicId as string
+  );
+
+  return res.status(200).json({
+    success: true,
+    priceList,
+  });
+};
+
+export const getClinicsMO = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+
+  if (!misInsurance?.beneficiaryId) {
+    return res.status(404).json({
+      success: false,
+      message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
+    });
+  }
+
+  const clinicsMO = await insuranceService.getClinicsMO(misInsurance.beneficiaryId);
+
+  return res.status(200).json({
+    success: true,
+    clinicsMO,
   });
 };
 

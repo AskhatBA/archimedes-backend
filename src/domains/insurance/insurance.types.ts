@@ -162,3 +162,13 @@ export interface QrAppointmentItem {
   currency: string;
   appointmentDetail: QrAppointmentDetail[];
 }
+
+export interface ClinicMO {
+  oid: string;
+  name: string;
+}
+
+export interface PriceListItem {
+  service: string;
+  price: number;
+}

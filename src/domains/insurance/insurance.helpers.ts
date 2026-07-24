@@ -20,8 +20,6 @@ export const parseApiError = (
   const axiosError = error as AxiosError;
   const errorMessage = (axiosError?.response?.data as { error: string })?.error;
 
-  console.log('parseApiError', axiosError.response);
-
   return {
     message: errorMessage || defaultErrorMessage,
     status:
@@ -53,10 +51,8 @@ export const insuranceRequest = async <T>({
         Authorization: beneficiaryId || '',
       },
     });
-    console.log('response', response);
     return response.data;
   } catch (error) {
-    console.log('insurance error', error, '; ', 'resolver', resolverName);
     const errorData = parseApiError(error);
     Sentry.captureException(error);
     throw new AppError(errorData.message, errorData.status);

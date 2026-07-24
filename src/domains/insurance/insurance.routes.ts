@@ -1047,4 +1047,99 @@ router.get('/check-iin', controller.checkIin);
  */
 router.get('/news', controller.getNews);
 
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     ClinicMO:
+ *       type: object
+ *       required: [oid, name]
+ *       properties:
+ *         oid:
+ *           type: string
+ *           format: uuid
+ *           example: "0692b3af-793b-48c9-9d2d-406d06f8b182"
+ *         name:
+ *           type: string
+ *           example: "Актау, ТОО \"Еркемед\" МЦ \"Акерке\""
+ * /insurance/clinics-mo:
+ *   get:
+ *     summary: Get list of MO clinics
+ *     tags: [Insurance]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 clinicsMO:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/ClinicMO'
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Insurance not found in MIS
+ */
+router.get('/clinics-mo', authenticate, controller.getClinicsMO);
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     PriceListItem:
+ *       type: object
+ *       required: [service, price]
+ *       properties:
+ *         service:
+ *           type: string
+ *           example: "Определение бетта-2 микроглобулина в сыворотке крови ИФА-методом"
+ *         price:
+ *           type: number
+ *           example: 6405
+ * /insurance/price-list:
+ *   get:
+ *     summary: Get price list for a clinic
+ *     tags: [Insurance]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: clinicId
+ *         in: query
+ *         description: Clinic OID (from getClinicsMO)
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 priceList:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/PriceListItem'
+ *       400:
+ *         description: clinicId is required
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Insurance not found in MIS
+ */
+router.get('/price-list', authenticate, controller.getPriceList);
+
 export default router;
