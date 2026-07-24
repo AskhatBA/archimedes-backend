@@ -4,6 +4,7 @@ import { ErrorCodes } from '@/shared/constants/error-codes';
 import { config } from '@/config';
 import { AppError } from '@/shared/services/app-error.service';
 import { resolveApiUrlParams } from '@/shared/helpers/resolve-api-url-params';
+import { createLogger } from '@/shared/lib/logger';
 
 import {
   MISDoctorAvailableSlot,
@@ -58,6 +59,8 @@ export const parseApiError = (
   };
 };
 
+const misLogger = createLogger('mis');
+
 const misHttp = axios.create({
   baseURL: config.mis.apiUrl,
 });
@@ -69,21 +72,54 @@ export const misRequest = async <T>({
   query = {},
   options = {},
 }: MisRequestPayload) => {
+  const apiResolver = misApiResolvers[resolverName as keyof typeof misApiResolvers];
+  const startedAt = Date.now();
+  let url: string | undefined;
+
   try {
-    const apiResolver = misApiResolvers[resolverName as keyof typeof misApiResolvers];
+    url = resolveApiUrlParams(resolverName, params);
+
     const response = await misHttp.request<T>({
       baseURL: options?.useDev ? config.mis.devApiUrl : config.mis.apiUrl,
       method: apiResolver.method,
-      url: resolveApiUrlParams(resolverName, params),
+      url,
       data: {
         ...apiResolver.defaultPayload,
         ...payload,
       },
       params: query,
     });
+
+    misLogger.debug(
+      {
+        resolverName,
+        method: apiResolver?.method,
+        url,
+        status: response.status,
+        durationMs: Date.now() - startedAt,
+        useDev: !!options?.useDev,
+      },
+      'MIS request completed'
+    );
+
     return response.data;
   } catch (error: unknown) {
-    console.log('mis error', error);
+    const axiosError = error as AxiosError;
+
+    misLogger.error(
+      {
+        resolverName,
+        method: apiResolver?.method,
+        url,
+        status: axiosError?.response?.status,
+        durationMs: Date.now() - startedAt,
+        useDev: !!options?.useDev,
+        responseData: axiosError?.response?.data,
+        err: error,
+      },
+      'MIS request failed'
+    );
+
     const errorData = parseApiError(error);
     throw new AppError(errorData.message, errorData.status);
   }

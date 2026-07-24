@@ -6,6 +6,7 @@ import * as jwtService from '@/shared/services/jwt.service';
 import { prismaClient } from '@/infrastructure/db';
 import { AppError } from '@/shared/services/app-error.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
+import { setRequestContextUser } from '@/shared/lib/logger';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -58,6 +59,9 @@ export const authenticate = asyncHandler(async (req: Request, _: Response, next:
     patient: user.patient,
     doctor: user.doctor,
   };
+
+  // From here on every log line of this request carries userId/role.
+  setRequestContextUser(user.id, user.role);
 
   next();
 });

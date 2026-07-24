@@ -8,6 +8,9 @@ import {
   cancelAppointmentNotification,
   rescheduleAppointmentNotification,
 } from '@/shared/queues/notification.queue';
+import { createLogger } from '@/shared/lib/logger';
+
+const appointmentsLogger = createLogger('appointments');
 
 export const getAllAppointments = (userId: string) => {
   return db.prismaClient.appointment.findMany({
@@ -97,7 +100,10 @@ export const createAppointment = async (data: {
       appointment.userId,
       appointment.dateTime
     ).catch((error) => {
-      console.error('Failed to schedule appointment notification:', error);
+      appointmentsLogger.error(
+        { err: error, appointmentId: appointment.id },
+        'Failed to schedule appointment notification'
+      );
       // Don't fail the appointment creation if notification scheduling fails
     });
   }
@@ -154,7 +160,10 @@ export const updateAppointment = async (
         );
       }
     } catch (error) {
-      console.error('Failed to update appointment notification:', error);
+      appointmentsLogger.error(
+        { err: error, appointmentId: id },
+        'Failed to update appointment notification'
+      );
       // Don't fail the appointment update if notification update fails
     }
   }
@@ -185,7 +194,10 @@ export const deleteAppointment = async (id: string, userId: string, role: Role) 
   // Cancel notification if appointment was deleted
   if (result.count > 0) {
     await cancelAppointmentNotification(id).catch((error) => {
-      console.error('Failed to cancel appointment notification:', error);
+      appointmentsLogger.error(
+        { err: error, appointmentId: id },
+        'Failed to cancel appointment notification'
+      );
     });
   }
 

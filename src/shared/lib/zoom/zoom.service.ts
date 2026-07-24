@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 import { config } from '@/config';
+import { createLogger } from '@/shared/lib/logger';
 
 import {
   CreateMeetingInput,
@@ -10,6 +11,8 @@ import {
   ZoomRecordingResponse,
   RecordingOutput,
 } from './zoom.types';
+
+const zoomLogger = createLogger('zoom');
 
 class ZoomService {
   private accessToken: string | null = null;
@@ -67,10 +70,15 @@ class ZoomService {
       return this.accessToken;
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        console.error('Zoom OAuth error:', {
-          status: error.response?.status,
-          data: error.response?.data,
-        });
+        zoomLogger.error(
+          {
+            operation: 'oauth-token',
+            status: error.response?.status,
+            responseData: error.response?.data,
+            err: error,
+          },
+          'Zoom OAuth request failed'
+        );
         throw new Error(
           `Failed to obtain Zoom access token: ${error.response?.data?.reason || error.message}`
         );
@@ -117,10 +125,15 @@ class ZoomService {
       };
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        console.error('Zoom API error:', {
-          status: error.response?.status,
-          data: error.response?.data,
-        });
+        zoomLogger.error(
+          {
+            operation: 'create-meeting',
+            status: error.response?.status,
+            responseData: error.response?.data,
+            err: error,
+          },
+          'Zoom API request failed'
+        );
 
         // Handle token expiration
         if (error.response?.status === 401) {
@@ -170,10 +183,15 @@ class ZoomService {
       };
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        console.error('Zoom recordings API error:', {
-          status: error.response?.status,
-          data: error.response?.data,
-        });
+        zoomLogger.error(
+          {
+            operation: 'get-recordings',
+            status: error.response?.status,
+            responseData: error.response?.data,
+            err: error,
+          },
+          'Zoom recordings request failed'
+        );
 
         if (error.response?.status === 401) {
           this.accessToken = null;
@@ -212,9 +230,10 @@ class ZoomService {
       return Buffer.from(response.data);
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        console.error('Zoom download error:', {
-          status: error.response?.status,
-        });
+        zoomLogger.error(
+          { operation: 'download-recording', status: error.response?.status, err: error },
+          'Zoom recording download failed'
+        );
 
         if (error.response?.status === 401) {
           this.accessToken = null;

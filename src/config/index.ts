@@ -7,10 +7,18 @@ const DEFAULT_NODE_ENV = 'development';
 
 dotenv.config();
 
+const nodeEnv = process.env.NODE_ENV || DEFAULT_NODE_ENV;
+
 export const config = {
   port: process.env.PORT || DEFAULT_PORT,
-  nodeEnv: process.env.NODE_ENV || DEFAULT_NODE_ENV,
+  nodeEnv,
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+
+  logging: {
+    level: process.env.LOG_LEVEL || (nodeEnv === 'production' ? 'info' : 'debug'),
+    // Human-readable output via pino-pretty. JSON to stdout everywhere else.
+    pretty: process.env.LOG_PRETTY ? process.env.LOG_PRETTY === 'true' : nodeEnv !== 'production',
+  },
 
   token: {
     jwtAccessSecret: process.env.JWT_ACCESS_SECRET,

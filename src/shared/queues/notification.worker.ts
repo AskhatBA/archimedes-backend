@@ -3,13 +3,18 @@ import { Worker, Job } from 'bullmq';
 import { redisConnection } from '@/infrastructure/redis';
 import * as db from '@/infrastructure/db';
 import { sendPushNotification } from '@/domains/notifications/notifications.service';
+import { createLogger } from '@/shared/lib/logger';
 
 import { AppointmentNotificationJobData } from './notification.queue';
+
+const workerLogger = createLogger('notification-worker');
 
 export const appointmentNotificationWorker = new Worker<AppointmentNotificationJobData>(
   'appointment-notifications',
   async (job: Job<AppointmentNotificationJobData>) => {
     const { appointmentId } = job.data;
+    const jobLogger = workerLogger.child({ jobId: job.id, appointmentId });
+    const startedAt = Date.now();
 
     try {
       // Fetch appointment details
@@ -18,14 +23,15 @@ export const appointmentNotificationWorker = new Worker<AppointmentNotificationJ
       });
 
       if (!appointment) {
-        console.warn(`Appointment ${appointmentId} not found. Skipping notification.`);
+        jobLogger.warn('Appointment not found, skipping notification');
         return { success: false, reason: 'Appointment not found' };
       }
 
       // Only send notification for scheduled appointments
       if (appointment.status !== 'SCHEDULED') {
-        console.log(
-          `Appointment ${appointmentId} is not scheduled (status: ${appointment.status}). Skipping notification.`
+        jobLogger.info(
+          { status: appointment.status },
+          'Appointment is not scheduled, skipping notification'
         );
         return { success: false, reason: 'Appointment not scheduled' };
       }
@@ -62,10 +68,21 @@ export const appointmentNotificationWorker = new Worker<AppointmentNotificationJ
 
       await sendPushNotification(appointment.userId, title, message, notificationData);
 
-      console.log(`Appointment reminder sent successfully for appointment ${appointmentId}`);
+      jobLogger.info(
+        {
+          userId: appointment.userId,
+          isTelemedicine: appointment.isTelemedicine,
+          attempt: job.attemptsMade + 1,
+          durationMs: Date.now() - startedAt,
+        },
+        'Appointment reminder sent'
+      );
       return { success: true };
     } catch (error) {
-      console.error(`Error sending appointment reminder for ${appointmentId}:`, error);
+      jobLogger.error(
+        { err: error, attempt: job.attemptsMade + 1, durationMs: Date.now() - startedAt },
+        'Failed to send appointment reminder'
+      );
       throw error; // Will trigger retry logic
     }
   },
@@ -79,23 +96,26 @@ export const appointmentNotificationWorker = new Worker<AppointmentNotificationJ
 
 // Event handlers for monitoring
 appointmentNotificationWorker.on('completed', (job) => {
-  console.log(`Job ${job.id} completed successfully`);
+  workerLogger.debug({ jobId: job.id }, 'Job completed');
 });
 
 appointmentNotificationWorker.on('failed', (job, err) => {
-  console.error(`Job ${job?.id} failed with error:`, err);
+  workerLogger.error(
+    { jobId: job?.id, attempt: job?.attemptsMade, attemptsLeft: job?.opts?.attempts, err },
+    'Job failed'
+  );
 });
 
 appointmentNotificationWorker.on('error', (err) => {
-  console.error('Worker error:', err);
+  workerLogger.error({ err }, 'Worker error');
 });
 
 export const startNotificationWorker = () => {
-  console.log('Appointment notification worker started');
+  workerLogger.info({ queue: 'appointment-notifications' }, 'Notification worker started');
   return appointmentNotificationWorker;
 };
 
 export const stopNotificationWorker = async () => {
   await appointmentNotificationWorker.close();
-  console.log('Appointment notification worker stopped');
+  workerLogger.info('Notification worker stopped');
 };

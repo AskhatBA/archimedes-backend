@@ -2,6 +2,9 @@ import { AuditEvent, Prisma } from '@prisma/client';
 import { Request } from 'express';
 
 import { prismaClient } from '@/infrastructure/db';
+import { createLogger } from '@/shared/lib/logger';
+
+const auditLogger = createLogger('audit-log');
 
 export { AuditEvent };
 
@@ -36,6 +39,8 @@ export const log = async (options: LogOptions): Promise<void> => {
       },
     });
   } catch (err) {
-    console.error('[AuditLog] Failed to write log entry:', err);
+    // The audit trail is a compliance record — if the DB write fails, the event must at
+    // least survive in the logs.
+    auditLogger.error({ err, event, success, userId }, 'Failed to write audit log entry');
   }
 };

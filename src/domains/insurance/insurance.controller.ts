@@ -268,8 +268,6 @@ export const getProgramById = async (req: Request, res: Response) => {
     req.params.programId
   );
 
-  console.log('program: ===>', program);
-
   return res.status(200).json({
     success: true,
     program,

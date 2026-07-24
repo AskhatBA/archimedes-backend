@@ -53,6 +53,16 @@ BullMQ queue (`appointment-notifications`) schedules push notifications via OneS
 
 `@/` maps to `src/`. Handled by `tsconfig-paths` at runtime and `tsc-alias` at build time.
 
+### Logging
+
+Pino, configured in `src/shared/lib/logger/`. Never use `console.*` — get a logger with `createLogger('<component>')` (from `@/shared/lib/logger`) and call it as `log.info({ ...fields }, 'Message')`: structured fields first, a static message second.
+
+`requestContext` + `httpLogger` (`src/middlewares/request-logger.middleware.ts`) run before every route. `requestContext` opens an `AsyncLocalStorage` scope holding a `reqId` (reused from the `x-request-id` header when present, and echoed back on the response), and the logger's mixin stamps `reqId`/`userId`/`role` onto every line emitted while handling that request — including logs from services deep in the call stack. This is what lets one filter show the whole request.
+
+Sensitive fields (IIN, phone, OTP, PIN, tokens, secrets, `authorization` header) are censored inside the logger by `src/shared/lib/logger/redact.ts`, so even a whole axios error or MIS response can be logged safely. Add new sensitive field names to `SENSITIVE_KEYS` there rather than stripping them at call sites.
+
+Output is JSON on stdout; `pino-pretty` is enabled in development. Controlled by `LOG_LEVEL` (default `info` in production, `debug` otherwise) and `LOG_PRETTY`.
+
 ### Config
 
 All environment variables are centralised in `src/config/index.ts`. Use `config.*` imports — never read `process.env` directly outside that file. `isDevelopment` and `isProduction` helpers are exported from the same file.

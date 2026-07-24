@@ -1,6 +1,9 @@
 import { Queue } from 'bullmq';
 
 import { redisConnection } from '@/infrastructure/redis';
+import { createLogger } from '@/shared/lib/logger';
+
+const queueLogger = createLogger('notification-queue');
 
 export interface AppointmentNotificationJobData {
   appointmentId: string;
@@ -44,11 +47,15 @@ export const scheduleAppointmentNotification = async (
 
   const delay = notificationTime.getTime() - Date.now();
 
-  console.log(`[Notification] Scheduling for appointment ${appointmentId}`);
-  console.log(`[Notification] Appointment time: ${dateTime}`);
-  console.log(`[Notification] Will send at: ${notificationTime}`);
-  console.log(`[Notification] Delay: ${delay}ms (${Math.round(delay / 1000)}s)`);
-  console.log(`[Notification] Test mode: ${USE_TEST_DELAY}`);
+  const jobId = `appointment-${appointmentId}`;
+  const logContext = {
+    jobId,
+    appointmentId,
+    appointmentAt: dateTime,
+    scheduledFor: notificationTime,
+    delayMs: delay,
+    testMode: USE_TEST_DELAY,
+  };
 
   // Only schedule if notification time is in the future
   if (delay > 0) {
@@ -61,10 +68,16 @@ export const scheduleAppointmentNotification = async (
       },
       {
         delay,
-        jobId: `appointment-${appointmentId}`, // Unique job ID to prevent duplicates
+        jobId, // Unique job ID to prevent duplicates
       }
     );
+
+    queueLogger.info(logContext, 'Appointment reminder scheduled');
+
+    return;
   }
+
+  queueLogger.info(logContext, 'Appointment reminder skipped: notification time is in the past');
 };
 
 export const cancelAppointmentNotification = async (appointmentId: string) => {
@@ -73,7 +86,12 @@ export const cancelAppointmentNotification = async (appointmentId: string) => {
 
   if (job) {
     await job.remove();
+    queueLogger.info({ jobId, appointmentId }, 'Appointment reminder cancelled');
+
+    return;
   }
+
+  queueLogger.debug({ jobId, appointmentId }, 'No scheduled reminder to cancel');
 };
 
 export const rescheduleAppointmentNotification = async (

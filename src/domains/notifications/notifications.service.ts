@@ -4,6 +4,9 @@ import { sendOneSignalPushNotification } from '@/shared/lib/one-signal/one-signa
 import { ErrorCodes } from '@/shared/constants/error-codes';
 import { AppError } from '@/shared/services/app-error.service';
 import * as db from '@/infrastructure/db';
+import { createLogger } from '@/shared/lib/logger';
+
+const notificationsLogger = createLogger('notifications');
 
 export const registerDeviceToken = async (userId: string, deviceId: string, platform: Platform) => {
   // Check if device already exists
@@ -91,10 +94,19 @@ export const sendPushNotification = async (
     data: data || {},
   };
 
-  console.log('Send notification via OneSignal: ', notification);
+  // Device ids identify a user's handset, so only their count is logged.
+  notificationsLogger.debug(
+    { userId, deviceCount: playerIds.length, title },
+    'Sending push notification'
+  );
 
   try {
     const response = await sendOneSignalPushNotification(notification);
+
+    notificationsLogger.info(
+      { userId, deviceCount: playerIds.length, oneSignalId: response?.data?.id ?? null },
+      'Push notification sent'
+    );
 
     // Save notification to database
     await db.prismaClient.notification.create({
@@ -109,6 +121,11 @@ export const sendPushNotification = async (
       },
     });
   } catch (error) {
+    notificationsLogger.error(
+      { err: error, userId, deviceCount: playerIds.length },
+      'Push notification failed'
+    );
+
     // Save failed notification to database
     await db.prismaClient.notification.create({
       data: {
