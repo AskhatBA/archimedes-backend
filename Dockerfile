@@ -7,8 +7,11 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-# Copy the rest of the code
-COPY . .
+# Copy only the files the build and runtime actually need.
+# Never `COPY . .` — a recursive copy of the build context can pull in .env,
+# .git, local logs and other secrets even when .dockerignore looks correct.
+COPY tsconfig.json ./
+COPY src ./src
 
 # Generate Prisma client
 RUN npm run db:generate
