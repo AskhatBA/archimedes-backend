@@ -970,10 +970,11 @@ router.get('/qr/submit-appointment', authenticate, controller.submitQrAppointmen
  *     parameters:
  *       - name: iin
  *         in: query
- *         description: Individual Identification Number
+ *         description: 12-digit Kazakhstan IIN. Validated for birth date, century/gender digit and control digit.
  *         required: true
  *         schema:
  *           type: string
+ *           pattern: '^\d{12}$'
  *     responses:
  *       200:
  *         description: IIN check result
@@ -994,7 +995,7 @@ router.get('/qr/submit-appointment', authenticate, controller.submitQrAppointmen
  *                   type: string
  *                   example: "Пользователь не найден"
  *       400:
- *         description: IIN is required
+ *         description: '`INVALID_IIN` — missing or malformed IIN'
  *       401:
  *         description: User not found or unauthorized
  */

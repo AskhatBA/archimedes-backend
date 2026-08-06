@@ -3,6 +3,7 @@ import { query, param, body, validationResult } from 'express-validator';
 
 import { AppError } from '@/shared/services/app-error.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
+import { assertValidIin } from '@/shared/services/iin.service';
 import * as auditLogService from '@/shared/services/audit-log.service';
 import { AuditEvent } from '@/shared/services/audit-log.service';
 
@@ -15,9 +16,9 @@ export const findPatient = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
 
-  await query('iin').notEmpty().withMessage('IIN is required').run(req);
+  const iin = assertValidIin(req.query.iin);
 
-  const patient = await misService.findPatientByIinAndPhone((req.query.iin as string) || '');
+  const patient = await misService.findPatientByIinAndPhone(iin);
 
   return res.status(200).json({
     success: true,

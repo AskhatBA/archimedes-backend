@@ -43,10 +43,11 @@ const router = Router();
  *     parameters:
  *       - name: iin
  *         in: query
- *         description: Individual Identification Number
+ *         description: 12-digit Kazakhstan IIN. Validated for birth date, century/gender digit and control digit.
  *         required: true
  *         schema:
  *           type: string
+ *           pattern: '^\d{12}$'
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -62,6 +63,8 @@ const router = Router();
  *                   example: true
  *                 patient:
  *                   $ref: '#/components/schemas/MISPatient'
+ *       400:
+ *         description: '`INVALID_IIN` — missing or malformed IIN'
  *       401:
  *         description: User not found or unauthorized
  */

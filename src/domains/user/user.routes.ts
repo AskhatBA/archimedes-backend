@@ -17,12 +17,11 @@ router.get('/patient/profile', authenticate, controller.getUserProfile);
  *     parameters:
  *       - name: iin
  *         in: query
- *         description: 12-digit IIN
+ *         description: 12-digit Kazakhstan IIN. Validated for birth date, century/gender digit and control digit.
  *         required: true
  *         schema:
  *           type: string
- *           minLength: 12
- *           maxLength: 12
+ *           pattern: '^\d{12}$'
  *       - name: phone
  *         in: query
  *         description: Phone number (optional, improves DB and MIS lookup)
@@ -49,7 +48,7 @@ router.get('/patient/profile', authenticate, controller.getUserProfile);
  *                   type: boolean
  *                   description: True if the provided phone matches the phone returned by the Insurance service for the given IIN
  *       400:
- *         description: Invalid input
+ *         description: Invalid input — `INVALID_IIN` when the IIN is malformed
  */
 router.get('/check-account', controller.checkAccount);
 

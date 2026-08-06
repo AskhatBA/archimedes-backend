@@ -3,6 +3,7 @@ import { query, body, validationResult, param } from 'express-validator';
 
 import { AppError } from '@/shared/services/app-error.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
+import { assertValidIin } from '@/shared/services/iin.service';
 import * as auditLogService from '@/shared/services/audit-log.service';
 import { AuditEvent } from '@/shared/services/audit-log.service';
 import * as misService from '@/domains/mis/mis.service';
@@ -607,18 +608,9 @@ export const getClinicsMO = async (req: Request, res: Response) => {
 };
 
 export const checkIin = async (req: Request, res: Response) => {
-  await query('iin').notEmpty().withMessage('IIN is required').run(req);
+  const iin = assertValidIin(req.query.iin);
 
-  const errors = validationResult(req);
-
-  if (!errors.isEmpty()) {
-    return res.status(400).json({
-      success: false,
-      message: errors.array(),
-    });
-  }
-
-  const result = await insuranceService.checkIin(req.query.iin as string);
+  const result = await insuranceService.checkIin(iin);
 
   return res.status(200).json(result);
 };

@@ -21,7 +21,7 @@ const router = Router();
  *           example: "77771400962"
  *         iin:
  *           type: string
- *           description: Optional 12-digit IIN. When supplied, the authoritative phone is fetched from the insurance service and the local user's phone is synced if it has changed.
+ *           description: Optional 12-digit Kazakhstan IIN, validated for birth date, century/gender digit and control digit. When supplied, the authoritative phone is fetched from the insurance service and the local user's phone is synced if it has changed.
  *           example: "630301350211"
  *     RequestOTPResponse:
  *        type: object
@@ -51,7 +51,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/RequestOTPResponse'
  *       400:
- *         description: Invalid phone number format
+ *         description: Invalid input — `INVALID_PHONE` or `INVALID_IIN`
  */
 router.post('/request-otp', controller.requestOtp);
 

@@ -106,12 +106,11 @@ router.get('/profile', authenticate, controller.getPatientProfile);
  *     parameters:
  *       - name: iin
  *         in: path
- *         description: 12-digit IIN
+ *         description: 12-digit Kazakhstan IIN. Validated for birth date, century/gender digit and control digit.
  *         required: true
  *         schema:
  *           type: string
- *           minLength: 12
- *           maxLength: 12
+ *           pattern: '^\d{12}$'
  *     responses:
  *       200:
  *         description: Patient found
@@ -120,7 +119,7 @@ router.get('/profile', authenticate, controller.getPatientProfile);
  *             schema:
  *               $ref: '#/components/schemas/GetPatientByIinResponse'
  *       400:
- *         description: Invalid IIN
+ *         description: '`INVALID_IIN` — malformed IIN'
  *       401:
  *         description: Unauthorized
  *       404:
@@ -152,6 +151,8 @@ router.get('/by-iin/:iin', authenticate, controller.getPatientByIin);
  *           format: date
  *         iin:
  *           type: string
+ *           description: 12-digit Kazakhstan IIN. Validated for birth date, century/gender digit and control digit.
+ *           pattern: '^\d{12}$'
  *         gender:
  *           type: string
  *           enum: [M, F]

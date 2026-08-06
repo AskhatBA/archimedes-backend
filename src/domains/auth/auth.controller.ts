@@ -4,6 +4,7 @@ import { ErrorCodes } from '@/shared/constants/error-codes';
 import { AppError } from '@/shared/services/app-error.service';
 import * as otpService from '@/shared/services/otp.service';
 import * as pinService from '@/shared/services/pin.service';
+import { assertValidIin } from '@/shared/services/iin.service';
 import * as jwtService from '@/shared/services/jwt.service';
 import * as auditLogService from '@/shared/services/audit-log.service';
 import { AuditEvent } from '@/shared/services/audit-log.service';
@@ -14,11 +15,13 @@ import * as patientService from '@/domains/patient/patient.service';
 import * as authService from './auth.service';
 
 export const requestOtp = async (req: Request, res: Response) => {
-  const { email, iin } = req.body;
+  const { email, iin: rawIin } = req.body;
   let { phone } = req.body;
   const phoneRegex = /^7\d{10}$/;
 
-  if (iin) {
+  if (rawIin) {
+    const iin = assertValidIin(rawIin);
+
     const checkIin = await insuranceService.checkIin(iin);
     const patient = await patientService.getPatientByIin(iin);
 

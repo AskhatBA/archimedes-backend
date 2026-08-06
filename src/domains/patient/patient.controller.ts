@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
-import { body, param, validationResult } from 'express-validator';
+import { body, validationResult } from 'express-validator';
 
 import { AppError } from '@/shared/services/app-error.service';
+import { assertValidIin } from '@/shared/services/iin.service';
 import * as auditLogService from '@/shared/services/audit-log.service';
 import { AuditEvent } from '@/shared/services/audit-log.service';
 import { useDemoAccount } from '@/shared/helpers';
@@ -55,19 +56,9 @@ export const getPatientByIin = async (req: Request, res: Response) => {
     throw new AppError('User not found', 401);
   }
 
-  await param('iin')
-    .notEmpty()
-    .isLength({ min: 12, max: 12 })
-    .withMessage('IIN must be 12 characters')
-    .run(req);
+  const iin = assertValidIin(req.params.iin);
 
-  const errors = validationResult(req);
-
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ success: false, errors: errors.array() });
-  }
-
-  const patient = await patientService.getPatientByIin(req.params.iin);
+  const patient = await patientService.getPatientByIin(iin);
 
   if (!patient) {
     return res.status(404).json({ success: false, message: 'Patient not found' });
@@ -88,11 +79,6 @@ export const createPatientProfile = async (req: Request, res: Response) => {
     .isISO8601()
     .withMessage('Valid birth date is required')
     .run(req);
-  await body('iin')
-    .notEmpty()
-    .isLength({ min: 12, max: 12 })
-    .withMessage('IIN must be 12 characters')
-    .run(req);
   await body('gender')
     .notEmpty()
     .isIn(['M', 'F'])
@@ -105,7 +91,9 @@ export const createPatientProfile = async (req: Request, res: Response) => {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const misPatient = await misService.findPatientByIinAndPhone(req.body.iin);
+  const iin = assertValidIin(req.body.iin);
+
+  const misPatient = await misService.findPatientByIinAndPhone(iin);
 
   if (!misPatient) {
     return res.status(400).json({
@@ -121,7 +109,7 @@ export const createPatientProfile = async (req: Request, res: Response) => {
     userId: req.user.id,
     birthDate: req.body.birthDate,
     gender: req.body.gender,
-    iin: req.body.iin,
+    iin,
     misPatientId: misPatient.id,
   });
 
@@ -131,7 +119,7 @@ export const createPatientProfile = async (req: Request, res: Response) => {
     userId: req.user.id,
     phone: req.user.phone,
     req,
-    metadata: { iin: req.body.iin as string },
+    metadata: { iin },
   });
 
   return res.status(200).json({ success: true, patient: newPatient });
