@@ -47,7 +47,7 @@ OTP-based: user receives SMS (via Twilio in production), stores a hashed OTP in 
 
 ### Notification queue
 
-BullMQ queue (`appointment-notifications`) schedules push notifications via OneSignal. The worker (`src/shared/queues/notification.worker.ts`) runs in the same process, started from `server.ts`. Notifications fire 10 minutes before an appointment (or 30s in test mode via `NOTIFICATION_TEST_MODE=true`). Job IDs are `appointment-<appointmentId>` to prevent duplicates.
+BullMQ queue (`appointment-notifications`) schedules push notifications via OneSignal. The worker (`src/shared/queues/notification.worker.ts`) runs in the same process, started from `server.ts`. Two reminders fire per appointment — 3 hours and 1 hour before it (or 30s/60s after creation in test mode via `NOTIFICATION_TEST_MODE=true`). Offsets are declared in `APPOINTMENT_REMINDERS` in `notification.queue.ts`. Job IDs are `appointment-<appointmentId>-<3h|1h>` to prevent duplicates; cancelling also removes the legacy `appointment-<appointmentId>` job from the old single-reminder scheme.
 
 ### Path aliases
 

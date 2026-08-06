@@ -93,7 +93,7 @@ export const createAppointment = async (data: {
     },
   });
 
-  // Schedule notification 10 minutes before appointment
+  // Schedule notifications 3 hours and 1 hour before appointment
   if (appointment.status === AppointmentStatus.SCHEDULED) {
     await scheduleAppointmentNotification(
       appointment.id,

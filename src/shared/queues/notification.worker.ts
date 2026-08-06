@@ -5,15 +5,21 @@ import * as db from '@/infrastructure/db';
 import { sendPushNotification } from '@/domains/notifications/notifications.service';
 import { createLogger } from '@/shared/lib/logger';
 
-import { AppointmentNotificationJobData } from './notification.queue';
+import { AppointmentNotificationJobData, AppointmentReminderKey } from './notification.queue';
 
 const workerLogger = createLogger('notification-worker');
+
+// Russian lead-in for each reminder, e.g. "У вас приём через 3 часа ..."
+const REMINDER_LEAD_TIME: Record<AppointmentReminderKey, string> = {
+  '3h': 'через 3 часа',
+  '1h': 'через час',
+};
 
 export const appointmentNotificationWorker = new Worker<AppointmentNotificationJobData>(
   'appointment-notifications',
   async (job: Job<AppointmentNotificationJobData>) => {
-    const { appointmentId } = job.data;
-    const jobLogger = workerLogger.child({ jobId: job.id, appointmentId });
+    const { appointmentId, reminder } = job.data;
+    const jobLogger = workerLogger.child({ jobId: job.id, appointmentId, reminder });
     const startedAt = Date.now();
 
     try {
@@ -54,11 +60,16 @@ export const appointmentNotificationWorker = new Worker<AppointmentNotificationJ
       // Prepare notification content
       const title = 'Напоминание о записи';
       const appointmentType = appointment.isTelemedicine ? 'онлайн-консультация' : 'приём';
-      const message = `У вас ${appointmentType} ${dateString} в ${timeString}`;
+      // Jobs queued before the two-reminder change carry no `reminder` field
+      const leadTime = reminder ? REMINDER_LEAD_TIME[reminder] : undefined;
+      const message = leadTime
+        ? `У вас ${appointmentType} ${leadTime} — ${dateString} в ${timeString}`
+        : `У вас ${appointmentType} ${dateString} в ${timeString}`;
 
       const notificationData = {
         type: 'appointment_reminder',
         appointmentId: appointment.id,
+        ...(reminder ? { reminder } : {}),
         dateTime: appointment.dateTime.toISOString(),
         isTelemedicine: appointment.isTelemedicine,
         ...(appointment.isTelemedicine && appointment.meetingUrl

@@ -89,6 +89,11 @@ export const config = {
     apiAuthKey: process.env.ONE_SIGNAL_API_AUTH_KEY,
   },
 
+  notifications: {
+    // Fire appointment reminders seconds after creation instead of hours before the visit
+    testMode: process.env.NOTIFICATION_TEST_MODE === 'true',
+  },
+
   appVersion: {
     iosUrl: process.env.APP_VERSION_IOS_URL || '',
     androidUrl: process.env.APP_VERSION_ANDROID_URL || '',
