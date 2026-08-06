@@ -9,10 +9,83 @@ import { AppointmentNotificationJobData, AppointmentReminderKey } from './notifi
 
 const workerLogger = createLogger('notification-worker');
 
-// Russian lead-in for each reminder, e.g. "У вас приём через 3 часа ..."
-const REMINDER_LEAD_TIME: Record<AppointmentReminderKey, string> = {
-  '3h': 'через 3 часа',
-  '1h': 'через час',
+// User's local zone (Asia/Almaty, UTC+5)
+const TIME_ZONE = 'Asia/Almaty';
+
+// YYYY-MM-DD as seen in TIME_ZONE — used to say "сегодня"/"завтра" instead of a date
+const zonedDayKey = (date: Date) =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+
+const daysUntil = (date: Date) => {
+  const day = Date.parse(`${zonedDayKey(date)}T00:00:00Z`);
+  const today = Date.parse(`${zonedDayKey(new Date())}T00:00:00Z`);
+
+  return Math.round((day - today) / (24 * 60 * 60 * 1000));
+};
+
+// "сегодня в 14:30" / "завтра в 09:00" / "6 августа в 09:00"
+const formatWhen = (date: Date) => {
+  const time = date.toLocaleTimeString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: TIME_ZONE,
+  });
+
+  const dayOffset = daysUntil(date);
+
+  if (dayOffset === 0) return `сегодня в ${time}`;
+  if (dayOffset === 1) return `завтра в ${time}`;
+
+  const day = date.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    timeZone: TIME_ZONE,
+  });
+
+  return `${day} в ${time}`;
+};
+
+const REMINDER_TITLES: Record<AppointmentReminderKey, { visit: string; online: string }> = {
+  '3h': { visit: 'Приём через 3 часа', online: 'Онлайн-консультация через 3 часа' },
+  '1h': { visit: 'Приём через час', online: 'Онлайн-консультация через час' },
+};
+
+// Second line: what the patient should do now. Differs by reminder — three hours
+// out it's about preparing, an hour out it's about being on time.
+const REMINDER_HINTS: Record<AppointmentReminderKey, { visit: string; online: string }> = {
+  '3h': {
+    visit: 'Возьмите с собой удостоверение личности.',
+    online: 'Консультация пройдёт в приложении — проверьте связь заранее.',
+  },
+  '1h': {
+    visit: 'Лучше прийти за 10–15 минут до начала.',
+    online: 'Подключайтесь из приложения за пару минут до начала.',
+  },
+};
+
+const buildReminderContent = (
+  reminder: AppointmentReminderKey | undefined,
+  isTelemedicine: boolean,
+  when: string
+) => {
+  const kind = isTelemedicine ? 'online' : 'visit';
+
+  // Jobs queued before the two-reminder change carry no `reminder` field
+  if (!reminder) {
+    const appointmentType = isTelemedicine ? 'Онлайн-консультация' : 'Приём';
+
+    return { title: 'Напоминание о записи', message: `${appointmentType} ${when}.` };
+  }
+
+  return {
+    title: REMINDER_TITLES[reminder][kind],
+    message: `${when.charAt(0).toUpperCase()}${when.slice(1)}. ${REMINDER_HINTS[reminder][kind]}`,
+  };
 };
 
 export const appointmentNotificationWorker = new Worker<AppointmentNotificationJobData>(
@@ -42,29 +115,8 @@ export const appointmentNotificationWorker = new Worker<AppointmentNotificationJ
         return { success: false, reason: 'Appointment not scheduled' };
       }
 
-      // Format date and time in user's local zone (Asia/Almaty, UTC+5)
-      const appointmentDate = new Date(appointment.dateTime);
-      const timeZone = 'Asia/Almaty';
-      const timeString = appointmentDate.toLocaleTimeString('ru-RU', {
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone,
-      });
-      const dateString = appointmentDate.toLocaleDateString('ru-RU', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-        timeZone,
-      });
-
-      // Prepare notification content
-      const title = 'Напоминание о записи';
-      const appointmentType = appointment.isTelemedicine ? 'онлайн-консультация' : 'приём';
-      // Jobs queued before the two-reminder change carry no `reminder` field
-      const leadTime = reminder ? REMINDER_LEAD_TIME[reminder] : undefined;
-      const message = leadTime
-        ? `У вас ${appointmentType} ${leadTime} — ${dateString} в ${timeString}`
-        : `У вас ${appointmentType} ${dateString} в ${timeString}`;
+      const when = formatWhen(new Date(appointment.dateTime));
+      const { title, message } = buildReminderContent(reminder, appointment.isTelemedicine, when);
 
       const notificationData = {
         type: 'appointment_reminder',
