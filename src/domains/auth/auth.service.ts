@@ -3,7 +3,7 @@ import { AuditEvent } from '@prisma/client';
 import * as db from '@/infrastructure/db';
 
 import { User, Role } from './auth.types';
-import { CreateUserDto } from './auth.dto';
+import { CreateUserDto, CreatePatientAccountDto } from './auth.dto';
 
 // Events that mark the start of a new session (a fresh login), as opposed to
 // token refreshes that merely continue an existing session. Biometric unlock
@@ -81,6 +81,60 @@ export const createUser = async (user: CreateUserDto) => {
       email: user.email || null,
       role: Role.PATIENT,
     },
+  });
+};
+
+/**
+ * Resolves the account a login attempt refers to. The IIN is authoritative
+ * (it lives on the patient profile); the phone is the fallback for accounts
+ * created before registration became a separate flow, which have a user row but
+ * no patient profile yet.
+ */
+export const findAccountByIinOrPhone = async (
+  iin: string,
+  phone: string
+): Promise<User | null> => {
+  const patient = await db.prismaClient.patient.findUnique({ where: { iin } });
+
+  if (patient) {
+    return findUserById(patient.userId);
+  }
+
+  return findUserByPhone(phone);
+};
+
+export const accountExists = async (iin: string, phone: string): Promise<boolean> => {
+  return !!(await findAccountByIinOrPhone(iin, phone));
+};
+
+/**
+ * Creates the user row and its patient profile together, so a registration that
+ * fails part-way never leaves a phone number claimed by a profile-less account.
+ */
+export const createPatientAccount = async (input: CreatePatientAccountDto) => {
+  return db.prismaClient.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: {
+        phone: input.phone,
+        role: Role.PATIENT,
+      },
+    });
+
+    const patient = await tx.patient.create({
+      data: {
+        userId: user.id,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        patronymic: input.patronymic || '',
+        fullName: `${input.firstName} ${input.lastName}`,
+        birthDate: input.birthDate,
+        gender: input.gender,
+        iin: input.iin,
+        misPatientId: input.misPatientId,
+      },
+    });
+
+    return { user, patient };
   });
 };
 

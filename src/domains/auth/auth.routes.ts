@@ -35,7 +35,8 @@ const router = Router();
  *            description: Phone number
  * /auth/request-otp:
  *   post:
- *     summary: Request OTP code for phone verification
+ *     summary: Request an OTP code to sign in to an existing account
+ *     description: Login only — this endpoint never creates an account. If no account matches the phone/IIN it returns 404 `ACCOUNT_NOT_FOUND` and the client should send the user through `/auth/register/*`.
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -51,9 +52,188 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/RequestOTPResponse'
  *       400:
- *         description: Invalid input — `INVALID_PHONE` or `INVALID_IIN`
+ *         description: Invalid input — `INVALID_PHONE`, `INVALID_IIN` or `INSURANCE_PHONE_IS_NOT_MATCHED`
+ *       404:
+ *         description: No account exists for this phone/IIN — `ACCOUNT_NOT_FOUND`
  */
 router.post('/request-otp', controller.requestOtp);
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     RegisterStartBody:
+ *       type: object
+ *       required:
+ *         - phone
+ *         - iin
+ *       properties:
+ *         phone:
+ *           type: string
+ *           description: Phone number starting with 7 followed by 10 digits.
+ *           example: "77771400962"
+ *         iin:
+ *           type: string
+ *           description: 12-digit Kazakhstan IIN.
+ *           example: "630301350211"
+ *     RegisterStartResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *         phone:
+ *           type: string
+ *           description: Phone number the code was sent to.
+ * /auth/register/start:
+ *   post:
+ *     summary: Registration step 1 — check the identity is new and send a confirmation code
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/RegisterStartBody'
+ *     responses:
+ *       200:
+ *         description: Confirmation code sent
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/RegisterStartResponse'
+ *       400:
+ *         description: Invalid input — `INVALID_PHONE`, `INVALID_IIN`, or `INSURANCE_PHONE_IS_NOT_MATCHED` when the insurance record for this IIN holds a different number
+ *       409:
+ *         description: An account already exists — `ACCOUNT_ALREADY_EXISTS`. The user should sign in instead.
+ */
+router.post('/register/start', controller.registerStart);
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     RegisterVerifyOtpBody:
+ *       type: object
+ *       required:
+ *         - phone
+ *         - iin
+ *         - otp
+ *       properties:
+ *         phone:
+ *           type: string
+ *           example: "77771400962"
+ *         iin:
+ *           type: string
+ *           example: "630301350211"
+ *         otp:
+ *           type: string
+ *           example: "1234"
+ *     RegisterVerifyOtpResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *         registrationToken:
+ *           type: string
+ *           description: Short-lived (15 min) token pinning the verified phone/IIN pair. Required by `/auth/register/complete`. It is not a session token and is rejected as a Bearer credential.
+ *         existsInMis:
+ *           type: boolean
+ *           description: Whether MIS already holds a record for this IIN. When true, `patient` carries the data to pre-fill the form with.
+ *         patient:
+ *           type: object
+ *           nullable: true
+ *           properties:
+ *             firstName:
+ *               type: string
+ *             lastName:
+ *               type: string
+ *             patronymic:
+ *               type: string
+ *             birthDate:
+ *               type: string
+ *             gender:
+ *               type: string
+ *               enum: [M, F]
+ *             iin:
+ *               type: string
+ * /auth/register/verify-otp:
+ *   post:
+ *     summary: Registration step 2 — verify the code and get the MIS data to pre-fill the form
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/RegisterVerifyOtpBody'
+ *     responses:
+ *       200:
+ *         description: Code verified
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/RegisterVerifyOtpResponse'
+ *       400:
+ *         description: Invalid or expired code — `INVALID_OTP` / `OTP_EXPIRED`
+ *       409:
+ *         description: An account already exists — `ACCOUNT_ALREADY_EXISTS`
+ */
+router.post('/register/verify-otp', controller.registerVerifyOtp);
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     RegisterCompleteBody:
+ *       type: object
+ *       required:
+ *         - registrationToken
+ *         - firstName
+ *         - lastName
+ *         - birthDate
+ *         - gender
+ *       properties:
+ *         registrationToken:
+ *           type: string
+ *           description: Token returned by `/auth/register/verify-otp`.
+ *         firstName:
+ *           type: string
+ *         lastName:
+ *           type: string
+ *         patronymic:
+ *           type: string
+ *         birthDate:
+ *           type: string
+ *           example: "1963-03-01"
+ *         gender:
+ *           type: string
+ *           enum: [M, F]
+ * /auth/register/complete:
+ *   post:
+ *     summary: Registration step 3 — create the account and sign the user in
+ *     description: Creates the MIS patient when one does not exist yet, then creates the user and patient profile in a single transaction and returns a session.
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/RegisterCompleteBody'
+ *     responses:
+ *       201:
+ *         description: Account created; tokens issued
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/VerifyOTPResponse'
+ *       400:
+ *         description: Invalid profile data, or the patient could not be created in MIS
+ *       401:
+ *         description: Missing, malformed or expired registration token — `INVALID_REGISTRATION_TOKEN`
+ *       409:
+ *         description: An account already exists — `ACCOUNT_ALREADY_EXISTS`
+ */
+router.post('/register/complete', controller.registerComplete);
 
 /**
  * @openapi

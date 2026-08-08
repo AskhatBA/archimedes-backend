@@ -15,10 +15,23 @@ const signOptions = {
   audience: 'archimedes-app',
 } as const;
 
+// Registration tokens are signed with the access-token secret but carry this
+// scope claim. `verifyAccessToken` rejects any token that has it, so a
+// registration token can never be presented as a Bearer token.
+const REGISTRATION_SCOPE = 'registration';
+const defaultRegistrationExpiresIn = '15m';
+
 interface TokenPayload {
   userId: string;
   role: string;
   tokenVersion: number;
+}
+
+export interface RegistrationTokenPayload {
+  phone: string;
+  iin: string;
+  /** MIS beneficiary id, when the patient already existed in MIS at OTP time. */
+  misPatientId?: string;
 }
 
 export const generateAccessToken = (payload: TokenPayload) => {
@@ -78,8 +91,22 @@ export const saveRefreshToken = (userId: string, refreshToken: string) => {
 
 export const verifyAccessToken = (token: string) => {
   try {
-    return jwt.verify(token, config.token.jwtAccessSecret!, signOptions) as TokenPayload;
+    const payload = jwt.verify(token, config.token.jwtAccessSecret!, signOptions) as TokenPayload & {
+      scope?: string;
+    };
+
+    // A registration token proves a phone number, not an identity — it must
+    // never authenticate a request.
+    if (payload.scope === REGISTRATION_SCOPE) {
+      throw new AppError(ErrorCodes.INVALID_TOKEN, 401);
+    }
+
+    return payload as TokenPayload;
   } catch (error: any) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
     if (error.name === 'TokenExpiredError') {
       throw new AppError(ErrorCodes.TOKEN_EXPIRED, 401);
     }
@@ -102,6 +129,38 @@ export const verifyRefreshToken = (token: string) => {
 
     throw new AppError(ErrorCodes.INVALID_REFRESH_TOKEN, 401);
   }
+};
+
+/**
+ * Short-lived token handed out once the registration OTP has been verified. It
+ * pins the phone/IIN pair the code was sent to, so the final "complete
+ * registration" call cannot be pointed at a different identity.
+ */
+export const generateRegistrationToken = (payload: RegistrationTokenPayload) => {
+  return jwt.sign({ ...payload, scope: REGISTRATION_SCOPE }, config.token.jwtAccessSecret!, {
+    ...signOptions,
+    expiresIn: defaultRegistrationExpiresIn,
+  });
+};
+
+export const verifyRegistrationToken = (token: string): RegistrationTokenPayload => {
+  let payload: RegistrationTokenPayload & { scope?: string };
+
+  try {
+    payload = jwt.verify(token, config.token.jwtAccessSecret!, signOptions) as typeof payload;
+  } catch {
+    throw new AppError(ErrorCodes.INVALID_REGISTRATION_TOKEN, 401);
+  }
+
+  if (payload.scope !== REGISTRATION_SCOPE || !payload.phone || !payload.iin) {
+    throw new AppError(ErrorCodes.INVALID_REGISTRATION_TOKEN, 401);
+  }
+
+  return {
+    phone: payload.phone,
+    iin: payload.iin,
+    ...(payload.misPatientId && { misPatientId: payload.misPatientId }),
+  };
 };
 
 export const extractTokenFromHeader = (authHeader: string | undefined) => {

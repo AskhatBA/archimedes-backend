@@ -1,8 +1,11 @@
 import { Request, Response } from 'express';
+import { body, validationResult } from 'express-validator';
+
 import { isProduction, config } from '@/config';
 import { ErrorCodes } from '@/shared/constants/error-codes';
 import { AppError } from '@/shared/services/app-error.service';
 import * as otpService from '@/shared/services/otp.service';
+import * as registrationOtpService from '@/shared/services/registration-otp.service';
 import * as pinService from '@/shared/services/pin.service';
 import { assertValidIin } from '@/shared/services/iin.service';
 import * as jwtService from '@/shared/services/jwt.service';
@@ -11,16 +14,31 @@ import { AuditEvent } from '@/shared/services/audit-log.service';
 import * as smsService from '@/infrastructure/sms/sms.service';
 import * as insuranceService from '@/domains/insurance/insurance.service';
 import * as patientService from '@/domains/patient/patient.service';
+import * as misService from '@/domains/mis/mis.service';
 
 import * as authService from './auth.service';
 
+const PHONE_REGEX = /^7\d{10}$/;
+
+const assertValidPhone = (phone: unknown): string => {
+  if (typeof phone !== 'string' || !PHONE_REGEX.test(phone)) {
+    throw new AppError(ErrorCodes.INVALID_PHONE, 400);
+  }
+
+  return phone;
+};
+
+/**
+ * Login only. Unlike before, this never provisions an account — a phone/IIN with
+ * no account in our DB is sent to the registration flow instead.
+ */
 export const requestOtp = async (req: Request, res: Response) => {
-  const { email, iin: rawIin } = req.body;
+  const { iin: rawIin } = req.body;
   let { phone } = req.body;
-  const phoneRegex = /^7\d{10}$/;
+  let iin: string | undefined;
 
   if (rawIin) {
-    const iin = assertValidIin(rawIin);
+    iin = assertValidIin(rawIin);
 
     const checkIin = await insuranceService.checkIin(iin);
     const patient = await patientService.getPatientByIin(iin);
@@ -54,44 +72,243 @@ export const requestOtp = async (req: Request, res: Response) => {
     }
   }
 
-  if (!phone || !phoneRegex.test(phone)) {
-    throw new AppError(ErrorCodes.INVALID_PHONE, 400);
+  assertValidPhone(phone);
+
+  const user = iin
+    ? await authService.findAccountByIinOrPhone(iin, phone)
+    : await authService.findUserByPhone(phone);
+
+  if (!user) {
+    await auditLogService.log({
+      event: AuditEvent.AUTH_LOGIN_FAILED,
+      success: false,
+      phone,
+      req,
+      metadata: { reason: 'ACCOUNT_NOT_FOUND' },
+    });
+    throw new AppError(ErrorCodes.ACCOUNT_NOT_FOUND, 404);
   }
 
   const otp = otpService.generateOTPCode();
   const hashedOTP = await otpService.hashOTP(otp);
-  const user = await authService.findUserByPhone(phone);
-  const isUserExists = !!user?.id;
 
   if (isProduction) {
     await smsService.sendSMS(phone, `Код для авторизации: ${otp}`);
   }
 
-  if (isUserExists) {
-    await otpService.saveOTP(user.id, hashedOTP);
-    return res
-      .status(200)
-      .json({ id: user?.id, phone: phone, otp: isProduction ? undefined : otp });
-  }
-
-  const createdUser = await authService.createUser({
-    email: email,
-    phone: phone,
-  });
-
-  await otpService.saveOTP(createdUser.id, hashedOTP);
+  await otpService.saveOTP(user.id, hashedOTP);
 
   auditLogService.log({
-    event: AuditEvent.USER_ACCOUNT_CREATED,
+    event: AuditEvent.AUTH_OTP_REQUEST,
     success: true,
-    userId: createdUser.id,
+    userId: user.id,
     phone,
     req,
   });
 
-  return res
-    .status(200)
-    .json({ id: createdUser?.id, phone: phone, otp: isProduction ? undefined : otp });
+  return res.status(200).json({ id: user.id, phone: phone, otp: isProduction ? undefined : otp });
+};
+
+/**
+ * Registration, step 1: claim a phone/IIN pair and send a confirmation code.
+ * Rejects identities that already have an account — those belong in the login
+ * flow — and identities whose insurance record is registered to another number.
+ */
+export const registerStart = async (req: Request, res: Response) => {
+  const phone = assertValidPhone(req.body.phone);
+  const iin = assertValidIin(req.body.iin);
+
+  if (await authService.accountExists(iin, phone)) {
+    throw new AppError(ErrorCodes.ACCOUNT_ALREADY_EXISTS, 409);
+  }
+
+  // When the insurance service knows this IIN its phone is authoritative:
+  // registering under a different number would build an account the insured
+  // person can never reach.
+  const checkIin = await insuranceService.checkIin(iin).catch(() => undefined);
+
+  if (checkIin?.errorCode === 0 && checkIin.phone && checkIin.phone !== phone) {
+    throw new AppError(ErrorCodes.INSURANCE_PHONE_IS_NOT_MATCHED, 400);
+  }
+
+  const otp = otpService.generateOTPCode();
+  const hashedOtp = await otpService.hashOTP(otp);
+
+  await registrationOtpService.saveRegistrationOtp(phone, iin, hashedOtp);
+
+  if (isProduction) {
+    await smsService.sendSMS(phone, `Код для регистрации: ${otp}`);
+  }
+
+  auditLogService.log({
+    event: AuditEvent.AUTH_OTP_REQUEST,
+    success: true,
+    phone,
+    req,
+    metadata: { flow: 'registration' },
+  });
+
+  return res.status(200).json({
+    success: true,
+    phone,
+    otp: isProduction ? undefined : otp,
+  });
+};
+
+/**
+ * Registration, step 2: exchange the code for a short-lived registration token
+ * and, in the same response, whatever MIS already knows about this patient so
+ * the form can be pre-filled. The MIS lookup sits behind OTP verification on
+ * purpose — it returns a real person's name and birth date, which must not be
+ * readable by anyone who merely knows an IIN.
+ */
+export const registerVerifyOtp = async (req: Request, res: Response) => {
+  const phone = assertValidPhone(req.body.phone);
+  const iin = assertValidIin(req.body.iin);
+  const { otp } = req.body;
+
+  try {
+    await registrationOtpService.validateRegistrationOtp(phone, iin, otp);
+  } catch (err) {
+    await auditLogService.log({
+      event: AuditEvent.AUTH_LOGIN_FAILED,
+      success: false,
+      phone,
+      req,
+      metadata: {
+        flow: 'registration',
+        reason: err instanceof AppError ? err.message : 'OTP validation failed',
+      },
+    });
+    throw err;
+  }
+
+  // The account could have been created while the code was in flight.
+  if (await authService.accountExists(iin, phone)) {
+    throw new AppError(ErrorCodes.ACCOUNT_ALREADY_EXISTS, 409);
+  }
+
+  const misPatient = await misService.findPatientByIinAndPhone(iin).catch(() => undefined);
+
+  const registrationToken = jwtService.generateRegistrationToken({
+    phone,
+    iin,
+    ...(misPatient?.id && { misPatientId: misPatient.id }),
+  });
+
+  return res.status(200).json({
+    success: true,
+    registrationToken,
+    existsInMis: !!misPatient,
+    patient: misPatient
+      ? {
+          firstName: misPatient.firstName,
+          lastName: misPatient.lastName,
+          patronymic: misPatient.patronymic,
+          birthDate: misPatient.birthDate,
+          gender: misPatient.gender,
+          iin: misPatient.iin,
+        }
+      : undefined,
+  });
+};
+
+/**
+ * Registration, step 3: create the MIS patient (when missing), the user and the
+ * patient profile, then sign the user in. The phone/IIN come from the
+ * registration token, never from the request body.
+ */
+export const registerComplete = async (req: Request, res: Response) => {
+  const { registrationToken, firstName, lastName, patronymic, birthDate, gender } = req.body;
+
+  if (!registrationToken || typeof registrationToken !== 'string') {
+    throw new AppError(ErrorCodes.INVALID_REGISTRATION_TOKEN, 401);
+  }
+
+  await body('firstName').notEmpty().withMessage('First name is required').run(req);
+  await body('lastName').notEmpty().withMessage('Last name is required').run(req);
+  await body('birthDate').notEmpty().withMessage('Valid birth date is required').run(req);
+  await body('gender').notEmpty().isIn(['M', 'F']).withMessage('Gender must be M or F').run(req);
+
+  const errors = validationResult(req);
+
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, errors: errors.array() });
+  }
+
+  const { phone, iin, misPatientId } = jwtService.verifyRegistrationToken(registrationToken);
+
+  if (await authService.accountExists(iin, phone)) {
+    throw new AppError(ErrorCodes.ACCOUNT_ALREADY_EXISTS, 409);
+  }
+
+  let resolvedMisPatientId = misPatientId;
+
+  if (!resolvedMisPatientId) {
+    const createdMisPatient = await misService.createPatient({
+      phoneNumber: phone,
+      firstName,
+      lastName,
+      patronymic,
+      gender,
+      birthDate,
+      iin,
+    });
+
+    resolvedMisPatientId = createdMisPatient?.id;
+  }
+
+  if (!resolvedMisPatientId) {
+    throw new AppError(ErrorCodes.MIS_PATIENT_NOT_FOUND, 400);
+  }
+
+  const { user } = await authService.createPatientAccount({
+    phone,
+    iin,
+    firstName,
+    lastName,
+    patronymic,
+    birthDate,
+    gender,
+    misPatientId: resolvedMisPatientId,
+  });
+
+  const tokens = jwtService.generateTokenPair({
+    userId: user.id,
+    role: user.role,
+    tokenVersion: user.tokenVersion,
+  });
+  await jwtService.saveRefreshToken(user.id, tokens.refreshToken);
+
+  auditLogService.log({
+    event: AuditEvent.USER_ACCOUNT_CREATED,
+    success: true,
+    userId: user.id,
+    phone,
+    req,
+    metadata: { flow: 'registration', misPatientCreated: !misPatientId },
+  });
+  auditLogService.log({
+    event: AuditEvent.USER_PROFILE_CREATED,
+    success: true,
+    userId: user.id,
+    phone,
+    req,
+  });
+  auditLogService.log({
+    event: AuditEvent.AUTH_LOGIN_SUCCESS,
+    success: true,
+    userId: user.id,
+    phone,
+    req,
+    metadata: { flow: 'registration' },
+  });
+
+  return res.status(201).json({
+    success: true,
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+  });
 };
 
 export const verifyOtp = async (req: Request, res: Response) => {
