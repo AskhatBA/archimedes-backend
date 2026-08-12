@@ -118,8 +118,6 @@ router.get('/profile', authenticate, controller.getPatientProfile);
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/GetPatientByIinResponse'
- *       400:
- *         description: '`INVALID_IIN` — malformed IIN'
  *       401:
  *         description: Unauthorized
  *       404:

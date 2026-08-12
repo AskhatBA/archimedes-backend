@@ -2,7 +2,6 @@ import { Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 
 import { AppError } from '@/shared/services/app-error.service';
-import { assertValidIin } from '@/shared/services/iin.service';
 import * as auditLogService from '@/shared/services/audit-log.service';
 import { AuditEvent } from '@/shared/services/audit-log.service';
 import { useDemoAccount } from '@/shared/helpers';
@@ -56,7 +55,7 @@ export const getPatientByIin = async (req: Request, res: Response) => {
     throw new AppError('User not found', 401);
   }
 
-  const iin = assertValidIin(req.params.iin);
+  const { iin } = req.params;
 
   const patient = await patientService.getPatientByIin(iin);
 
@@ -91,7 +90,7 @@ export const createPatientProfile = async (req: Request, res: Response) => {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const iin = assertValidIin(req.body.iin);
+  const iin = req.body.iin as string;
 
   const misPatient = await misService.findPatientByIinAndPhone(iin);
 

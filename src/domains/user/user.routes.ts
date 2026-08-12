@@ -47,8 +47,6 @@ router.get('/patient/profile', authenticate, controller.getUserProfile);
  *                 isPhoneMatch:
  *                   type: boolean
  *                   description: True if the provided phone matches the phone returned by the Insurance service for the given IIN
- *       400:
- *         description: Invalid input — `INVALID_IIN` when the IIN is malformed
  */
 router.get('/check-account', controller.checkAccount);
 

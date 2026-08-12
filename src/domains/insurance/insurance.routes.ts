@@ -994,8 +994,6 @@ router.get('/qr/submit-appointment', authenticate, controller.submitQrAppointmen
  *                 message:
  *                   type: string
  *                   example: "Пользователь не найден"
- *       400:
- *         description: '`INVALID_IIN` — missing or malformed IIN'
  *       401:
  *         description: User not found or unauthorized
  */

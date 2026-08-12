@@ -52,7 +52,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/RequestOTPResponse'
  *       400:
- *         description: Invalid input — `INVALID_PHONE`, `INVALID_IIN` or `INSURANCE_PHONE_IS_NOT_MATCHED`
+ *         description: Invalid input — `INVALID_PHONE` or `INSURANCE_PHONE_IS_NOT_MATCHED`
  *       404:
  *         description: No account exists for this phone/IIN — `ACCOUNT_NOT_FOUND`
  */
@@ -102,7 +102,7 @@ router.post('/request-otp', controller.requestOtp);
  *             schema:
  *               $ref: '#/components/schemas/RegisterStartResponse'
  *       400:
- *         description: Invalid input — `INVALID_PHONE`, `INVALID_IIN`, or `INSURANCE_PHONE_IS_NOT_MATCHED` when the insurance record for this IIN holds a different number
+ *         description: Invalid input — `INVALID_PHONE`, or `INSURANCE_PHONE_IS_NOT_MATCHED` when the insurance record for this IIN holds a different number
  *       409:
  *         description: An account already exists — `ACCOUNT_ALREADY_EXISTS`. The user should sign in instead.
  */

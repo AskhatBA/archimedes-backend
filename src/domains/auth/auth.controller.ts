@@ -7,7 +7,6 @@ import { AppError } from '@/shared/services/app-error.service';
 import * as otpService from '@/shared/services/otp.service';
 import * as registrationOtpService from '@/shared/services/registration-otp.service';
 import * as pinService from '@/shared/services/pin.service';
-import { assertValidIin } from '@/shared/services/iin.service';
 import * as jwtService from '@/shared/services/jwt.service';
 import * as auditLogService from '@/shared/services/audit-log.service';
 import { AuditEvent } from '@/shared/services/audit-log.service';
@@ -33,13 +32,10 @@ const assertValidPhone = (phone: unknown): string => {
  * no account in our DB is sent to the registration flow instead.
  */
 export const requestOtp = async (req: Request, res: Response) => {
-  const { iin: rawIin } = req.body;
   let { phone } = req.body;
-  let iin: string | undefined;
+  const iin: string | undefined = req.body.iin;
 
-  if (rawIin) {
-    iin = assertValidIin(rawIin);
-
+  if (iin) {
     const checkIin = await insuranceService.checkIin(iin);
     const patient = await patientService.getPatientByIin(iin);
 
@@ -116,7 +112,7 @@ export const requestOtp = async (req: Request, res: Response) => {
  */
 export const registerStart = async (req: Request, res: Response) => {
   const phone = assertValidPhone(req.body.phone);
-  const iin = assertValidIin(req.body.iin);
+  const iin = req.body.iin as string;
 
   if (await authService.accountExists(iin, phone)) {
     throw new AppError(ErrorCodes.ACCOUNT_ALREADY_EXISTS, 409);
@@ -164,7 +160,7 @@ export const registerStart = async (req: Request, res: Response) => {
  */
 export const registerVerifyOtp = async (req: Request, res: Response) => {
   const phone = assertValidPhone(req.body.phone);
-  const iin = assertValidIin(req.body.iin);
+  const iin = req.body.iin as string;
   const { otp } = req.body;
 
   try {

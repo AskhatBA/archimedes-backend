@@ -63,8 +63,6 @@ const router = Router();
  *                   example: true
  *                 patient:
  *                   $ref: '#/components/schemas/MISPatient'
- *       400:
- *         description: '`INVALID_IIN` — missing or malformed IIN'
  *       401:
  *         description: User not found or unauthorized
  */

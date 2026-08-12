@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import { query, validationResult } from 'express-validator';
 
-import { assertValidIin } from '@/shared/services/iin.service';
 
 import * as userService from './user.service';
 
@@ -20,7 +19,7 @@ export const checkAccount = async (req: Request, res: Response) => {
     return res.status(400).json({ success: false, errors: errors.array() });
   }
 
-  const iin = assertValidIin(req.query.iin);
+  const iin = req.query.iin as string;
   const phone = req.query.phone as string | undefined;
 
   const result = await userService.checkAccount(iin, phone);

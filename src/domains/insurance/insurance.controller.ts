@@ -3,7 +3,6 @@ import { query, body, validationResult, param } from 'express-validator';
 
 import { AppError } from '@/shared/services/app-error.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
-import { assertValidIin } from '@/shared/services/iin.service';
 import * as auditLogService from '@/shared/services/audit-log.service';
 import { AuditEvent } from '@/shared/services/audit-log.service';
 import * as misService from '@/domains/mis/mis.service';
@@ -608,7 +607,7 @@ export const getClinicsMO = async (req: Request, res: Response) => {
 };
 
 export const checkIin = async (req: Request, res: Response) => {
-  const iin = assertValidIin(req.query.iin);
+  const iin = req.query.iin as string;
 
   const result = await insuranceService.checkIin(iin);
 
