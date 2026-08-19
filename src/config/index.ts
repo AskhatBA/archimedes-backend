@@ -100,12 +100,31 @@ export const config = {
   },
 
   freedomPay: {
-    merchantId: Number(process.env.FREEDOMPAY_MERCHANT_ID) || 587251,
-    secretKey: process.env.FREEDOMPAY_SECRET_KEY || 'n3EdQzxXq4M0Qcvr',
+    merchantId: Number(process.env.FREEDOMPAY_MERCHANT_ID) || 0,
+    secretKey: process.env.FREEDOMPAY_SECRET_KEY || '',
     apiUrl: process.env.FREEDOMPAY_API_URL || 'https://api.freedompay.kz',
     callbackUrl: process.env.FREEDOMPAY_CALLBACK_URL || '',
     successUrl: process.env.FREEDOMPAY_SUCCESS_URL || '',
     failureUrl: process.env.FREEDOMPAY_FAILURE_URL || '',
+    // pg_testing_mode: payments are created on the sandbox, no real money moves.
+    testingMode: process.env.FREEDOMPAY_TESTING_MODE === 'true',
+    // pg_lifetime: seconds the payer has to complete the payment before it expires.
+    lifetimeSeconds: Number(process.env.FREEDOMPAY_LIFETIME_SECONDS) || 1800,
+
+    reconcile: {
+      // How often the background job re-checks PENDING payments against FreedomPay.
+      intervalSeconds: Number(process.env.FREEDOMPAY_RECONCILE_INTERVAL_SECONDS) || 60,
+      // Upper bound on payments inspected per run, so one sweep cannot run unbounded.
+      // Keep batchSize * spacing below intervalSeconds or sweeps start overlapping.
+      batchSize: Number(process.env.FREEDOMPAY_RECONCILE_BATCH_SIZE) || 20,
+      // FreedomPay asks for 1.5-2s between consecutive payment API calls to avoid
+      // tripping its rate limiting and anti-fraud checks.
+      requestSpacingMs: Number(process.env.FREEDOMPAY_RECONCILE_SPACING_MS) || 1500,
+      // A payment still PENDING this long after creation is treated as abandoned and
+      // marked FAILED. Must exceed pg_lifetime, otherwise a payer who is still on the
+      // provider's page gets their order failed underneath them.
+      maxAgeMinutes: Number(process.env.FREEDOMPAY_RECONCILE_MAX_AGE_MINUTES) || 60,
+    },
   },
 };
 

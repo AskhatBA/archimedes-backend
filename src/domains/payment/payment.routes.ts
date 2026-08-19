@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import { authenticate } from '@/middlewares/auth.middleware';
+
 import * as controller from './payment.controller';
 
 const router = Router();
@@ -89,8 +90,17 @@ router.post('/init', authenticate, controller.initPayment);
  * @openapi
  * /payment/callback:
  *   post:
- *     summary: FreedomPay server-to-server result callback
- *     description: Called by FreedomPay after a payment is processed. Verifies the request signature, updates the payment status, and increments the user's balance on success. Returns a signed XML acknowledgement.
+ *     summary: FreedomPay server-to-server result callback (pg_result_url)
+ *     description: |
+ *       Called by FreedomPay after a payment is processed. Must stay public and unauthenticated.
+ *
+ *       Verifies the request signature and the settled amount, then moves the payment out of
+ *       PENDING exactly once and credits the user's balance on success. Repeated deliveries of
+ *       the same result are ignored, so the balance is never credited twice.
+ *
+ *       Always answers 200 with a signed XML body — outcomes are reported in `pg_status`
+ *       (`ok` / `rejected` / `error`), because a non-200 makes FreedomPay retry the callback
+ *       every 30 minutes for 2 hours.
  *     tags: [Payment]
  *     requestBody:
  *       required: true
@@ -102,14 +112,20 @@ router.post('/init', authenticate, controller.initPayment);
  *               pg_order_id:
  *                 type: string
  *                 format: uuid
+ *                 description: Internal payment ID passed as pg_order_id on init
  *               pg_payment_id:
  *                 type: string
- *               pg_status:
+ *                 description: FreedomPay transaction ID
+ *               pg_result:
  *                 type: string
- *                 enum: [ok, error, rejected]
+ *                 enum: ['0', '1', '2']
+ *                 description: 1 - success, 0 - failure, 2 - not completed yet (stays PENDING)
  *               pg_amount:
  *                 type: string
+ *                 description: Settled amount; must match the initiated amount
  *               pg_currency:
+ *                 type: string
+ *               pg_payment_date:
  *                 type: string
  *               pg_salt:
  *                 type: string
@@ -122,8 +138,6 @@ router.post('/init', authenticate, controller.initPayment);
  *           application/xml:
  *             schema:
  *               type: string
- *       400:
- *         description: Invalid signature or missing payment
  */
 router.post('/callback', controller.handleCallback);
 
@@ -220,6 +234,10 @@ router.get('/history', authenticate, controller.getPaymentHistory);
  * /payment/status/{id}:
  *   get:
  *     summary: Get a single payment by ID
+ *     description: |
+ *       Returns the payment record. If the payment is still PENDING more than a minute after
+ *       creation, its state is re-checked against FreedomPay first — this settles payments whose
+ *       result callback never arrived. Poll this endpoint after the WebView closes.
  *     tags: [Payment]
  *     security:
  *       - bearerAuth: []

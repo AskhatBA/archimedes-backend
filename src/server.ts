@@ -4,9 +4,18 @@ import app from './app';
 import { config } from './config';
 import { logger } from './shared/lib/logger';
 import { startNotificationWorker } from './shared/queues/notification.worker';
+import { schedulePaymentReconciliation } from './shared/queues/payment-reconciliation.queue';
+import { startPaymentReconciliationWorker } from './shared/queues/payment-reconciliation.worker';
 
 // Start the notification worker
 startNotificationWorker();
+
+// Settles payments whose FreedomPay result callback never arrived. Runs in the background
+// so no client has to poll for an outcome.
+startPaymentReconciliationWorker();
+void schedulePaymentReconciliation().catch((err) => {
+  logger.error({ err }, 'Failed to schedule payment reconciliation');
+});
 
 // app.listen(config.port, () => {
 //   console.log(`Server is running on port ${config.port}`);
@@ -21,6 +30,11 @@ const shutdown = async (signal: string) => {
 
   const { stopNotificationWorker } = await import('./shared/queues/notification.worker');
   await stopNotificationWorker();
+
+  const { stopPaymentReconciliationWorker } = await import(
+    './shared/queues/payment-reconciliation.worker'
+  );
+  await stopPaymentReconciliationWorker();
 
   server.close(() => {
     logger.info('HTTP server closed');

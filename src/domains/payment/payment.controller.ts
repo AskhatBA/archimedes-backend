@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 
 import { AppError } from '@/shared/services/app-error.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
+
 import * as paymentService from './payment.service';
 
 export const initPayment = async (req: Request, res: Response) => {
@@ -18,6 +19,8 @@ export const initPayment = async (req: Request, res: Response) => {
   return res.status(200).json(result);
 };
 
+// FreedomPay retries this callback every 30 minutes for 2 hours unless it gets a 200,
+// so failures are reported inside the signed XML body rather than as an HTTP error.
 export const handleCallback = async (req: Request, res: Response) => {
   const xml = await paymentService.handleCallback(req.body as Record<string, string>);
   res.setHeader('Content-Type', 'application/xml; charset=utf-8');
