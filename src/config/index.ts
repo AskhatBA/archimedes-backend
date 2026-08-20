@@ -7,12 +7,25 @@ const DEFAULT_NODE_ENV = 'development';
 
 dotenv.config();
 
+const DEFAULT_CORS_ORIGINS = ['http://localhost:3000', 'http://localhost:5173'];
+
 const nodeEnv = process.env.NODE_ENV || DEFAULT_NODE_ENV;
+
+/** Splits CORS_ORIGIN ("https://a.kz, https://b.kz") into an allowlist. Undefined when unset/blank. */
+function parseOriginList(value?: string): string[] | undefined {
+  const origins = (value ?? '')
+    .split(',')
+    .map((origin) => origin.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+
+  return origins.length > 0 ? origins : undefined;
+}
 
 export const config = {
   port: process.env.PORT || DEFAULT_PORT,
   nodeEnv,
-  corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  // Comma-separated allowlist: the browser is sent back the caller's own origin when it matches.
+  corsOrigin: parseOriginList(process.env.CORS_ORIGIN) ?? DEFAULT_CORS_ORIGINS,
 
   logging: {
     level: process.env.LOG_LEVEL || (nodeEnv === 'production' ? 'info' : 'debug'),
