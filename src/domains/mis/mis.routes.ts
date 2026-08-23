@@ -263,6 +263,8 @@ router.get('/specializations', authenticate, controller.getSpecializations);
  *           type: string
  *         name:
  *           type: string
+ *         iin:
+ *           type: string
  *         position:
  *           type: string
  *         specialtyName:

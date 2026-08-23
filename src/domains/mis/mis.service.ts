@@ -164,6 +164,7 @@ export const getDoctorsBySpecializationIdAndBranchId = async (
   return response.doctors.map((doctor) => ({
     id: doctor.id,
     name: doctor.name,
+    iin: doctor.iin,
     position: doctor.position,
     specialtyName: doctor.specialty_name,
     branchName: doctor.branch_name,

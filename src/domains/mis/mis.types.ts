@@ -44,6 +44,7 @@ export interface MISSpecializationsResponse {
 export interface MISDoctor {
   id: string;
   name: string;
+  iin: string;
   specialty_name: string;
   branch_name: string;
   position: string;
