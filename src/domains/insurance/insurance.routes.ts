@@ -1141,4 +1141,51 @@ router.get('/clinics-mo', authenticate, controller.getClinicsMO);
  */
 router.get('/price-list', authenticate, controller.getPriceList);
 
+/**
+ * @openapi
+ * /insurance/medic-service:
+ *   get:
+ *     summary: Get services provided by a doctor in a clinic
+ *     tags: [Insurance]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: clinicId
+ *         in: query
+ *         description: Clinic OID (from getClinicsMO)
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - name: medicIIN
+ *         in: query
+ *         description: Doctor IIN
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "123456789012"
+ *     responses:
+ *       200:
+ *         description: Response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 medicServices:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *       400:
+ *         description: clinicId or medicIIN is required
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Insurance not found in MIS
+ */
+router.get('/medic-service', authenticate, controller.getMedicService);
+
 export default router;

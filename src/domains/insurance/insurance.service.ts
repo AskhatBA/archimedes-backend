@@ -18,6 +18,7 @@ import {
   QrAppointmentItem,
   ClinicMO,
   PriceListItem,
+  MedicServiceItem,
 } from './insurance.types';
 import {
   INSURANCE_API_GET_CITIES,
@@ -40,6 +41,7 @@ import {
   INSURANCE_API_QR_SUBMIT_APPOINTMENT,
   INSURANCE_API_GET_CLINICS_MO,
   INSURANCE_API_GET_PRICE_LIST,
+  INSURANCE_API_GET_MEDIC_SERVICE,
   ElectronicReferralServiceStatus,
 } from './insurance.constants';
 
@@ -308,6 +310,19 @@ export const getPriceList = async (beneficiaryId: string, clinicId: string) => {
     resolverName: INSURANCE_API_GET_PRICE_LIST,
     beneficiaryId,
     query: { clinicId },
+  });
+  return response;
+};
+
+export const getMedicService = async (
+  beneficiaryId: string,
+  clinicId: string,
+  medicIIN: string
+) => {
+  const response = await insuranceRequest<MedicServiceItem[]>({
+    resolverName: INSURANCE_API_GET_MEDIC_SERVICE,
+    beneficiaryId,
+    query: { cliniId: clinicId, medicIIN },
   });
   return response;
 };

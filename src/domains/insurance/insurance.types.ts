@@ -172,3 +172,7 @@ export interface PriceListItem {
   service: string;
   price: number;
 }
+
+export interface MedicServiceItem {
+  [key: string]: unknown;
+}
