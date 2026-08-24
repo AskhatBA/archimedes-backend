@@ -690,3 +690,69 @@ export const updateElectronicReferralServiceStatus = async (req: Request, res: R
     success: true,
   });
 };
+
+const REFUND_CATEGORIES = [0, 2, 4, 5];
+const REFUND_LIST_MAX_LIMIT = 100;
+
+/**
+ * Dashboard-only listing of every refund request in the system. The route is gated on
+ * `requireRole(Role.ADMIN)`, so a patient token never gets here — it fails with 403 in
+ * the middleware, which is also where the mobile scoping guarantee comes from.
+ */
+export const getAdminRefundRequests = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  await query('page').optional().isInt({ min: 1 }).withMessage('page must be >= 1').run(req);
+  await query('limit')
+    .optional()
+    .isInt({ min: 1, max: REFUND_LIST_MAX_LIMIT })
+    .withMessage(`limit must be between 1 and ${REFUND_LIST_MAX_LIMIT}`)
+    .run(req);
+  await query('category')
+    .optional()
+    .isIn(REFUND_CATEGORIES)
+    .withMessage('Unknown refund category')
+    .run(req);
+  await query('dateFrom')
+    .optional()
+    .isISO8601()
+    .withMessage('dateFrom must be an ISO date')
+    .run(req);
+  await query('dateTo').optional().isISO8601().withMessage('dateTo must be an ISO date').run(req);
+
+  const errors = validationResult(req);
+
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: errors.array(),
+    });
+  }
+
+  const { page, limit, search, category, dateFrom, dateTo } = req.query;
+
+  const result = await insuranceService.getAdminRefundRequests({
+    page: page ? Number(page) : 1,
+    limit: limit ? Number(limit) : 20,
+    search: (search as string)?.trim() || undefined,
+    category: category !== undefined ? Number(category) : undefined,
+    dateFrom: (dateFrom as string) || undefined,
+    dateTo: (dateTo as string) || undefined,
+  });
+
+  auditLogService.log({
+    event: AuditEvent.REFUND_REQUESTS_VIEWED,
+    success: true,
+    userId: req.user.id,
+    phone: req.user.phone,
+    req,
+    metadata: { source: 'admin', page: result.page, total: result.total },
+  });
+
+  return res.status(200).json({
+    success: true,
+    ...result,
+  });
+};

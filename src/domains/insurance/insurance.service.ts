@@ -1,3 +1,5 @@
+import { Prisma } from '@prisma/client';
+
 import * as db from '@/infrastructure/db';
 
 import { RefundRequestDTO } from './insurance.dto';
@@ -325,4 +327,122 @@ export const getMedicService = async (
     query: { cliniId: clinicId, medicIIN },
   });
   return response;
+};
+
+export type AdminRefundListParams = {
+  page: number;
+  limit: number;
+  search?: string | undefined;
+  category?: number | undefined;
+  dateFrom?: string | undefined;
+  dateTo?: string | undefined;
+};
+
+/**
+ * The MIS answers a refund submission with an `errorCode` — 0 means it accepted the
+ * request, anything else (or a missing response) means it never landed there. That is
+ * the only outcome signal we persist, so it is what the dashboard shows.
+ */
+const refundState = (externalResponse: unknown): 'accepted' | 'failed' | 'unknown' => {
+  if (!externalResponse || typeof externalResponse !== 'object') {
+    return 'unknown';
+  }
+
+  const errorCode = (externalResponse as { errorCode?: unknown }).errorCode;
+
+  if (typeof errorCode !== 'number') {
+    return 'unknown';
+  }
+
+  return errorCode === 0 ? 'accepted' : 'failed';
+};
+
+const countFiles = (files: unknown) => (Array.isArray(files) ? files.length : 0);
+
+/**
+ * Dashboard-wide refund listing. Unlike `getLocalRefundRequests` this is not scoped to
+ * one user — the caller is an ADMIN — so it paginates and reads the patient name from
+ * our own DB instead of round-tripping to the MIS profile API per row.
+ */
+export const getAdminRefundRequests = async ({
+  page,
+  limit,
+  search,
+  category,
+  dateFrom,
+  dateTo,
+}: AdminRefundListParams) => {
+  const where: Prisma.InsuranceRefundRequestWhereInput = {};
+
+  if (typeof category === 'number') {
+    where.category = category;
+  }
+
+  // `date` is the free-form claim date the mobile app sends (ISO `YYYY-MM-DD`), so it
+  // sorts lexicographically and a string range is a valid filter on it.
+  if (dateFrom || dateTo) {
+    where.date = {
+      ...(dateFrom ? { gte: dateFrom } : {}),
+      ...(dateTo ? { lte: dateTo } : {}),
+    };
+  }
+
+  if (search) {
+    where.user = {
+      OR: [
+        { phone: { contains: search, mode: 'insensitive' } },
+        { patient: { fullName: { contains: search, mode: 'insensitive' } } },
+        { patient: { iin: { contains: search } } },
+      ],
+    };
+  }
+
+  const [total, rows, totals] = await Promise.all([
+    db.prismaClient.insuranceRefundRequest.count({ where }),
+    db.prismaClient.insuranceRefundRequest.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+      select: {
+        id: true,
+        userId: true,
+        beneficiaryId: true,
+        personId: true,
+        programId: true,
+        category: true,
+        date: true,
+        amount: true,
+        comments: true,
+        files: true,
+        externalResponse: true,
+        createdAt: true,
+        user: {
+          select: {
+            phone: true,
+            patient: { select: { fullName: true, iin: true } },
+          },
+        },
+      },
+    }),
+    // Sum over the whole filtered set, not just the current page — the dashboard shows
+    // it as the header figure for the active filters.
+    db.prismaClient.insuranceRefundRequest.aggregate({ where, _sum: { amount: true } }),
+  ]);
+
+  return {
+    items: rows.map(({ user, files, externalResponse, ...refund }) => ({
+      ...refund,
+      patientName: user.patient?.fullName ?? null,
+      patientIin: user.patient?.iin ?? null,
+      patientPhone: user.phone,
+      filesCount: countFiles(files),
+      state: refundState(externalResponse),
+    })),
+    total,
+    page,
+    limit,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
+    totalAmount: totals._sum.amount ?? 0,
+  };
 };

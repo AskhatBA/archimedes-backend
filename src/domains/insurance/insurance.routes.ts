@@ -1,6 +1,9 @@
 import { Router } from 'express';
 
+import { Role } from '@prisma/client';
+
 import { authenticate } from '@/middlewares/auth.middleware';
+import { requireRole } from '@/middlewares/require-role.middleware';
 
 import * as controller from './insurance.controller';
 
@@ -1187,5 +1190,117 @@ router.get('/price-list', authenticate, controller.getPriceList);
  *         description: Insurance not found in MIS
  */
 router.get('/medic-service', authenticate, controller.getMedicService);
+
+/**
+ * @openapi
+ * /insurance/admin/refund-requests:
+ *   get:
+ *     summary: List every refund request (dashboard, admin only)
+ *     description: >
+ *       Paginated listing of the refund requests stored on our side, across all users.
+ *       Requires an ADMIN account — a patient's mobile token authenticates but is
+ *       rejected with 403.
+ *     tags: [Insurance]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 20
+ *       - in: query
+ *         name: search
+ *         description: Matches patient full name, IIN or phone
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: integer
+ *           enum: [0, 2, 4, 5]
+ *       - in: query
+ *         name: dateFrom
+ *         description: Claim date lower bound, inclusive (YYYY-MM-DD)
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: dateTo
+ *         description: Claim date upper bound, inclusive (YYYY-MM-DD)
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: A page of refund requests
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 items:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       patientName:
+ *                         type: string
+ *                         nullable: true
+ *                       patientIin:
+ *                         type: string
+ *                         nullable: true
+ *                       patientPhone:
+ *                         type: string
+ *                       category:
+ *                         type: integer
+ *                       amount:
+ *                         type: number
+ *                       date:
+ *                         type: string
+ *                       comments:
+ *                         type: string
+ *                         nullable: true
+ *                       filesCount:
+ *                         type: integer
+ *                       state:
+ *                         type: string
+ *                         enum: [accepted, failed, unknown]
+ *                       createdAt:
+ *                         type: string
+ *                 total:
+ *                   type: integer
+ *                 page:
+ *                   type: integer
+ *                 limit:
+ *                   type: integer
+ *                 totalPages:
+ *                   type: integer
+ *                 totalAmount:
+ *                   type: number
+ *       400:
+ *         description: Invalid pagination or filter values
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Authenticated, but not an admin
+ */
+router.get(
+  '/admin/refund-requests',
+  authenticate,
+  requireRole(Role.ADMIN),
+  controller.getAdminRefundRequests
+);
 
 export default router;
