@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
+import { Role } from '@prisma/client';
 
 import { isProduction, config } from '@/config';
 import { ErrorCodes } from '@/shared/constants/error-codes';
@@ -7,6 +8,8 @@ import { AppError } from '@/shared/services/app-error.service';
 import * as otpService from '@/shared/services/otp.service';
 import * as registrationOtpService from '@/shared/services/registration-otp.service';
 import * as pinService from '@/shared/services/pin.service';
+import * as passwordService from '@/shared/services/password.service';
+import * as loginThrottleService from '@/shared/services/login-throttle.service';
 import * as jwtService from '@/shared/services/jwt.service';
 import * as auditLogService from '@/shared/services/audit-log.service';
 import { AuditEvent } from '@/shared/services/audit-log.service';
@@ -638,5 +641,119 @@ export const createDemoAccount = async (_: Request, res: Response) => {
     id: createdUser?.id,
     phone: demoAccount.phone,
     otp: demoAccount.otp,
+  });
+};
+
+/**
+ * Email + password login for the Archimedes dashboard.
+ *
+ * Deliberately separate from the mobile OTP flow: the dashboard is a single
+ * operator account, not a public sign-up surface. Every failure — unknown
+ * email, non-admin account, wrong password — returns the same
+ * `INVALID_CREDENTIALS` 401 so the response cannot be used to enumerate
+ * accounts or to discover which email is the admin's.
+ */
+export const adminLogin = async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+  const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+
+  const logFailure = (reason: string, userId?: string) =>
+    auditLogService.log({
+      event: AuditEvent.ADMIN_LOGIN_FAILED,
+      success: false,
+      ...(userId !== undefined && { userId }),
+      req,
+      metadata: { email: normalizedEmail, reason },
+    });
+
+  if (!normalizedEmail || typeof password !== 'string' || password.length === 0) {
+    await logFailure('MISSING_CREDENTIALS');
+    throw new AppError(ErrorCodes.INVALID_CREDENTIALS, 400);
+  }
+
+  try {
+    await loginThrottleService.assertNotThrottled(normalizedEmail);
+  } catch (err) {
+    await auditLogService.log({
+      event: AuditEvent.ADMIN_LOGIN_THROTTLED,
+      success: false,
+      req,
+      metadata: { email: normalizedEmail },
+    });
+    throw err;
+  }
+
+  const user = await authService.findUserByEmail(normalizedEmail);
+  const isAdminWithPassword = user?.role === Role.ADMIN && !!user.passwordHash;
+
+  // No account (or not an admin) still pays the bcrypt cost, so the timing of a
+  // rejection does not reveal which case it was.
+  const isValid = isAdminWithPassword
+    ? await passwordService.verifyPassword(password, user.passwordHash as string)
+    : await passwordService.burnPasswordComparison(password);
+
+  if (!isValid) {
+    const failures = await loginThrottleService.registerFailure(normalizedEmail);
+    const isLockedOut = failures >= config.admin.maxLoginAttempts;
+
+    await logFailure(
+      user ? (isAdminWithPassword ? 'WRONG_PASSWORD' : 'NOT_AN_ADMIN') : 'UNKNOWN_EMAIL',
+      user?.id
+    );
+
+    throw new AppError(
+      isLockedOut ? ErrorCodes.TOO_MANY_LOGIN_ATTEMPTS : ErrorCodes.INVALID_CREDENTIALS,
+      isLockedOut ? 429 : 401
+    );
+  }
+
+  const admin = user as NonNullable<typeof user>;
+
+  // Same single-session rule as the mobile app: a new login invalidates the
+  // tokens of whatever session was open before it.
+  const updatedUser = await authService.incrementTokenVersion(admin.id);
+  const tokens = jwtService.generateTokenPair({
+    userId: admin.id,
+    role: admin.role,
+    tokenVersion: updatedUser.tokenVersion,
+  });
+  await jwtService.saveRefreshToken(admin.id, tokens.refreshToken);
+  await loginThrottleService.clearFailures(normalizedEmail);
+
+  await auditLogService.log({
+    event: AuditEvent.ADMIN_LOGIN_SUCCESS,
+    success: true,
+    userId: admin.id,
+    req,
+    metadata: { email: normalizedEmail },
+  });
+
+  return res.status(200).json({
+    success: true,
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+    user: { id: admin.id, email: admin.email, role: admin.role },
+  });
+};
+
+/**
+ * Session probe for the dashboard. The route is gated on `requireRole(ADMIN)`,
+ * so a valid patient or doctor token gets 403 here — this is what stops a
+ * mobile token pasted into the browser from opening the dashboard.
+ */
+export const adminMe = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  const user = await authService.findUserById(req.user.id);
+
+  if (!user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  return res.status(200).json({
+    success: true,
+    user: { id: user.id, email: user.email, role: user.role },
   });
 };

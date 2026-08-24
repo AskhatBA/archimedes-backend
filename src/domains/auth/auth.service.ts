@@ -74,6 +74,16 @@ export const findUserByPhone = async (phone: string): Promise<User | null> => {
   });
 };
 
+/**
+ * Email is optional and unique on User, so this only ever matches an account
+ * that was explicitly given one — today that means the dashboard admin.
+ */
+export const findUserByEmail = async (email: string): Promise<User | null> => {
+  return db.prismaClient.user.findUnique({
+    where: { email },
+  });
+};
+
 export const createUser = async (user: CreateUserDto) => {
   return db.prismaClient.user.create({
     data: {

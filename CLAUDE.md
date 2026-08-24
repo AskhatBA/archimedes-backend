@@ -45,6 +45,22 @@ MIS (external medical information system) calls go through `misRequest()` in `sr
 
 OTP-based: user receives SMS (via Twilio in production), stores a hashed OTP in Redis, verifies it, then gets a JWT access+refresh token pair. The `authenticate` middleware (`src/middlewares/auth.middleware.ts`) validates the Bearer token and attaches `req.user` (with `id`, `phone`, `role`, `patient`, `doctor`).
 
+`requireRole(...roles)` (`src/middlewares/require-role.middleware.ts`) runs after `authenticate` and 403s anyone whose role is not in the list. Use it for anything the mobile app must never reach.
+
+### Dashboard admin
+
+The web dashboard (separate repo, `archimedes-dashboard`) signs in with email + password at `POST /v1/api/auth/admin/login`, not OTP. Only accounts with `role = ADMIN` and a `passwordHash` can log in, and `GET /v1/api/auth/admin/me` is gated on `requireRole(Role.ADMIN)` — a patient's valid mobile token authenticates but gets 403 there, which is what keeps it out of the dashboard.
+
+There is deliberately **no sign-up endpoint**. The single admin is provisioned from `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `ADMIN_PHONE` by:
+
+```bash
+npm run db:create-admin
+```
+
+The script refuses to create a second ADMIN, hashes the password with bcrypt (cost 12) into `User.passwordHash`, and bumps `tokenVersion` when re-run so a password rotation revokes the old session. Passwords are never stored or logged in clear text — `password`/`passwordHash` are in the logger's redact list.
+
+Every login failure returns the same `INVALID_CREDENTIALS` regardless of cause (unknown email, non-admin account, wrong password), and a missing account still pays the bcrypt cost, so neither the body nor the timing reveals which emails exist. Failures are counted per email in Redis by `login-throttle.service.ts` (`ADMIN_MAX_LOGIN_ATTEMPTS`, default 5, over `ADMIN_LOCK_MINUTES`, default 15) and audited as `ADMIN_LOGIN_SUCCESS` / `ADMIN_LOGIN_FAILED` / `ADMIN_LOGIN_THROTTLED`.
+
 ### Notification queue
 
 BullMQ queue (`appointment-notifications`) schedules push notifications via OneSignal. The worker (`src/shared/queues/notification.worker.ts`) runs in the same process, started from `server.ts`. Two reminders fire per appointment — 3 hours and 1 hour before it (or 30s/60s after creation in test mode via `NOTIFICATION_TEST_MODE=true`). Offsets are declared in `APPOINTMENT_REMINDERS` in `notification.queue.ts`. Job IDs are `appointment-<appointmentId>-<3h|1h>` to prevent duplicates; cancelling also removes the legacy `appointment-<appointmentId>` job from the old single-reminder scheme.

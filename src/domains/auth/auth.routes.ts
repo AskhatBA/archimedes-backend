@@ -1,6 +1,9 @@
 import { Router } from 'express';
 
+import { Role } from '@prisma/client';
+
 import { authenticate } from '@/middlewares/auth.middleware';
+import { requireRole } from '@/middlewares/require-role.middleware';
 
 import * as controller from './auth.controller';
 
@@ -584,5 +587,108 @@ router.post('/biometric', authenticate, controller.setBiometric);
  *         description: Unauthorized
  */
 router.get('/sessions', authenticate, controller.getSessions);
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     AdminLoginBody:
+ *       type: object
+ *       required:
+ *         - email
+ *         - password
+ *       properties:
+ *         email:
+ *           type: string
+ *           format: email
+ *           example: "admin@archimedes.kz"
+ *         password:
+ *           type: string
+ *           format: password
+ *     AdminLoginResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *         accessToken:
+ *           type: string
+ *         refreshToken:
+ *           type: string
+ *         user:
+ *           $ref: '#/components/schemas/AdminUser'
+ *     AdminUser:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *         email:
+ *           type: string
+ *           format: email
+ *         role:
+ *           type: string
+ *           example: ADMIN
+ * /auth/admin/login:
+ *   post:
+ *     summary: Sign in to the Archimedes dashboard with email and password
+ *     description: >
+ *       Dashboard-only login. Accounts without the ADMIN role are rejected with the
+ *       same generic `INVALID_CREDENTIALS` error as an unknown email, so the response
+ *       cannot be used to enumerate accounts. Failed attempts are counted per email
+ *       and locked out for a configurable window. The admin account is provisioned
+ *       out of band by `npm run db:create-admin` — there is no sign-up endpoint.
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AdminLoginBody'
+ *     responses:
+ *       200:
+ *         description: Signed in
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AdminLoginResponse'
+ *       400:
+ *         description: Missing email or password — `INVALID_CREDENTIALS`
+ *       401:
+ *         description: Wrong credentials or a non-admin account — `INVALID_CREDENTIALS`
+ *       429:
+ *         description: Too many failed attempts — `TOO_MANY_LOGIN_ATTEMPTS`
+ */
+router.post('/admin/login', controller.adminLogin);
+
+/**
+ * @openapi
+ * /auth/admin/me:
+ *   get:
+ *     summary: Current dashboard admin
+ *     description: >
+ *       Session probe used by the dashboard on load. Requires a valid Bearer token
+ *       belonging to an ADMIN account — a patient's or doctor's token authenticates
+ *       but is rejected with 403.
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: The signed-in admin
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 user:
+ *                   $ref: '#/components/schemas/AdminUser'
+ *       401:
+ *         description: Missing, expired or superseded token
+ *       403:
+ *         description: Authenticated, but not an admin — `FORBIDDEN`
+ */
+router.get('/admin/me', authenticate, requireRole(Role.ADMIN), controller.adminMe);
 
 export default router;

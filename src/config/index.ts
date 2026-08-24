@@ -45,6 +45,17 @@ export const config = {
     lockMinutes: Number(process.env.PIN_LOCK_MINUTES) || 15,
   },
 
+  // The single dashboard operator. email/password/phone are read only by the
+  // provisioning script (`npm run db:create-admin`) — the running server never
+  // compares against them, it compares against the stored bcrypt hash.
+  admin: {
+    email: process.env.ADMIN_EMAIL,
+    password: process.env.ADMIN_PASSWORD,
+    phone: process.env.ADMIN_PHONE,
+    maxLoginAttempts: Number(process.env.ADMIN_MAX_LOGIN_ATTEMPTS) || 5,
+    lockMinutes: Number(process.env.ADMIN_LOCK_MINUTES) || 15,
+  },
+
   twilio: {
     accountSid: process.env.TWILIO_ACCOUNT_SID!,
     authToken: process.env.TWILIO_AUTH_TOKEN!,

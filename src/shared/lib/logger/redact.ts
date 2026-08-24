@@ -15,6 +15,7 @@ const SENSITIVE_KEYS = [
   'pin',
   'pinHash',
   'password',
+  'passwordHash',
   'token',
   'accessToken',
   'refreshToken',

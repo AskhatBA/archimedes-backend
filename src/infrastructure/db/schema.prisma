@@ -24,6 +24,9 @@ model User {
   role                  Role      @default(PATIENT)
   balance               Float     @default(0)
 
+  // Set only for dashboard admins — mobile users authenticate by OTP/PIN and leave this null.
+  passwordHash          String?
+
   pinHash               String?
   pinFailedAttempts     Int       @default(0)
   pinLockedUntil        DateTime?
@@ -202,6 +205,9 @@ enum AuditEvent {
   AUTH_PIN_VERIFY_SUCCESS
   AUTH_PIN_VERIFY_FAILED
   AUTH_PIN_LOCKED
+  ADMIN_LOGIN_SUCCESS
+  ADMIN_LOGIN_FAILED
+  ADMIN_LOGIN_THROTTLED
   USER_ACCOUNT_CREATED
   USER_PHONE_CHANGED
   USER_PROFILE_CREATED
