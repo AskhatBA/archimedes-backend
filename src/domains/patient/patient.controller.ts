@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
-import { body, validationResult } from 'express-validator';
+import { body, query, validationResult } from 'express-validator';
 
 import { AppError } from '@/shared/services/app-error.service';
 import * as auditLogService from '@/shared/services/audit-log.service';
 import { AuditEvent } from '@/shared/services/audit-log.service';
 import { useDemoAccount } from '@/shared/helpers';
+import { Gender } from '@/shared/types/gender';
 
 import * as misService from '../mis/mis.service';
 
@@ -161,4 +162,62 @@ export const createDemoPatient = async (req: Request, res: Response) => {
   });
 
   return res.status(200).json({ success: true, patient: newPatient });
+};
+
+const PATIENT_LIST_MAX_LIMIT = 100;
+
+/**
+ * Dashboard-only listing of every patient profile. The route is gated on
+ * `requireRole(Role.ADMIN)`, so a patient token is rejected with 403 in the middleware
+ * and never reaches another patient's data. Every read is written to the audit trail —
+ * this endpoint returns PII in bulk.
+ */
+export const getAdminPatients = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError('User not found', 401);
+  }
+
+  await query('page').optional().isInt({ min: 1 }).withMessage('page must be >= 1').run(req);
+  await query('limit')
+    .optional()
+    .isInt({ min: 1, max: PATIENT_LIST_MAX_LIMIT })
+    .withMessage(`limit must be between 1 and ${PATIENT_LIST_MAX_LIMIT}`)
+    .run(req);
+  await query('gender')
+    .optional()
+    .isIn(['M', 'F'])
+    .withMessage('gender must be either M or F')
+    .run(req);
+
+  const errors = validationResult(req);
+
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: errors.array(),
+    });
+  }
+
+  const { page, limit, search, gender } = req.query;
+
+  const result = await patientService.getAdminPatients({
+    page: page ? Number(page) : 1,
+    limit: limit ? Number(limit) : 20,
+    search: (search as string)?.trim() || undefined,
+    gender: (gender as Gender) || undefined,
+  });
+
+  auditLogService.log({
+    event: AuditEvent.PATIENT_LIST_VIEWED,
+    success: true,
+    userId: req.user.id,
+    phone: req.user.phone,
+    req,
+    metadata: { source: 'admin', page: result.page, total: result.total },
+  });
+
+  return res.status(200).json({
+    success: true,
+    ...result,
+  });
 };

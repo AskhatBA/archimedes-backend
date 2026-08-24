@@ -1,6 +1,9 @@
 import { Router } from 'express';
 
+import { Role } from '@prisma/client';
+
 import { authenticate } from '@/middlewares/auth.middleware';
+import { requireRole } from '@/middlewares/require-role.middleware';
 
 import * as controller from './patient.controller';
 
@@ -183,5 +186,111 @@ router.get('/by-iin/:iin', authenticate, controller.getPatientByIin);
 router.post('/profile', authenticate, controller.createPatientProfile);
 
 router.post('/create-demo-patient', authenticate, controller.createDemoPatient);
+
+/**
+ * @openapi
+ * /patient/admin/patients:
+ *   get:
+ *     summary: List every patient profile (dashboard, admin only)
+ *     description: >
+ *       Paginated listing of the patient profiles stored on our side, across all users.
+ *       Requires an ADMIN account — a patient's mobile token authenticates but is
+ *       rejected with 403. Rows are ordered by IIN: names are encrypted at rest, so the
+ *       database cannot sort them. A name search is matched after decryption and its
+ *       results come back in alphabetical order.
+ *     tags: [Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 20
+ *       - in: query
+ *         name: search
+ *         description: Matches full name, IIN or phone
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: gender
+ *         schema:
+ *           type: string
+ *           enum: [M, F]
+ *     responses:
+ *       200:
+ *         description: A page of patients
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 items:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       userId:
+ *                         type: string
+ *                       firstName:
+ *                         type: string
+ *                       lastName:
+ *                         type: string
+ *                       patronymic:
+ *                         type: string
+ *                       fullName:
+ *                         type: string
+ *                       birthDate:
+ *                         type: string
+ *                       gender:
+ *                         type: string
+ *                         enum: [M, F]
+ *                       iin:
+ *                         type: string
+ *                       misPatientId:
+ *                         type: string
+ *                       phone:
+ *                         type: string
+ *                       email:
+ *                         type: string
+ *                         nullable: true
+ *                       appointmentsCount:
+ *                         type: integer
+ *                       refundsCount:
+ *                         type: integer
+ *                 total:
+ *                   type: integer
+ *                 page:
+ *                   type: integer
+ *                 limit:
+ *                   type: integer
+ *                 totalPages:
+ *                   type: integer
+ *       400:
+ *         description: Invalid pagination or filter values
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Authenticated, but not an admin
+ */
+router.get(
+  '/admin/patients',
+  authenticate,
+  requireRole(Role.ADMIN),
+  controller.getAdminPatients
+);
 
 export default router;
