@@ -182,6 +182,8 @@ router.post('/create-patient', authenticate, controller.createPatient);
  *           type: string
  *         address:
  *           type: string
+ *         externalId:
+ *           type: string
  * /mis/branches:
  *   get:
  *     summary: Get medical branches from MIS

@@ -22,6 +22,7 @@ export interface MISBranch {
   id: string;
   name: string;
   address: string;
+  external_id: string;
 }
 
 export interface MISBranchesResponse {

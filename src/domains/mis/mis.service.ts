@@ -140,7 +140,13 @@ export const createPatient = async (patient: CreatePatientDto) => {
 
 export const getBranches = async () => {
   const response = await misRequest<MISBranchesResponse>({ resolverName: MIS_API_BRANCH_LIST });
-  return response.branches;
+
+  return response.branches.map((branch) => ({
+    id: branch.id,
+    name: branch.name,
+    address: branch.address,
+    externalId: branch.external_id,
+  }));
 };
 
 export const getSpecializationsByBranchId = async (branchId: string) => {
