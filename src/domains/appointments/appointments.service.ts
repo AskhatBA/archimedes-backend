@@ -30,20 +30,42 @@ export const getAppointmentById = (id: string, userId: string) => {
   });
 };
 
+// Приёмы идут по времени клиники (Asia/Almaty, UTC+5 без перехода на летнее время),
+// поэтому "тот же день" считаем в этой зоне, а не в зоне сервера — иначе вечерние
+// и ночные слоты на сервере в UTC попадают в соседние сутки.
+const CLINIC_TIME_ZONE = 'Asia/Almaty';
+const CLINIC_UTC_OFFSET = '+05:00';
+
+const clinicDayRange = (dateTime: Date) => {
+  const dayKey = new Intl.DateTimeFormat('en-CA', {
+    timeZone: CLINIC_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(dateTime);
+
+  return {
+    startOfDay: new Date(`${dayKey}T00:00:00.000${CLINIC_UTC_OFFSET}`),
+    endOfDay: new Date(`${dayKey}T23:59:59.999${CLINIC_UTC_OFFSET}`),
+  };
+};
+
+// Клиент показывает `message` из ответа пользователю как есть, поэтому текст — на русском.
+export const APPOINTMENT_SAME_DOCTOR_SAME_DAY_MESSAGE =
+  'У вас уже есть активная запись к этому врачу на выбранный день. Запись к одному врачу дважды за день недоступна.';
+
 export const checkAppointmentConflicts = async (
   patientId: string,
   doctorId: string,
   dateTime: Date
 ): Promise<void> => {
-  const startOfDay = new Date(dateTime);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(dateTime);
-  endOfDay.setHours(23, 59, 59, 999);
+  const { startOfDay, endOfDay } = clinicDayRange(dateTime);
 
-  const [dateConflict, doctorConflict] = await Promise.all([
+  const [sameDoctorSameDay, doctorConflict] = await Promise.all([
     db.prismaClient.appointment.findFirst({
       where: {
         patientId,
+        doctorId,
         dateTime: { gte: startOfDay, lte: endOfDay },
         status: AppointmentStatus.SCHEDULED,
       },
@@ -57,8 +79,13 @@ export const checkAppointmentConflicts = async (
     }),
   ]);
 
-  if (dateConflict) {
-    throw new AppError(ErrorCodes.APPOINTMENT_DATE_CONFLICT, 409);
+  if (sameDoctorSameDay) {
+    appointmentsLogger.warn(
+      { patientId, doctorId, dateTime, conflictingAppointmentId: sameDoctorSameDay.id },
+      'Rejected duplicate same-day appointment with the same doctor'
+    );
+
+    throw new AppError(APPOINTMENT_SAME_DOCTOR_SAME_DAY_MESSAGE, 409);
   }
 
   if (doctorConflict) {

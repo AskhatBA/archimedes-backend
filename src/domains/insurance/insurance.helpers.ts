@@ -2,12 +2,15 @@ import axios, { AxiosError } from 'axios';
 import Sentry from '@sentry/node';
 
 import { config } from '@/config';
+import { createLogger } from '@/shared/lib/logger';
 import { resolveApiUrlParams } from '@/shared/helpers/resolve-api-url-params';
 import { ErrorCodes } from '@/shared/constants/error-codes';
 import { AppError } from '@/shared/services/app-error.service';
 
 import { InsuranceRequestPayload } from './insurance.types';
 import { insuranceApiResolverDefault } from './insurance.constants';
+
+const insuranceLogger = createLogger('insurance');
 
 const insuranceHttp = axios.create({
   baseURL: config.insuranceService.apiUrl,
@@ -36,12 +39,17 @@ export const insuranceRequest = async <T>({
   query = {},
   beneficiaryId,
 }: InsuranceRequestPayload) => {
+  const apiResolver =
+    insuranceApiResolverDefault[resolverName as keyof typeof insuranceApiResolverDefault];
+  const startedAt = Date.now();
+  let url: string | undefined;
+
   try {
-    const apiResolver =
-      insuranceApiResolverDefault[resolverName as keyof typeof insuranceApiResolverDefault];
+    url = resolveApiUrlParams(resolverName, params);
+
     const response = await insuranceHttp.request<T>({
       method: apiResolver.method,
-      url: resolveApiUrlParams(resolverName, params),
+      url,
       data: {
         ...apiResolver.defaultPayload,
         ...payload,
@@ -51,8 +59,37 @@ export const insuranceRequest = async <T>({
         Authorization: beneficiaryId || '',
       },
     });
+
+    insuranceLogger.debug(
+      {
+        resolverName,
+        method: apiResolver?.method,
+        url,
+        query,
+        status: response.status,
+        durationMs: Date.now() - startedAt,
+      },
+      'Insurance request completed'
+    );
+
     return response.data;
   } catch (error) {
+    const axiosError = error as AxiosError;
+
+    insuranceLogger.error(
+      {
+        resolverName,
+        method: apiResolver?.method,
+        url,
+        query,
+        status: axiosError?.response?.status,
+        durationMs: Date.now() - startedAt,
+        responseData: axiosError?.response?.data,
+        err: error,
+      },
+      'Insurance request failed'
+    );
+
     const errorData = parseApiError(error);
     Sentry.captureException(error);
     throw new AppError(errorData.message, errorData.status);

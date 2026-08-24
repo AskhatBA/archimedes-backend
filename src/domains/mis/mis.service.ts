@@ -212,6 +212,14 @@ export const createAppointment = async (newAppointment: CreateAppointmentDto) =>
   let meeting;
   let familyMemberProgramId;
 
+  // Проверяем до обращения в МИС и до создания встречи в Zoom, иначе при конфликте
+  // запись останется в МИС, а локально создать её уже не получится.
+  await appointmentService.checkAppointmentConflicts(
+    newAppointment.familyMemberId || newAppointment.patientId,
+    newAppointment.doctorId,
+    new Date(newAppointment.startTime)
+  );
+
   if (newAppointment.isTelemedicine) {
     meeting = await zoomService.createMeeting({
       start_time: newAppointment.startTime,
