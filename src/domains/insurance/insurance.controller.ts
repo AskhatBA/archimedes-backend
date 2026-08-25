@@ -610,7 +610,7 @@ export const getMedicService = async (req: Request, res: Response) => {
     });
   }
 
-  const medicServices = await insuranceService.getMedicService(
+  const medicService = await insuranceService.getMedicService(
     misInsurance.beneficiaryId,
     req.query.clinicId as string,
     req.query.medicIIN as string
@@ -618,7 +618,7 @@ export const getMedicService = async (req: Request, res: Response) => {
 
   return res.status(200).json({
     success: true,
-    medicServices,
+    medicService,
   });
 };
 

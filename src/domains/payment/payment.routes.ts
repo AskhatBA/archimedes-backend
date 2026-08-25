@@ -23,6 +23,25 @@ const router = Router();
  *           type: string
  *           description: Payment description shown to the payer
  *           example: Balance replenishment
+ *         purpose:
+ *           type: string
+ *           enum: [BALANCE_TOPUP, APPOINTMENT]
+ *           default: BALANCE_TOPUP
+ *           description: |
+ *             What the payment is for. Selects the handler that runs when the payment
+ *             settles successfully — `APPOINTMENT` books the visit described in `metadata`.
+ *         metadata:
+ *           type: object
+ *           description: |
+ *             Payload for the purpose's post-success handler, validated here at init time.
+ *             For `APPOINTMENT`: `doctorId`, `branchId`, `startTime`, `endTime`,
+ *             `isTelemedicine` and an optional `familyMemberId`.
+ *           example:
+ *             doctorId: "0a4c1e2b-6c1f-4a52-9d0e-7b1d2c3f4a5b"
+ *             branchId: "5f2a9c31-8de4-4b77-9a10-2c3d4e5f6a7b"
+ *             startTime: "2026-08-27T09:30:00+05:00"
+ *             endTime: "2026-08-27T10:00:00+05:00"
+ *             isTelemedicine: false
  *     InitPaymentResponse:
  *       type: object
  *       properties:
@@ -46,6 +65,9 @@ const router = Router();
  *         status:
  *           type: string
  *           enum: [PENDING, SUCCESS, FAILED]
+ *         purpose:
+ *           type: string
+ *           enum: [BALANCE_TOPUP, APPOINTMENT]
  *         pgPaymentId:
  *           type: string
  *           nullable: true
@@ -78,7 +100,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/InitPaymentResponse'
  *       400:
- *         description: Invalid amount
+ *         description: Invalid amount, unknown purpose, or metadata the purpose rejects
  *       401:
  *         description: Unauthorized
  *       502:

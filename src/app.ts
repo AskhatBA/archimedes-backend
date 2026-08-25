@@ -5,6 +5,8 @@ import cors from 'cors';
 import { createLogger } from '@/shared/lib/logger';
 import { initSentry } from '@/shared/lib/sentry';
 
+import { registerPaymentSuccessHandlers } from './domains/payment/payment.success-handlers';
+
 import { config } from './config';
 import { setupSwagger } from './config/swagger';
 import { errorHandler } from './middlewares/error-handler.middleware';
@@ -12,6 +14,9 @@ import { requestContext, httpLogger } from './middlewares/request-logger.middlew
 import { setupRoutes } from './routes';
 
 const log = createLogger('cors');
+
+// Before any route or background sweep can settle a payment.
+registerPaymentSuccessHandlers();
 
 const app = express();
 

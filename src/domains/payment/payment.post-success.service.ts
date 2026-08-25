@@ -1,4 +1,7 @@
+import { PaymentPurpose, Prisma } from '@prisma/client';
+
 import { createLogger } from '@/shared/lib/logger';
+import { AppError } from '@/shared/services/app-error.service';
 
 const postSuccessLogger = createLogger('payment-post-success');
 
@@ -10,34 +13,115 @@ export interface PaymentSuccessContext {
   amount: number;
   /** FreedomPay transaction id, absent only if the provider never reported one. */
   pgPaymentId?: string | undefined;
+  /** What the payment was for — selects the handler that runs here. */
+  purpose: PaymentPurpose;
+  /** Payload stored at init time, already validated by the handler's `validateMetadata`. */
+  metadata: Prisma.JsonValue | null;
 }
 
 /**
- * Business logic to run once a payment is confirmed successful.
+ * Everything a purpose needs to plug into the payment lifecycle.
+ *
+ * `validateMetadata` runs synchronously at `/payment/init` — before the user is sent to
+ * the provider — so a malformed payload is rejected while nobody has paid yet. Whatever
+ * it returns is what gets stored on the payment and handed back to `onSuccess`.
+ *
+ * `onSuccess` runs exactly once, at the moment the payment leaves PENDING for SUCCESS,
+ * no matter which path settled it (the FreedomPay result callback or the background
+ * reconciliation sweep).
+ */
+export interface PaymentPurposeHandler<TMetadata = unknown> {
+  /**
+   * Validates and normalises the metadata for this purpose. Throw an `AppError` to
+   * reject the init request. Omit it for purposes that carry no payload.
+   */
+  validateMetadata?: (metadata: unknown) => TMetadata;
+  /** Business logic to run once the payment is confirmed successful. */
+  onSuccess: (context: PaymentSuccessContext) => Promise<void>;
+}
+
+const handlers = new Map<PaymentPurpose, PaymentPurposeHandler<never>>();
+
+/**
+ * Attaches business logic to a payment purpose.
+ *
+ * Register from a module that is imported at startup (see
+ * `payment.success-handlers.ts`) — registration has to happen before the first payment
+ * settles, and before the first `/payment/init` for that purpose.
+ */
+export const registerPaymentPurposeHandler = <TMetadata>(
+  purpose: PaymentPurpose,
+  handler: PaymentPurposeHandler<TMetadata>
+): void => {
+  if (handlers.has(purpose)) {
+    postSuccessLogger.warn({ purpose }, 'Payment purpose handler replaced');
+  }
+  handlers.set(purpose, handler as PaymentPurposeHandler<never>);
+};
+
+/**
+ * Validates the metadata a caller wants to attach to a new payment.
+ *
+ * A purpose with no handler is only allowed to carry no metadata at all — otherwise the
+ * payload would be stored and then silently ignored on success.
+ */
+export const validatePaymentMetadata = (
+  purpose: PaymentPurpose,
+  metadata: unknown
+): Prisma.InputJsonValue | undefined => {
+  const handler = handlers.get(purpose);
+
+  if (!handler?.validateMetadata) {
+    if (metadata === undefined || metadata === null) return undefined;
+    throw new AppError(`Payment purpose ${purpose} does not accept metadata`, 400);
+  }
+
+  return handler.validateMetadata(metadata) as Prisma.InputJsonValue;
+};
+
+/**
+ * Dispatches to the handler registered for the payment's purpose.
  *
  * Called from `settlePayment` at the single point that knows a payment just moved out of
  * PENDING, so it runs **exactly once per payment** — never again on the callback retries
  * FreedomPay sends for two hours, and not a second time when the reconciliation poll
  * settles the same payment.
  *
- * Guarantees this runs under:
+ * Guarantees a handler runs under:
  * - the balance has already been credited and the transaction has committed, so reads of
  *   the user's balance here see the new value;
  * - throwing is safe: `runPostPaymentSuccess` swallows and logs errors, so a failure here
  *   cannot make the callback report an error and cannot roll back the credited balance.
  *
- * Because the result callback waits on this, keep it short. Anything slow or externally
- * dependent (MIS calls, emails, receipts) belongs on the BullMQ queue rather than inline
- * here — enqueue the job from this function and let the worker do the work.
+ * Because the result callback waits on this, keep handlers short. Anything slow or
+ * externally dependent (emails, receipts) belongs on the BullMQ queue rather than inline
+ * — enqueue the job from the handler and let the worker do the work.
  */
 const handlePaymentSuccess = async (context: PaymentSuccessContext): Promise<void> => {
-  // TODO: put the real post-payment logic here.
+  const handler = handlers.get(context.purpose);
+
+  if (!handler) {
+    postSuccessLogger.info(
+      {
+        paymentId: context.paymentId,
+        userId: context.userId,
+        amount: context.amount,
+        purpose: context.purpose,
+      },
+      'Payment succeeded with no purpose handler registered'
+    );
+    return;
+  }
+
+  await handler.onSuccess(context);
+
   postSuccessLogger.info(
     {
       paymentId: context.paymentId,
       userId: context.userId,
       amount: context.amount,
       pgPaymentId: context.pgPaymentId,
+      purpose: context.purpose,
     },
     'Post-payment success handler ran'
   );
@@ -56,7 +140,12 @@ export const runPostPaymentSuccess = async (context: PaymentSuccessContext): Pro
     await handlePaymentSuccess(context);
   } catch (error) {
     postSuccessLogger.error(
-      { err: error, paymentId: context.paymentId, userId: context.userId },
+      {
+        err: error,
+        paymentId: context.paymentId,
+        userId: context.userId,
+        purpose: context.purpose,
+      },
       'Post-payment success handler failed'
     );
   }

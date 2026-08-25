@@ -174,16 +174,25 @@ enum PaymentStatus {
   FAILED
 }
 
+/// What the payment is for. Drives which post-success handler runs when it settles.
+enum PaymentPurpose {
+  BALANCE_TOPUP
+  APPOINTMENT
+}
+
 model Payment {
-  id          String        @id @default(uuid()) @db.Uuid
-  userId      String        @db.Uuid
+  id          String         @id @default(uuid()) @db.Uuid
+  userId      String         @db.Uuid
   amount      Float
   description String
-  status      PaymentStatus @default(PENDING)
-  pgPaymentId String?       @unique
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      PaymentStatus  @default(PENDING)
+  purpose     PaymentPurpose @default(BALANCE_TOPUP)
+  /// Payload the post-success handler for `purpose` needs, validated at init time.
+  metadata    Json?
+  pgPaymentId String?        @unique
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([createdAt])

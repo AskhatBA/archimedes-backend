@@ -1,9 +1,13 @@
 import { Request, Response } from 'express';
+import { PaymentPurpose } from '@prisma/client';
 
 import { AppError } from '@/shared/services/app-error.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
 
 import * as paymentService from './payment.service';
+
+const isPaymentPurpose = (value: unknown): value is PaymentPurpose =>
+  typeof value === 'string' && value in PaymentPurpose;
 
 export const initPayment = async (req: Request, res: Response) => {
   if (!req.user) throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
@@ -15,7 +19,23 @@ export const initPayment = async (req: Request, res: Response) => {
     throw new AppError('Invalid amount', 400);
   }
 
-  const result = await paymentService.initPayment(req.user.id, amount, description);
+  const rawPurpose = req.body.purpose;
+
+  if (rawPurpose !== undefined && !isPaymentPurpose(rawPurpose)) {
+    throw new AppError('Invalid payment purpose', 400);
+  }
+
+  const purpose = rawPurpose ?? PaymentPurpose.BALANCE_TOPUP;
+
+  // `metadata` is validated inside the service by the handler registered for `purpose`,
+  // so each purpose owns the shape of its own payload.
+  const result = await paymentService.initPayment(
+    req.user.id,
+    amount,
+    description,
+    purpose,
+    req.body.metadata
+  );
   return res.status(200).json(result);
 };
 

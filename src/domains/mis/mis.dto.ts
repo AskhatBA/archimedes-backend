@@ -30,7 +30,8 @@ export interface CreateAppointmentDto {
   startTime: string;
   endTime: string;
   branchId: string;
-  insuranceProgramId: string;
+  /** Absent for a patient without a programme — the visit is paid for per booking. */
+  insuranceProgramId?: string;
   familyMemberId?: string;
   isTelemedicine?: boolean;
 }

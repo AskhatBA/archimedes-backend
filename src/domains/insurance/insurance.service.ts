@@ -321,10 +321,10 @@ export const getMedicService = async (
   clinicId: string,
   medicIIN: string
 ) => {
-  const response = await insuranceRequest<MedicServiceItem[]>({
+  const response = await insuranceRequest<MedicServiceItem>({
     resolverName: INSURANCE_API_GET_MEDIC_SERVICE,
     beneficiaryId,
-    query: { cliniId: clinicId, medicIIN },
+    query: { clinicId, medicIIN },
   });
   return response;
 };

@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 
 import axios from 'axios';
-import { PaymentStatus } from '@prisma/client';
+import { PaymentPurpose, PaymentStatus, Prisma } from '@prisma/client';
 
 import * as db from '@/infrastructure/db';
 import { config } from '@/config';
@@ -22,7 +22,7 @@ import {
   InitPaymentResult,
   PaymentCallbackParams,
 } from './payment.dto';
-import { runPostPaymentSuccess } from './payment.post-success.service';
+import { runPostPaymentSuccess, validatePaymentMetadata } from './payment.post-success.service';
 
 const paymentLogger = createLogger('payment');
 
@@ -153,9 +153,15 @@ async function callFreedomPay(
 export async function initPayment(
   userId: string,
   amount: number,
-  description: string
+  description: string,
+  purpose: PaymentPurpose = PaymentPurpose.BALANCE_TOPUP,
+  metadata?: unknown
 ): Promise<InitPaymentResult> {
   assertConfigured();
+
+  // Validated before the payment record exists: a payload the purpose handler cannot use
+  // must be rejected while nobody has paid yet, not discovered after the money moved.
+  const storedMetadata = validatePaymentMetadata(purpose, metadata);
 
   const user = await db.prismaClient.user.findUnique({
     where: { id: userId },
@@ -164,7 +170,13 @@ export async function initPayment(
   if (!user) throw new AppError('User not found', 404);
 
   const payment = await db.prismaClient.payment.create({
-    data: { userId, amount, description },
+    data: {
+      userId,
+      amount,
+      description,
+      purpose,
+      ...(storedMetadata === undefined ? {} : { metadata: storedMetadata }),
+    },
   });
 
   const params: FreedomPayParams = {
@@ -243,16 +255,23 @@ type SettledStatus = typeof PaymentStatus.SUCCESS | typeof PaymentStatus.FAILED;
  * payment can also be settled by the reconciliation poll, so the balance must only be
  * credited by whichever caller wins the conditional update.
  */
+/** The fields `settlePayment` needs, as selected by each of its callers. */
+interface SettleablePayment {
+  id: string;
+  userId: string;
+  amount: number;
+  purpose: PaymentPurpose;
+  metadata: Prisma.JsonValue | null;
+}
+
 async function settlePayment(
-  paymentId: string,
-  userId: string,
-  amount: number,
+  payment: SettleablePayment,
   status: SettledStatus,
   pgPaymentId?: string
 ): Promise<boolean> {
   const settled = await db.prismaClient.$transaction(async (tx) => {
     const { count } = await tx.payment.updateMany({
-      where: { id: paymentId, status: PaymentStatus.PENDING },
+      where: { id: payment.id, status: PaymentStatus.PENDING },
       data: { status, ...(pgPaymentId ? { pgPaymentId } : {}) },
     });
 
@@ -260,8 +279,8 @@ async function settlePayment(
 
     if (status === PaymentStatus.SUCCESS) {
       await tx.user.update({
-        where: { id: userId },
-        data: { balance: { increment: amount } },
+        where: { id: payment.userId },
+        data: { balance: { increment: payment.amount } },
       });
     }
 
@@ -273,7 +292,14 @@ async function settlePayment(
   // whether the result callback or the reconciliation poll won the race. Deliberately
   // outside the transaction — the balance must stay credited even if this fails.
   if (settled && status === PaymentStatus.SUCCESS) {
-    await runPostPaymentSuccess({ paymentId, userId, amount, pgPaymentId });
+    await runPostPaymentSuccess({
+      paymentId: payment.id,
+      userId: payment.userId,
+      amount: payment.amount,
+      pgPaymentId,
+      purpose: payment.purpose,
+      metadata: payment.metadata,
+    });
   }
 
   return settled;
@@ -352,13 +378,7 @@ export async function handleCallback(params: PaymentCallbackParams): Promise<str
     return buildCallbackResponse(FREEDOMPAY_STATUS.ok, 'Payment pending');
   }
 
-  const settled = await settlePayment(
-    payment.id,
-    payment.userId,
-    payment.amount,
-    status,
-    params.pg_payment_id
-  );
+  const settled = await settlePayment(payment, status, params.pg_payment_id);
 
   paymentLogger.info(
     { paymentId: payment.id, status, settled, pgPaymentId: params.pg_payment_id },
@@ -374,12 +394,9 @@ export async function handleCallback(params: PaymentCallbackParams): Promise<str
  * This is the safety net for a result callback that never arrived — without it a paid
  * order would stay PENDING and the user's balance would never be credited.
  */
-async function reconcilePayment(payment: {
-  id: string;
-  userId: string;
-  amount: number;
-  pgPaymentId: string | null;
-}): Promise<PaymentStatus> {
+async function reconcilePayment(
+  payment: SettleablePayment & { pgPaymentId: string | null }
+): Promise<PaymentStatus> {
   const params: FreedomPayParams = { pg_order_id: payment.id };
   if (payment.pgPaymentId) params.pg_payment_id = payment.pgPaymentId;
 
@@ -414,13 +431,7 @@ async function reconcilePayment(payment: {
       return PaymentStatus.PENDING;
     }
 
-    const settled = await settlePayment(
-      payment.id,
-      payment.userId,
-      payment.amount,
-      PaymentStatus.SUCCESS,
-      parsed.pg_payment_id
-    );
+    const settled = await settlePayment(payment, PaymentStatus.SUCCESS, parsed.pg_payment_id);
     paymentLogger.info({ paymentId: payment.id, settled }, 'Payment settled from reconciliation');
     return PaymentStatus.SUCCESS;
   }
@@ -431,7 +442,7 @@ async function reconcilePayment(payment: {
     paymentStatus === FREEDOMPAY_PAYMENT_STATUS.refunded;
 
   if (isFinalFailure) {
-    await settlePayment(payment.id, payment.userId, payment.amount, PaymentStatus.FAILED);
+    await settlePayment(payment, PaymentStatus.FAILED);
     return PaymentStatus.FAILED;
   }
 
@@ -469,14 +480,14 @@ export async function reconcilePendingPayments(): Promise<ReconciliationSweepRes
   // has closed, so these are failed locally instead of being queried forever.
   const abandoned = await db.prismaClient.payment.findMany({
     where: { status: PaymentStatus.PENDING, createdAt: { lt: abandonedBefore } },
-    select: { id: true, userId: true, amount: true },
+    select: { id: true, userId: true, amount: true, purpose: true, metadata: true },
     take: batchSize,
   });
 
   let expired = 0;
   for (const payment of abandoned) {
     try {
-      await settlePayment(payment.id, payment.userId, payment.amount, PaymentStatus.FAILED);
+      await settlePayment(payment, PaymentStatus.FAILED);
       expired += 1;
     } catch (error) {
       paymentLogger.error({ err: error, paymentId: payment.id }, 'Failed to expire payment');
@@ -494,7 +505,14 @@ export async function reconcilePendingPayments(): Promise<ReconciliationSweepRes
       status: PaymentStatus.PENDING,
       createdAt: { lt: new Date(now - RECONCILE_AFTER_MS), gte: abandonedBefore },
     },
-    select: { id: true, userId: true, amount: true, pgPaymentId: true },
+    select: {
+      id: true,
+      userId: true,
+      amount: true,
+      purpose: true,
+      metadata: true,
+      pgPaymentId: true,
+    },
     orderBy: { createdAt: 'asc' },
     take: batchSize,
   });
@@ -522,6 +540,8 @@ const PAYMENT_SELECT = {
   amount: true,
   description: true,
   status: true,
+  purpose: true,
+  metadata: true,
   pgPaymentId: true,
   createdAt: true,
 } as const;
@@ -531,6 +551,7 @@ function toPublicPayment(payment: {
   amount: number;
   description: string;
   status: PaymentStatus;
+  purpose: PaymentPurpose;
   pgPaymentId: string | null;
   createdAt: Date;
 }) {
@@ -539,6 +560,7 @@ function toPublicPayment(payment: {
     amount: payment.amount,
     description: payment.description,
     status: payment.status,
+    purpose: payment.purpose,
     pgPaymentId: payment.pgPaymentId,
     createdAt: payment.createdAt,
   };

@@ -174,5 +174,7 @@ export interface PriceListItem {
 }
 
 export interface MedicServiceItem {
-  [key: string]: unknown;
+  oid: string;
+  service: string;
+  price: number;
 }

@@ -1146,6 +1146,22 @@ router.get('/price-list', authenticate, controller.getPriceList);
 
 /**
  * @openapi
+ * components:
+ *   schemas:
+ *     MedicServiceItem:
+ *       type: object
+ *       required: [oid, service, price]
+ *       properties:
+ *         oid:
+ *           type: string
+ *           format: uuid
+ *           example: "128e28d0-7431-4300-8592-71def440f16e"
+ *         service:
+ *           type: string
+ *           example: "Консультация: Терапевт"
+ *         price:
+ *           type: number
+ *           example: 12000
  * /insurance/medic-service:
  *   get:
  *     summary: Get services provided by a doctor in a clinic
@@ -1178,10 +1194,8 @@ router.get('/price-list', authenticate, controller.getPriceList);
  *                 success:
  *                   type: boolean
  *                   example: true
- *                 medicServices:
- *                   type: array
- *                   items:
- *                     type: object
+ *                 medicService:
+ *                   $ref: '#/components/schemas/MedicServiceItem'
  *       400:
  *         description: clinicId or medicIIN is required
  *       401:

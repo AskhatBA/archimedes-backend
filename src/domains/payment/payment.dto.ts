@@ -1,6 +1,11 @@
+import { PaymentPurpose } from '@prisma/client';
+
 export type InitPaymentDto = {
   amount: number;
   description?: string;
+  purpose?: PaymentPurpose;
+  /** Payload for the purpose's post-success handler; shape is owned by that handler. */
+  metadata?: unknown;
 };
 
 export type InitPaymentResult = {

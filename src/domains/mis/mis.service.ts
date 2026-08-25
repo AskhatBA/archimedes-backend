@@ -234,7 +234,9 @@ export const createAppointment = async (newAppointment: CreateAppointmentDto) =>
     });
   }
 
-  if (newAppointment.familyMemberId) {
+  // Only an insured booking can be for a family member: the programme is what ties the
+  // relative to the policy, and it is also what `getFamily` looks them up by.
+  if (newAppointment.familyMemberId && newAppointment.insuranceProgramId) {
     const family = await insuranceService.getFamily(
       newAppointment.patientId,
       newAppointment.insuranceProgramId
