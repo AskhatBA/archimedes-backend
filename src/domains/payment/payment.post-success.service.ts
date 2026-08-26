@@ -1,5 +1,6 @@
 import { PaymentPurpose, Prisma } from '@prisma/client';
 
+import * as db from '@/infrastructure/db';
 import { createLogger } from '@/shared/lib/logger';
 import { AppError } from '@/shared/services/app-error.service';
 
@@ -36,11 +37,22 @@ export interface PaymentPurposeHandler<TMetadata = unknown> {
    * reject the init request. Omit it for purposes that carry no payload.
    */
   validateMetadata?: (metadata: unknown) => TMetadata;
+  /**
+   * Last check before the user is sent to the provider, with everything the purpose needs
+   * to look up. Throw an `AppError` to refuse the payment.
+   *
+   * This is where a purpose rejects an order it would not be able to fulfil anyway — the
+   * alternative is discovering it in `onSuccess`, when the money has already moved and
+   * the only options left are a manual refund or a lost payment.
+   */
+  beforePayment?: (context: { userId: string; metadata: TMetadata }) => Promise<void>;
   /** Business logic to run once the payment is confirmed successful. */
   onSuccess: (context: PaymentSuccessContext) => Promise<void>;
 }
 
-const handlers = new Map<PaymentPurpose, PaymentPurposeHandler<never>>();
+// Metadata types differ per purpose, so the registry stores them opaquely: each handler
+// only ever sees the payload its own `validateMetadata` produced.
+const handlers = new Map<PaymentPurpose, PaymentPurposeHandler<unknown>>();
 
 /**
  * Attaches business logic to a payment purpose.
@@ -56,7 +68,7 @@ export const registerPaymentPurposeHandler = <TMetadata>(
   if (handlers.has(purpose)) {
     postSuccessLogger.warn({ purpose }, 'Payment purpose handler replaced');
   }
-  handlers.set(purpose, handler as PaymentPurposeHandler<never>);
+  handlers.set(purpose, handler as PaymentPurposeHandler<unknown>);
 };
 
 /**
@@ -77,6 +89,24 @@ export const validatePaymentMetadata = (
   }
 
   return handler.validateMetadata(metadata) as Prisma.InputJsonValue;
+};
+
+/**
+ * Runs the purpose's pre-flight check, if it has one.
+ *
+ * Called from `initPayment` with the metadata `validatePaymentMetadata` just normalised,
+ * before the payment record exists. Errors propagate to the caller — this is meant to
+ * fail the init request.
+ */
+export const runBeforePayment = async (
+  purpose: PaymentPurpose,
+  userId: string,
+  metadata: unknown
+): Promise<void> => {
+  const handler = handlers.get(purpose);
+  if (!handler?.beforePayment) return;
+
+  await handler.beforePayment({ userId, metadata });
 };
 
 /**
@@ -148,5 +178,20 @@ export const runPostPaymentSuccess = async (context: PaymentSuccessContext): Pro
       },
       'Post-payment success handler failed'
     );
+
+    // Recorded on the payment so the failure is not invisible: the payer has been charged
+    // and whatever they paid for did not happen, which the app surfaces and support can
+    // act on. Best effort — the payment stays settled even if this write fails.
+    try {
+      await db.prismaClient.payment.update({
+        where: { id: context.paymentId },
+        data: { postSuccessError: String((error as Error)?.message || error).slice(0, 500) },
+      });
+    } catch (updateError) {
+      postSuccessLogger.error(
+        { err: updateError, paymentId: context.paymentId },
+        'Failed to record post-payment handler error'
+      );
+    }
   }
 };

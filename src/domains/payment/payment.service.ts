@@ -22,7 +22,11 @@ import {
   InitPaymentResult,
   PaymentCallbackParams,
 } from './payment.dto';
-import { runPostPaymentSuccess, validatePaymentMetadata } from './payment.post-success.service';
+import {
+  runBeforePayment,
+  runPostPaymentSuccess,
+  validatePaymentMetadata,
+} from './payment.post-success.service';
 
 const paymentLogger = createLogger('payment');
 
@@ -162,6 +166,10 @@ export async function initPayment(
   // Validated before the payment record exists: a payload the purpose handler cannot use
   // must be rejected while nobody has paid yet, not discovered after the money moved.
   const storedMetadata = validatePaymentMetadata(purpose, metadata);
+
+  // Refuses orders the purpose could not fulfil anyway (a slot already taken, say) while
+  // the user still has an unspent card — after this point a rejection costs a refund.
+  await runBeforePayment(purpose, userId, storedMetadata);
 
   const user = await db.prismaClient.user.findUnique({
     where: { id: userId },
@@ -542,6 +550,7 @@ const PAYMENT_SELECT = {
   status: true,
   purpose: true,
   metadata: true,
+  postSuccessError: true,
   pgPaymentId: true,
   createdAt: true,
 } as const;
@@ -552,6 +561,7 @@ function toPublicPayment(payment: {
   description: string;
   status: PaymentStatus;
   purpose: PaymentPurpose;
+  postSuccessError: string | null;
   pgPaymentId: string | null;
   createdAt: Date;
 }) {
@@ -561,6 +571,8 @@ function toPublicPayment(payment: {
     description: payment.description,
     status: payment.status,
     purpose: payment.purpose,
+    // Set when the payment went through but what it paid for did not happen.
+    postSuccessError: payment.postSuccessError,
     pgPaymentId: payment.pgPaymentId,
     createdAt: payment.createdAt,
   };
@@ -581,6 +593,35 @@ export async function getPaymentStatus(paymentId: string, userId: string) {
 
   const status = await reconcilePayment(payment);
   return toPublicPayment({ ...payment, status });
+}
+
+/**
+ * Payments the user has started but not finished, newest first.
+ *
+ * Feeds the "waiting for payment" state in the app: until a payment settles there is
+ * nothing in MIS to show, so the payment itself — with the metadata its purpose stored —
+ * is what describes the pending order. Filtered by `purpose` so each flow reads only its
+ * own, and bounded by the provider's payment window: past `pg_lifetime` the payer can no
+ * longer complete it, and the reconciliation sweep is about to mark it failed.
+ */
+export async function getPendingPayments(userId: string, purpose?: PaymentPurpose) {
+  const startedAfter = new Date(Date.now() - config.freedomPay.lifetimeSeconds * 1000);
+
+  const payments = await db.prismaClient.payment.findMany({
+    where: {
+      userId,
+      status: PaymentStatus.PENDING,
+      createdAt: { gte: startedAfter },
+      ...(purpose ? { purpose } : {}),
+    },
+    orderBy: { createdAt: 'desc' },
+    select: PAYMENT_SELECT,
+  });
+
+  return payments.map((payment) => ({
+    ...toPublicPayment(payment),
+    metadata: payment.metadata,
+  }));
 }
 
 export async function getPaymentHistory(userId: string) {

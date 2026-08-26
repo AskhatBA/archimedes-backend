@@ -2,6 +2,7 @@ import { PaymentPurpose } from '@prisma/client';
 
 import * as misService from '@/domains/mis/mis.service';
 import * as patientService from '@/domains/patient/patient.service';
+import { checkAppointmentConflicts } from '@/domains/appointments/appointments.service';
 import {
   registerPaymentPurposeHandler,
   PaymentSuccessContext,
@@ -26,6 +27,15 @@ export interface AppointmentPaymentMetadata {
   isTelemedicine: boolean;
   /** MIS id of a family member, when booking for someone other than the account owner. */
   familyMemberId?: string;
+  /**
+   * Display-only copies of what the patient picked. MIS knows none of this until the
+   * appointment exists, so they are carried here to describe the visit while the payment
+   * is still pending — see `GET /payment/pending`.
+   */
+  doctorName?: string;
+  branchName?: string;
+  branchAddress?: string;
+  serviceName?: string;
 }
 
 const requireString = (value: unknown, field: string): string => {
@@ -43,12 +53,23 @@ const requireDate = (value: unknown, field: string): string => {
   return asString;
 };
 
+/** Display-only fields are dropped rather than rejected — they cannot break the booking. */
+const optionalString = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined;
+
 const validateMetadata = (metadata: unknown): AppointmentPaymentMetadata => {
   if (typeof metadata !== 'object' || metadata === null) {
     throw new AppError('metadata is required for an appointment payment', 400);
   }
 
   const raw = metadata as Record<string, unknown>;
+
+  const display = {
+    doctorName: optionalString(raw.doctorName),
+    branchName: optionalString(raw.branchName),
+    branchAddress: optionalString(raw.branchAddress),
+    serviceName: optionalString(raw.serviceName),
+  };
 
   return {
     doctorId: requireString(raw.doctorId, 'doctorId'),
@@ -59,7 +80,41 @@ const validateMetadata = (metadata: unknown): AppointmentPaymentMetadata => {
     ...(raw.familyMemberId
       ? { familyMemberId: requireString(raw.familyMemberId, 'familyMemberId') }
       : {}),
+    ...Object.fromEntries(Object.entries(display).filter(([, value]) => value !== undefined)),
   };
+};
+
+const requireMisPatientId = async (userId: string): Promise<string> => {
+  const patient = await patientService.getPatientById(userId);
+
+  if (!patient?.misPatientId) {
+    throw new AppError(`Patient not found for user ${userId}`, 404);
+  }
+
+  return patient.misPatientId;
+};
+
+/**
+ * Refuses the payment if this visit could not be booked.
+ *
+ * The same conflict rules `createAppointment` applies, run before the user pays: the
+ * common case is a second booking with the same doctor on the same day, which used to be
+ * discovered only after the money moved.
+ */
+const ensureBookable = async ({
+  userId,
+  metadata,
+}: {
+  userId: string;
+  metadata: AppointmentPaymentMetadata;
+}): Promise<void> => {
+  const misPatientId = await requireMisPatientId(userId);
+
+  await checkAppointmentConflicts(
+    metadata.familyMemberId || misPatientId,
+    metadata.doctorId,
+    new Date(metadata.startTime)
+  );
 };
 
 /**
@@ -74,15 +129,11 @@ const validateMetadata = (metadata: unknown): AppointmentPaymentMetadata => {
  */
 const bookPaidAppointment = async (context: PaymentSuccessContext): Promise<void> => {
   const metadata = validateMetadata(context.metadata);
-  const patient = await patientService.getPatientById(context.userId);
-
-  if (!patient?.misPatientId) {
-    throw new AppError(`Patient not found for user ${context.userId}`, 404);
-  }
+  const misPatientId = await requireMisPatientId(context.userId);
 
   const appointment = await misService.createAppointment({
     userId: context.userId,
-    patientId: patient.misPatientId,
+    patientId: misPatientId,
     doctorId: metadata.doctorId,
     branchId: metadata.branchId,
     startTime: metadata.startTime,
@@ -106,6 +157,7 @@ const bookPaidAppointment = async (context: PaymentSuccessContext): Promise<void
 export const registerAppointmentPaymentHandler = (): void => {
   registerPaymentPurposeHandler<AppointmentPaymentMetadata>(PaymentPurpose.APPOINTMENT, {
     validateMetadata,
+    beforePayment: ensureBookable,
     onSuccess: bookPaidAppointment,
   });
 };

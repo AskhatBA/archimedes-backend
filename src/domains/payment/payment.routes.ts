@@ -231,6 +231,52 @@ router.get('/balance', authenticate, controller.getBalance);
 
 /**
  * @openapi
+ * /payment/pending:
+ *   get:
+ *     summary: Payments the user started but has not finished
+ *     description: |
+ *       Everything still PENDING and still inside the provider's payment window, newest
+ *       first. Each row carries the `metadata` its purpose stored at init time, which is
+ *       what lets a client describe an order that does not exist anywhere else yet — an
+ *       appointment being paid for is not in MIS until the payment settles.
+ *     tags: [Payment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: purpose
+ *         in: query
+ *         required: false
+ *         description: Return only payments made for this purpose.
+ *         schema:
+ *           type: string
+ *           enum: [BALANCE_TOPUP, APPOINTMENT]
+ *     responses:
+ *       200:
+ *         description: Pending payments
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 payments:
+ *                   type: array
+ *                   items:
+ *                     allOf:
+ *                       - $ref: '#/components/schemas/Payment'
+ *                       - type: object
+ *                         properties:
+ *                           metadata:
+ *                             type: object
+ *                             nullable: true
+ *       400:
+ *         description: Invalid payment purpose
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/pending', authenticate, controller.getPendingPayments);
+
+/**
+ * @openapi
  * /payment/history:
  *   get:
  *     summary: Get payment history for the authenticated user

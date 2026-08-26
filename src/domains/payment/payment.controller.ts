@@ -54,6 +54,19 @@ export const getPaymentStatus = async (req: Request, res: Response) => {
   return res.status(200).json(payment);
 };
 
+export const getPendingPayments = async (req: Request, res: Response) => {
+  if (!req.user) throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+
+  const rawPurpose = req.query.purpose;
+
+  if (rawPurpose !== undefined && !isPaymentPurpose(rawPurpose)) {
+    throw new AppError('Invalid payment purpose', 400);
+  }
+
+  const payments = await paymentService.getPendingPayments(req.user.id, rawPurpose);
+  return res.status(200).json({ payments });
+};
+
 export const getPaymentHistory = async (req: Request, res: Response) => {
   if (!req.user) throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   const history = await paymentService.getPaymentHistory(req.user.id);
