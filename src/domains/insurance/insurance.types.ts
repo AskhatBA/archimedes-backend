@@ -178,3 +178,12 @@ export interface MedicServiceItem {
   service: string;
   price: number;
 }
+
+export interface PayProgramItem {
+  oid: string;
+  code: string;
+  name: string;
+  price: number;
+  description: string;
+  programUrl: string;
+}

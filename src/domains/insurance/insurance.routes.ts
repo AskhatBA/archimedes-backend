@@ -1207,6 +1207,62 @@ router.get('/medic-service', authenticate, controller.getMedicService);
 
 /**
  * @openapi
+ * components:
+ *   schemas:
+ *     PayProgramItem:
+ *       type: object
+ *       required: [oid, code, name, price, description, programUrl]
+ *       properties:
+ *         oid:
+ *           type: string
+ *           format: uuid
+ *           example: "01a03c50-7c95-7677-9777-003122ff2a12"
+ *         code:
+ *           type: string
+ *           example: "M2"
+ *         name:
+ *           type: string
+ *           example: "Ақбота-1"
+ *         price:
+ *           type: number
+ *           example: 180000
+ *         description:
+ *           type: string
+ *           description: Multi-line program description
+ *         programUrl:
+ *           type: string
+ *           format: uri
+ *           example: "https://mobileapi.archimedes.kz/v3/client/productdescription/01a03c50-da52-7d18-b67f-db619f845796"
+ * /insurance/pay-programs:
+ *   get:
+ *     summary: Get list of paid insurance programs available for purchase
+ *     tags: [Insurance]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 payPrograms:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/PayProgramItem'
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Insurance not found in MIS
+ */
+router.get('/pay-programs', authenticate, controller.getPayPrograms);
+
+/**
+ * @openapi
  * /insurance/admin/refund-requests:
  *   get:
  *     summary: List every refund request (dashboard, admin only)

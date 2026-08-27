@@ -644,6 +644,28 @@ export const getClinicsMO = async (req: Request, res: Response) => {
   });
 };
 
+export const getPayPrograms = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  }
+
+  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+
+  if (!misInsurance?.beneficiaryId) {
+    return res.status(404).json({
+      success: false,
+      message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
+    });
+  }
+
+  const payPrograms = await insuranceService.getPayPrograms(misInsurance.beneficiaryId);
+
+  return res.status(200).json({
+    success: true,
+    payPrograms,
+  });
+};
+
 export const checkIin = async (req: Request, res: Response) => {
   const iin = req.query.iin as string;
 

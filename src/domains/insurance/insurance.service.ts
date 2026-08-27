@@ -21,6 +21,7 @@ import {
   ClinicMO,
   PriceListItem,
   MedicServiceItem,
+  PayProgramItem,
 } from './insurance.types';
 import {
   INSURANCE_API_GET_CITIES,
@@ -44,6 +45,7 @@ import {
   INSURANCE_API_GET_CLINICS_MO,
   INSURANCE_API_GET_PRICE_LIST,
   INSURANCE_API_GET_MEDIC_SERVICE,
+  INSURANCE_API_GET_PAY_PROGRAMS,
   ElectronicReferralServiceStatus,
 } from './insurance.constants';
 
@@ -325,6 +327,14 @@ export const getMedicService = async (
     resolverName: INSURANCE_API_GET_MEDIC_SERVICE,
     beneficiaryId,
     query: { clinicId, medicIIN },
+  });
+  return response;
+};
+
+export const getPayPrograms = async (beneficiaryId: string) => {
+  const response = await insuranceRequest<PayProgramItem[]>({
+    resolverName: INSURANCE_API_GET_PAY_PROGRAMS,
+    beneficiaryId,
   });
   return response;
 };
