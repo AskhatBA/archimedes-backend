@@ -169,7 +169,7 @@ export async function initPayment(
 
   // Refuses orders the purpose could not fulfil anyway (a slot already taken, say) while
   // the user still has an unspent card — after this point a rejection costs a refund.
-  await runBeforePayment(purpose, userId, storedMetadata);
+  await runBeforePayment(purpose, userId, amount, storedMetadata);
 
   const user = await db.prismaClient.user.findUnique({
     where: { id: userId },

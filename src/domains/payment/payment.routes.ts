@@ -25,17 +25,21 @@ const router = Router();
  *           example: Balance replenishment
  *         purpose:
  *           type: string
- *           enum: [BALANCE_TOPUP, APPOINTMENT]
+ *           enum: [BALANCE_TOPUP, APPOINTMENT, PAID_PROGRAM]
  *           default: BALANCE_TOPUP
  *           description: |
  *             What the payment is for. Selects the handler that runs when the payment
- *             settles successfully — `APPOINTMENT` books the visit described in `metadata`.
+ *             settles successfully — `APPOINTMENT` books the visit described in `metadata`,
+ *             `PAID_PROGRAM` records the paid-programs order described in `metadata`.
  *         metadata:
  *           type: object
  *           description: |
  *             Payload for the purpose's post-success handler, validated here at init time.
  *             For `APPOINTMENT`: `doctorId`, `branchId`, `startTime`, `endTime`,
  *             `isTelemedicine` and an optional `familyMemberId`.
+ *             For `PAID_PROGRAM`: `items` (each with `category`, `id`/`externalId`, `code`,
+ *             `title`, `price`) plus optional `contactPhone` and `comment`. The item prices
+ *             must add up to `amount`, and check-up prices must match the catalogue.
  *           example:
  *             doctorId: "0a4c1e2b-6c1f-4a52-9d0e-7b1d2c3f4a5b"
  *             branchId: "5f2a9c31-8de4-4b77-9a10-2c3d4e5f6a7b"
@@ -67,7 +71,7 @@ const router = Router();
  *           enum: [PENDING, SUCCESS, FAILED]
  *         purpose:
  *           type: string
- *           enum: [BALANCE_TOPUP, APPOINTMENT]
+ *           enum: [BALANCE_TOPUP, APPOINTMENT, PAID_PROGRAM]
  *         pgPaymentId:
  *           type: string
  *           nullable: true
@@ -249,7 +253,7 @@ router.get('/balance', authenticate, controller.getBalance);
  *         description: Return only payments made for this purpose.
  *         schema:
  *           type: string
- *           enum: [BALANCE_TOPUP, APPOINTMENT]
+ *           enum: [BALANCE_TOPUP, APPOINTMENT, PAID_PROGRAM]
  *     responses:
  *       200:
  *         description: Pending payments

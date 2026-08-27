@@ -41,6 +41,7 @@ model User {
   insuranceRefundRequests InsuranceRefundRequest[]
   payments                Payment[]
   auditLogs               AuditLog[]
+  programOrders           ProgramOrder[]
 }
 
 model Patient {
@@ -177,6 +178,8 @@ enum PaymentStatus {
 enum PaymentPurpose {
   BALANCE_TOPUP
   APPOINTMENT
+  /// A paid-programs cart (med plans and/or check-ups) bought from the mobile app.
+  PAID_PROGRAM
 }
 
 model Payment {
@@ -195,6 +198,8 @@ model Payment {
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Set only for `PAID_PROGRAM` payments — the order its success handler created.
+  programOrder     ProgramOrder?
 
   @@index([userId])
   @@index([createdAt])
@@ -239,6 +244,8 @@ enum AuditEvent {
   CHECKUP_CREATED
   CHECKUP_UPDATED
   CHECKUP_DELETED
+  PROGRAM_ORDER_CREATED
+  PROGRAM_ORDER_STATUS_CHANGED
 }
 
 model AuditLog {
@@ -308,4 +315,72 @@ model Checkup {
   updatedAt   DateTime        @updatedAt
 
   @@index([isActive, sortOrder])
+}
+
+/// Where an operator has got to with a paid-programs order.
+enum ProgramOrderStatus {
+  /// Paid, nobody has picked it up yet.
+  NEW
+  /// An operator is working it — the patient has been contacted, a date is being agreed.
+  IN_PROGRESS
+  /// The program has been issued / the check-up has taken place.
+  COMPLETED
+  CANCELLED
+}
+
+/// Which catalogue an ordered program came from. Mirrors the mobile app's two tabs.
+enum ProgramOrderCategory {
+  /// Med plan proxied from the MIS (`GET /insurance/pay-programs`).
+  MED_PLAN
+  /// Our own check-up catalogue (`Checkup`).
+  CHECKUP
+}
+
+/// A paid-programs order ("заявка"): what the patient bought from the paid-programs
+/// screen, recorded once the payment behind it settles as SUCCESS.
+///
+/// Created by the `PAID_PROGRAM` payment purpose handler, never by a request from the
+/// app — an order exists only if the money moved. `paymentId` is unique, which is what
+/// makes the handler idempotent: a replayed provider callback cannot duplicate the order.
+model ProgramOrder {
+  id           String             @id @default(uuid()) @db.Uuid
+  userId       String             @db.Uuid
+  /// The settled payment this order was paid by — one order per payment.
+  paymentId    String             @unique @db.Uuid
+  status       ProgramOrderStatus @default(NEW)
+  /// Amount actually paid, in tenge. Kept here so the order reads on its own.
+  total        Float
+  /// Phone to call the patient back on, copied from the account at order time.
+  contactPhone String?
+  /// Free-form note an operator leaves while working the order.
+  comment      String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  user    User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment Payment            @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  items   ProgramOrderItem[]
+
+  @@index([userId])
+  @@index([status, createdAt])
+  @@index([createdAt])
+}
+
+/// One program inside an order, snapshotted at purchase time — titles and prices in the
+/// catalogue keep changing, an order must not.
+model ProgramOrderItem {
+  id         String               @id @default(uuid()) @db.Uuid
+  orderId    String               @db.Uuid
+  category   ProgramOrderCategory
+  /// Catalogue id at purchase time: the MIS `oid` for a med plan, `Checkup.id` for a check-up.
+  externalId String
+  /// Catalogue code, e.g. `M2` for a med plan or the `thyroid` slug for a check-up.
+  code       String?
+  title      String
+  /// Price in tenge at purchase time.
+  price      Float
+
+  order ProgramOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
 }

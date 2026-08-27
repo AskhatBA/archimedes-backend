@@ -45,7 +45,12 @@ export interface PaymentPurposeHandler<TMetadata = unknown> {
    * alternative is discovering it in `onSuccess`, when the money has already moved and
    * the only options left are a manual refund or a lost payment.
    */
-  beforePayment?: (context: { userId: string; metadata: TMetadata }) => Promise<void>;
+  beforePayment?: (context: {
+    userId: string;
+    /** What the payer is about to be charged, in KZT — the purpose checks its own total against it. */
+    amount: number;
+    metadata: TMetadata;
+  }) => Promise<void>;
   /** Business logic to run once the payment is confirmed successful. */
   onSuccess: (context: PaymentSuccessContext) => Promise<void>;
 }
@@ -101,12 +106,13 @@ export const validatePaymentMetadata = (
 export const runBeforePayment = async (
   purpose: PaymentPurpose,
   userId: string,
+  amount: number,
   metadata: unknown
 ): Promise<void> => {
   const handler = handlers.get(purpose);
   if (!handler?.beforePayment) return;
 
-  await handler.beforePayment({ userId, metadata });
+  await handler.beforePayment({ userId, amount, metadata });
 };
 
 /**

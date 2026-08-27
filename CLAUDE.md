@@ -95,6 +95,39 @@ and leaves the columns an operator curates in the database — `description`, `d
 `coverage`, `popular` — untouched on rows that already exist. Retire an entry by setting
 `isActive = false` rather than deleting it, so old references keep resolving.
 
+### Paid-programs orders
+
+The paid-programs cart is not paid for through the generic payment form: checkout calls
+`POST /v1/api/payment/init` with `purpose: PAID_PROGRAM` and the cart as `metadata`, and
+the order ("заявка") is written to the `ProgramOrder` / `ProgramOrderItem` tables by the
+purpose's post-success handler (`src/domains/program-orders/program-order.payment-handler.ts`)
+the moment the payment settles as SUCCESS — from the FreedomPay callback or from the
+reconciliation sweep, so it lands even if the app was closed on the provider's page. An
+order therefore never exists without money behind it, and `ProgramOrder.paymentId` is
+unique, so a replayed callback cannot duplicate one.
+
+Checkout is refused at init time — while the payer still has an unspent card — if a
+check-up has been retired or repriced since the catalogue was cached on the device
+(`PROGRAM_ORDER_PRICE_CHANGED`), or if the item prices do not add up to the amount being
+charged (`PROGRAM_ORDER_TOTAL_MISMATCH`). Check-up titles and codes are re-read from our
+catalogue when the order is written; med-plan rows keep the MIS snapshot the app showed,
+since the MIS owns those prices.
+
+The `program-orders` domain serves them:
+
+- `GET /v1/api/program-orders` — the caller's own orders, newest first
+- `GET /v1/api/program-orders/:id` — one of them, scoped to the caller
+- `GET /v1/api/program-orders/admin` — dashboard listing (`requireRole(Role.ADMIN)`),
+  paginated, filterable by status/category/date/search, with the summed total of the
+  filtered set
+- `GET /v1/api/program-orders/admin/:id`
+- `PATCH /v1/api/program-orders/admin/:id` — move the order along (`NEW`, `IN_PROGRESS`,
+  `COMPLETED`, `CANCELLED`) or leave an operator note; amounts and items are immutable
+
+`/admin` is registered before `/:id`, otherwise the by-id handler swallows it. Status
+moves are audited as `PROGRAM_ORDER_STATUS_CHANGED`, and the handler's write as
+`PROGRAM_ORDER_CREATED`.
+
 ### Notification queue
 
 BullMQ queue (`appointment-notifications`) schedules push notifications via OneSignal. The worker (`src/shared/queues/notification.worker.ts`) runs in the same process, started from `server.ts`. Two reminders fire per appointment — 3 hours and 1 hour before it (or 30s/60s after creation in test mode via `NOTIFICATION_TEST_MODE=true`). Offsets are declared in `APPOINTMENT_REMINDERS` in `notification.queue.ts`. Job IDs are `appointment-<appointmentId>-<3h|1h>` to prevent duplicates; cancelling also removes the legacy `appointment-<appointmentId>` job from the old single-reminder scheme.
