@@ -236,6 +236,9 @@ enum AuditEvent {
   REFUND_REQUESTS_VIEWED
   REFUND_ACCESS_DENIED
   PATIENT_LIST_VIEWED
+  CHECKUP_CREATED
+  CHECKUP_UPDATED
+  CHECKUP_DELETED
 }
 
 model AuditLog {
@@ -274,4 +277,35 @@ model Notification {
   @@index([userId])
   @@index([createdAt])
   @@index([userId, isRead])
+}
+
+enum CheckupCoverage {
+  PERSONAL
+  FAMILY
+}
+
+/// Check-up catalogue for the mobile app's "Чек-ап" tab. Unlike med plans, which the
+/// MIS owns and we only proxy, these programs are ours: they are seeded from the
+/// clinic's price list (`npm run db:seed-checkups`) and edited in the database.
+model Checkup {
+  id          String          @id @default(uuid()) @db.Uuid
+  /// Stable slug the seed upserts on, e.g. `thyroid`. Ids are free to change, this is not.
+  code        String          @unique
+  title       String
+  /// Optional intro paragraph above the service list — the app hides it when empty.
+  description String?
+  /// Price in tenge.
+  price       Int
+  /// How long the program runs, e.g. "1 день". Hidden by the app when unknown.
+  duration    String?
+  coverage    CheckupCoverage @default(PERSONAL)
+  /// What the program includes, rendered as a checklist in the details drawer.
+  services    String[]
+  popular     Boolean         @default(false)
+  isActive    Boolean         @default(true)
+  sortOrder   Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([isActive, sortOrder])
 }

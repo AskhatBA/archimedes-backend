@@ -13,7 +13,8 @@
     "db:generate": "prisma generate --schema=./src/infrastructure/db/schema.prisma",
     "db:push": "prisma db push --schema=./src/infrastructure/db/schema.prisma",
     "db:studio": "prisma studio --schema=./src/infrastructure/db/schema.prisma",
-    "db:create-admin": "ts-node -r tsconfig-paths/register src/infrastructure/db/scripts/create-admin.ts"
+    "db:create-admin": "ts-node -r tsconfig-paths/register src/infrastructure/db/scripts/create-admin.ts",
+    "db:seed-checkups": "ts-node -r tsconfig-paths/register src/infrastructure/db/scripts/seed-checkups.ts"
   },
   "keywords": [],
   "author": "",

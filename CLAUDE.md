@@ -13,6 +13,8 @@ npm run db:migrate   # Run Prisma migrations
 npm run db:generate  # Regenerate Prisma client after schema changes
 npm run db:push      # Push schema to DB without migration file
 npm run db:studio    # Open Prisma Studio UI
+
+npm run db:seed-checkups  # Seed/refresh the check-up catalogue
 ```
 
 There are no tests. `npm test` exits with an error.
@@ -60,6 +62,38 @@ npm run db:create-admin
 The script refuses to create a second ADMIN, hashes the password with bcrypt (cost 12) into `User.passwordHash`, and bumps `tokenVersion` when re-run so a password rotation revokes the old session. Passwords are never stored or logged in clear text — `password`/`passwordHash` are in the logger's redact list.
 
 Every login failure returns the same `INVALID_CREDENTIALS` regardless of cause (unknown email, non-admin account, wrong password), and a missing account still pays the bcrypt cost, so neither the body nor the timing reveals which emails exist. Failures are counted per email in Redis by `login-throttle.service.ts` (`ADMIN_MAX_LOGIN_ATTEMPTS`, default 5, over `ADMIN_LOCK_MINUTES`, default 15) and audited as `ADMIN_LOGIN_SUCCESS` / `ADMIN_LOGIN_FAILED` / `ADMIN_LOGIN_THROTTLED`.
+
+### Check-up catalogue
+
+The mobile app's paid-programs screen has two tabs. `MED_PLAN` is proxied from the MIS
+(`GET /v1/api/insurance/pay-programs`), but check-ups are ours: they live in the `Checkup`
+table and are served by the `checkups` domain at `GET /v1/api/checkups` (and
+`GET /v1/api/checkups/:id`, which accepts either the uuid or the stable `code` slug).
+Both endpoints require `authenticate` and return only rows with `isActive = true`,
+ordered by `sortOrder`.
+
+The dashboard edits the catalogue through the admin endpoints, all gated on
+`requireRole(Role.ADMIN)` and written to the audit trail (`CHECKUP_CREATED`,
+`CHECKUP_UPDATED`, `CHECKUP_DELETED`):
+
+- `GET /v1/api/checkups/admin` — the whole catalogue, unpublished rows included
+- `POST /v1/api/checkups/admin` — create; a duplicate `code` is a 409 `CHECKUP_CODE_TAKEN`
+- `PATCH /v1/api/checkups/admin/:id` — partial update; only the keys sent are written
+- `DELETE /v1/api/checkups/admin/:id` — hard delete
+
+`/admin` is registered before `/:id` in the router, otherwise the by-id handler swallows it.
+
+The catalogue is seeded from the clinic's price list by:
+
+```bash
+npm run db:seed-checkups
+```
+
+The script (`src/infrastructure/db/scripts/seed-checkups.ts`) upserts on `code`, so it is
+safe to re-run: it refreshes what the price list owns (title, price, services, ordering)
+and leaves the columns an operator curates in the database — `description`, `duration`,
+`coverage`, `popular` — untouched on rows that already exist. Retire an entry by setting
+`isActive = false` rather than deleting it, so old references keep resolving.
 
 ### Notification queue
 
