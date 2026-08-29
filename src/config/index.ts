@@ -21,6 +21,19 @@ function parseOriginList(value?: string): string[] | undefined {
   return origins.length > 0 ? origins : undefined;
 }
 
+/**
+ * Splits a comma-separated address list ("a@x.kz, b@y.kz") into recipients.
+ * Undefined when unset/blank, so the caller's default stands.
+ */
+function parseEmailList(value?: string): string[] | undefined {
+  const emails = (value ?? '')
+    .split(',')
+    .map((email) => email.trim())
+    .filter(Boolean);
+
+  return emails.length > 0 ? emails : undefined;
+}
+
 export const config = {
   port: process.env.PORT || DEFAULT_PORT,
   nodeEnv,
@@ -141,6 +154,30 @@ export const config = {
   notifications: {
     // Fire appointment reminders seconds after creation instead of hours before the visit
     testMode: process.env.NOTIFICATION_TEST_MODE === 'true',
+  },
+
+  mail: {
+    // Отключает отправку писем целиком, не трогая код: например, на стенде.
+    enabled: process.env.MAIL_ENABLED !== 'false',
+    smtp: {
+      host: process.env.SMTP_HOST || 'mail.archimedes.kz',
+      port: Number(process.env.SMTP_PORT) || 25,
+      // 25 — это открытый порт с STARTTLS, а не SMTPS. secure=true только для 465.
+      secure: process.env.SMTP_SECURE === 'true',
+      // Релей внутренний и может ходить без авторизации — тогда логин/пароль пустые.
+      user: process.env.SMTP_USER,
+      password: process.env.SMTP_PASSWORD,
+      // У внутреннего релея обычно самоподписанный сертификат, и на 25-м порту
+      // письмо всё равно уходит открыто, поэтому по умолчанию не проверяем.
+      rejectUnauthorized: process.env.SMTP_TLS_REJECT_UNAUTHORIZED === 'true',
+    },
+    // Адрес в поле From. Домен должен совпадать с релеем, иначе письмо уйдёт в спам.
+    from: process.env.MAIL_FROM || 'Archimedes App <no-reply@archimedes.kz>',
+    // Кому уходят заявки на платные программы. Список через запятую —
+    // адрес меняется или дополняется через PROGRAM_ORDER_EMAIL_TO без правки кода.
+    programOrderRecipients: parseEmailList(process.env.PROGRAM_ORDER_EMAIL_TO) ?? [
+      'baltabaev.a2509@gmail.com',
+    ],
   },
 
   appVersion: {

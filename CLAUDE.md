@@ -128,6 +128,45 @@ The `program-orders` domain serves them:
 moves are audited as `PROGRAM_ORDER_STATUS_CHANGED`, and the handler's write as
 `PROGRAM_ORDER_CREATED`.
 
+### Order emails
+
+Besides the row in our tables, every settled paid-programs order is emailed to the
+operators. The payment handler only **enqueues** it (`enqueueProgramOrderEmail`) — the
+FreedomPay result callback waits on that handler, so the SMTP round-trip belongs on
+the `program-order-email` queue, whose worker (`program-order-email.worker.ts`, started
+from `server.ts`) re-reads the order with `getOrderForEmail` and sends it. Failing to
+enqueue is logged and swallowed: the order is already written and visible in the
+dashboard, and losing the email must not fail the payment.
+
+The job id is `program-order-email-<orderId>`, so a replayed provider callback or the
+reconciliation sweep landing on the same order cannot send a second copy. A refused
+relay is retried 5 times with exponential backoff (from 30s); a job that runs after the
+order was deleted logs and exits rather than retrying.
+
+The message body (`program-order.email.ts`) is the same view the dashboard row shows —
+order id, time in clinic time (Asia/Almaty), patient name/IIN/phones, comment, the
+items with their category and price, and the total — as HTML with a plain-text
+fallback. Titles and comments are patient/catalogue text and are HTML-escaped.
+
+SMTP lives in `src/infrastructure/mail/` — one pooled nodemailer transport built lazily
+and reused. `sendMail` throws on failure so the queue retries; never call it inline in a
+request. Env:
+
+- `SMTP_HOST` (`mail.archimedes.kz`), `SMTP_PORT` (25), `SMTP_SECURE` (`false` — `true`
+  only for implicit TLS on 465; port 25 upgrades via STARTTLS when offered)
+- `SMTP_USER` / `SMTP_PASSWORD` — the relay is Exchange and answers unauthenticated,
+  but only for its own domain: an outside recipient (a gmail address, say) is
+  refused with `550 5.7.1 Unable to relay`, so a mailbox account is required for
+  anything but `@archimedes.kz`. Setting them also turns STARTTLS from optional into
+  required, so the password never crosses a cleartext session
+- `SMTP_TLS_REJECT_UNAUTHORIZED` (`false`) — the internal relay's certificate is
+  self-signed
+- `MAIL_FROM` — the `From` header; keep the domain on the relay or the mail is filtered
+- `MAIL_ENABLED` — `false` stops sending without touching code (jobs still succeed)
+- `PROGRAM_ORDER_EMAIL_TO` — **who receives the orders**, comma-separated, so a recipient
+  is changed or added without a deploy. Defaults to the single personal address the
+  orders currently go to until the clinic's own mailbox takes over.
+
 ### Appointments in the dashboard
 
 Appointments are booked through MIS (`mis.service.createAppointment`), and our

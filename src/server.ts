@@ -11,9 +11,13 @@ import {
 import { startAppointmentSyncWorker } from './shared/queues/appointment-sync.worker';
 import { schedulePaymentReconciliation } from './shared/queues/payment-reconciliation.queue';
 import { startPaymentReconciliationWorker } from './shared/queues/payment-reconciliation.worker';
+import { startProgramOrderEmailWorker } from './shared/queues/program-order-email.worker';
 
 // Start the notification worker
 startNotificationWorker();
+
+// Письма о новых оплаченных заявках на платные программы.
+startProgramOrderEmailWorker();
 
 // Settles payments whose FreedomPay result callback never arrived. Runs in the background
 // so no client has to poll for an outcome.
@@ -54,6 +58,11 @@ const shutdown = async (signal: string) => {
     './shared/queues/payment-reconciliation.worker'
   );
   await stopPaymentReconciliationWorker();
+
+  const { stopProgramOrderEmailWorker } = await import(
+    './shared/queues/program-order-email.worker'
+  );
+  await stopProgramOrderEmailWorker();
 
   if (config.mis.appointmentSync.enabled) {
     const { stopAppointmentSyncWorker } = await import('./shared/queues/appointment-sync.worker');

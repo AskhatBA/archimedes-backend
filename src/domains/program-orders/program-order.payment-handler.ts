@@ -10,6 +10,7 @@ import { ErrorCodes } from '@/shared/constants/error-codes';
 import { AppError } from '@/shared/services/app-error.service';
 import * as auditLogService from '@/shared/services/audit-log.service';
 import { AuditEvent } from '@/shared/services/audit-log.service';
+import { enqueueProgramOrderEmail } from '@/shared/queues/program-order-email.queue';
 
 import * as programOrdersService from './program-orders.service';
 import type { ProgramOrderItemInput, ProgramOrderMetadata } from './program-orders.dto';
@@ -210,6 +211,18 @@ const createOrder = async (context: PaymentSuccessContext): Promise<void> => {
     },
     'Paid-program order created after successful payment'
   );
+
+  // Письмо операторам уходит через очередь: SMTP внешний и медленный, а на этот
+  // обработчик ждёт колбэк FreedomPay. Ошибка постановки в очередь не должна
+  // отменить уже записанную заявку — оператор всё равно видит её в дашборде.
+  try {
+    await enqueueProgramOrderEmail(order.id);
+  } catch (error) {
+    handlerLogger.error(
+      { err: error, orderId: order.id, paymentId: context.paymentId },
+      'Failed to queue paid-program order email'
+    );
+  }
 
   auditLogService.log({
     event: AuditEvent.PROGRAM_ORDER_CREATED,

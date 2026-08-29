@@ -67,3 +67,11 @@ export interface UpdateProgramOrderBody {
   status?: ProgramOrderStatus;
   comment?: string | null;
 }
+
+/**
+ * Что уходит письмом операторам при новой оплаченной заявке.
+ *
+ * Совпадает со строкой дашборда: письмо показывает ту же заявку и того же
+ * пациента, просто до того, как оператор откроет панель.
+ */
+export type ProgramOrderEmailData = ProgramOrderAdminDto;

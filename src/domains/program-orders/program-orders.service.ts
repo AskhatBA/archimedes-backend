@@ -14,6 +14,7 @@ import type {
   AdminProgramOrderListParams,
   ProgramOrderAdminDto,
   ProgramOrderDto,
+  ProgramOrderEmailData,
   ProgramOrderItemInput,
   UpdateProgramOrderBody,
 } from './program-orders.dto';
@@ -93,6 +94,41 @@ export const createOrderForPayment = async ({
   });
 
   return toDto(order);
+};
+
+/**
+ * Reads one order with the patient behind it, for the notification email.
+ *
+ * Returns `null` rather than throwing: the caller is a queue worker, and an order
+ * deleted between the payment settling and the job running is nothing to retry.
+ */
+export const getOrderForEmail = async (
+  orderId: string
+): Promise<ProgramOrderEmailData | null> => {
+  const order = await prismaClient.programOrder.findUnique({
+    where: { id: orderId },
+    include: {
+      items: true,
+      user: {
+        select: {
+          phone: true,
+          patient: { select: { fullName: true, iin: true } },
+        },
+      },
+    },
+  });
+
+  if (!order) return null;
+
+  const { user, ...rest } = order;
+
+  return {
+    ...toDto(rest),
+    userId: order.userId,
+    patientName: user.patient?.fullName ?? null,
+    patientIin: user.patient?.iin ?? null,
+    patientPhone: user.phone,
+  };
 };
 
 /** The patient's own order history, newest first. */
