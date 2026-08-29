@@ -179,10 +179,21 @@ goes into the same lookup table so an approved request is still found.
 
 Rules the sweep follows:
 
-- Candidates are `SCHEDULED` rows dated within `MIS_APPOINTMENT_SYNC_LOOKBACK_DAYS` (7) of
-  now or later, ordered by `statusSyncedAt` ascending with nulls first — a just-booked visit
-  is confirmed before an old one is re-checked, and over a few passes the whole queue is
-  covered.
+- The queue is split by how close the visit is, so a booking three months out cannot crowd
+  out tomorrow's. **Hot** rows — from `MIS_APPOINTMENT_SYNC_LOOKBACK_DAYS` (7) back to
+  `MIS_APPOINTMENT_SYNC_HOT_HORIZON_HOURS` (48) ahead — are checked every pass and get the
+  budget first. **Cold** rows, further out than the horizon, are picked up only with the
+  budget left over and only when their last check is older than
+  `MIS_APPOINTMENT_SYNC_COLD_INTERVAL_HOURS` (24); nothing is lost, because such a booking
+  moves into the hot tier by itself once the horizon reaches it. A cold row belonging to a
+  patient already being polled rides along for free — MIS returns that patient's statuses in
+  one answer either way.
+- The hot horizon is bounded from below by the reminders: they go out 3 hours before the
+  visit, so a cancellation has to be known before that, or the push lands on a cancelled
+  appointment.
+- Within each tier rows are ordered by `statusSyncedAt` ascending with nulls first — a
+  just-booked visit is confirmed before an old one is re-checked, and over a few passes the
+  whole tier is covered.
 - MIS status strings are mapped in `MIS_STATUS_MAP`. An unknown string is not an error: it is
   stored raw in `Appointment.misStatus`, our `status` is left alone, and the string is logged
   so it can be added deliberately.
@@ -197,11 +208,22 @@ Rules the sweep follows:
 The sweep syncs status only. It deliberately does not move `dateTime`: a visit rescheduled in
 MIS still shows its original time here.
 
+A run reports `checked / patients / hotPatients / coldPatients / updated / notFound /
+failedPatients`, so `coldPatients` staying at 0 is the sign the hot tier is eating the whole
+budget and `batchSize` needs raising.
+
 Env: `MIS_APPOINTMENT_SYNC_ENABLED` (default on — set `false` to stop the schedule, which the
 next boot then removes), `MIS_APPOINTMENT_SYNC_INTERVAL_SECONDS` (900),
 `MIS_APPOINTMENT_SYNC_BATCH_SIZE` (25 patients per run),
-`MIS_APPOINTMENT_SYNC_SPACING_MS` (300), `MIS_APPOINTMENT_SYNC_LOOKBACK_DAYS` (7). Keep
-`batchSize * spacing` below the interval or sweeps overlap.
+`MIS_APPOINTMENT_SYNC_SPACING_MS` (300), `MIS_APPOINTMENT_SYNC_LOOKBACK_DAYS` (7),
+`MIS_APPOINTMENT_SYNC_HOT_HORIZON_HOURS` (48),
+`MIS_APPOINTMENT_SYNC_COLD_INTERVAL_HOURS` (24). Keep `batchSize * spacing` below the
+interval or sweeps overlap.
+
+Sizing: one run costs two MIS requests per patient (~0.45s each with the default spacing), so
+a full sweep of the queue takes `ceil(P / batchSize) * interval`, where `P` is the number of
+distinct MIS patients with open appointments — not the number of accounts. Keep that below
+the 3-hour reminder for the hot tier.
 
 ### Notification queue
 

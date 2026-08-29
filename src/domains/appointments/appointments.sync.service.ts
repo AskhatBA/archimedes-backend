@@ -1,4 +1,4 @@
-import { AppointmentStatus } from '@prisma/client';
+import { AppointmentStatus, Prisma } from '@prisma/client';
 
 import * as misService from '@/domains/mis/mis.service';
 import { config } from '@/config';
@@ -64,6 +64,10 @@ export interface AppointmentSyncResult {
   checked: number;
   /** Пациентов МИС, которых опросили. */
   patients: number;
+  /** Из них попавших в проход из-за близкого визита. */
+  hotPatients: number;
+  /** Из них добранных из дальних записей на остаток бюджета. */
+  coldPatients: number;
   /** Приёмов, у которых статус действительно изменился. */
   updated: number;
   /** Приёмов, которых МИС не показал ни в записях, ни в заявках. */
@@ -176,10 +180,19 @@ const applyStatus = async (
 /**
  * Один проход синхронизации.
  *
- * Берём открытые (`SCHEDULED`) приёмы за окно `lookbackDays` назад и всё будущее, группируем
- * по пациенту МИС и опрашиваем пациентов, у которых дольше всех не было сверки. Недоступность
- * МИС по одному пациенту не роняет проход: его приёмы просто остаются со старым
- * `statusSyncedAt` и попадут в начало следующей выборки.
+ * Очередь делится по близости визита, иначе запись на три месяца вперёд занимала бы место
+ * наравне с завтрашней и растягивала полный обход на сутки:
+ *
+ * - «горячие» — приёмы от `lookbackDays` назад до `hotHorizonHours` вперёд. Сверяются каждый
+ *   проход. Границу задают напоминания: они уходят за 3 часа до визита, и отмена должна быть
+ *   известна раньше, иначе пуш придёт на отменённый приём.
+ * - «холодные» — всё, что дальше горизонта. Берутся только если остался бюджет и с прошлой
+ *   сверки прошло больше `coldIntervalHours`. Такой записи ещё неделю нечего менять, а
+ *   переехать в горячую очередь она успеет сама, когда до неё останется меньше горизонта.
+ *
+ * Внутри каждой группы первыми идут те, у кого дольше всех не было сверки. Недоступность МИС
+ * по одному пациенту не роняет проход: его приёмы остаются со старым `statusSyncedAt` и
+ * попадут в начало следующей выборки.
  */
 /**
  * Сколько приёмов на пациента закладываем в выборку. Занижение не теряет данные: остаток
@@ -188,47 +201,92 @@ const applyStatus = async (
 const CANDIDATES_PER_PATIENT = 20;
 
 export const syncAppointmentStatuses = async (): Promise<AppointmentSyncResult> => {
-  const { batchSize, requestSpacingMs, lookbackDays } = config.mis.appointmentSync;
-  const syncedAfter = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
+  const { batchSize, requestSpacingMs, lookbackDays, hotHorizonHours, coldIntervalHours } =
+    config.mis.appointmentSync;
+  const now = Date.now();
+  const notBefore = new Date(now - lookbackDays * 24 * 60 * 60 * 1000);
+  const horizon = new Date(now + hotHorizonHours * 60 * 60 * 1000);
+  const coldStaleBefore = new Date(now - coldIntervalHours * 60 * 60 * 1000);
 
-  const candidates = await prismaClient.appointment.findMany({
-    where: {
-      status: AppointmentStatus.SCHEDULED,
-      dateTime: { gte: syncedAfter },
-    },
-    select: {
-      id: true,
-      userId: true,
-      patientId: true,
-      externalId: true,
-      dateTime: true,
-      status: true,
-      misStatus: true,
-    },
-    // Никогда не сверявшиеся идут первыми, дальше — самые давние: за несколько проходов
-    // очередь обходится целиком, и ни один приём не остаётся без внимания.
-    orderBy: [{ statusSyncedAt: { sort: 'asc', nulls: 'first' } }, { dateTime: 'asc' }],
-    // Верхняя граница выборки: опрашиваем всё равно не больше `batchSize` пациентов, а
-    // сортировка гарантирует, что в срез попадают самые несвежие строки.
-    take: batchSize * CANDIDATES_PER_PATIENT,
-  });
+  const select = {
+    id: true,
+    userId: true,
+    patientId: true,
+    externalId: true,
+    dateTime: true,
+    status: true,
+    misStatus: true,
+  } as const;
 
+  // Никогда не сверявшиеся идут первыми, дальше — самые давние: за несколько проходов
+  // очередь обходится целиком, и ни один приём не остаётся без внимания.
+  const orderBy = [
+    { statusSyncedAt: { sort: 'asc', nulls: 'first' } },
+    { dateTime: 'asc' },
+  ] satisfies Prisma.AppointmentOrderByWithRelationInput[];
+
+  // Верхняя граница выборки: опрашиваем всё равно не больше `batchSize` пациентов, а
+  // сортировка гарантирует, что в срез попадают самые несвежие строки.
+  const take = batchSize * CANDIDATES_PER_PATIENT;
+
+  const [hot, cold] = await Promise.all([
+    prismaClient.appointment.findMany({
+      where: {
+        status: AppointmentStatus.SCHEDULED,
+        dateTime: { gte: notBefore, lte: horizon },
+      },
+      select,
+      orderBy,
+      take,
+    }),
+    prismaClient.appointment.findMany({
+      where: {
+        status: AppointmentStatus.SCHEDULED,
+        dateTime: { gt: horizon },
+        // Дальние записи, сверенные недавно, в проход не берём вовсе — это и есть то, что
+        // не даёт им вытеснять ближайшие визиты из бюджета.
+        OR: [{ statusSyncedAt: null }, { statusSyncedAt: { lt: coldStaleBefore } }],
+      },
+      select,
+      orderBy,
+      take,
+    }),
+  ]);
+
+  // Горячие первыми, поэтому бюджет достаётся им, а холодные забирают только остаток.
   const byPatient = new Map<string, SyncCandidate[]>();
-  for (const appointment of candidates) {
+  const hotPatients = new Set<string>();
+
+  for (const appointment of hot) {
     const group = byPatient.get(appointment.patientId);
     if (group) {
       group.push(appointment);
     } else {
       byPatient.set(appointment.patientId, [appointment]);
+      hotPatients.add(appointment.patientId);
     }
   }
 
-  // Порядок выборки сохраняется в Map, поэтому срез — это ровно самые «протухшие» пациенты.
+  for (const appointment of cold) {
+    const group = byPatient.get(appointment.patientId);
+    // Дальняя запись пациента, которого мы и так опрашиваем, идёт довеском: его статусы
+    // приезжают из МИС одним ответом, отдельного запроса она не стоит.
+    if (group) {
+      group.push(appointment);
+      continue;
+    }
+
+    byPatient.set(appointment.patientId, [appointment]);
+  }
+
+  // Порядок вставки сохраняется в Map, поэтому срез — это ровно самые приоритетные пациенты.
   const patients = [...byPatient.entries()].slice(0, batchSize);
 
   const result: AppointmentSyncResult = {
     checked: 0,
     patients: patients.length,
+    hotPatients: patients.filter(([misPatientId]) => hotPatients.has(misPatientId)).length,
+    coldPatients: patients.filter(([misPatientId]) => !hotPatients.has(misPatientId)).length,
     updated: 0,
     notFound: 0,
     failedPatients: 0,
