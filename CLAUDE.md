@@ -156,6 +156,53 @@ of a range on a UTC server. As with program orders, `/admin` is registered befor
 The dashboard never writes an appointment: the visit lives in MIS, and moving or
 cancelling it from the admin panel would leave the two systems disagreeing.
 
+### Appointment status sync
+
+MIS owns the status of a visit and never calls us back when it changes, so an `Appointment`
+row would sit at `SCHEDULED` forever after the doctor closed the visit or the front desk
+cancelled it. The mobile app hides this — its list is proxied live from MIS
+(`GET /v1/api/mis/appointments`) — but the dashboard reads our tables, so a background sweep
+keeps them honest.
+
+`syncAppointmentStatuses()` (`appointments.sync.service.ts`) runs on the BullMQ queue
+`appointment-status-sync`, scheduled from `server.ts` with the same `upsertJobScheduler`
+pattern as payment reconciliation, and can be triggered by hand from the dashboard with
+`POST /v1/api/appointments/admin/sync` (`requireRole(Role.ADMIN)`), which answers with what
+the sweep did.
+
+It polls **per MIS patient, not per appointment**: one `GET /beneficiary/:userId/appointments/`
+plus one `.../appointment-requests/?include_past=true` return every visit of that beneficiary,
+so a day's queue costs a handful of requests. Both lists are read because `externalId` holds
+whatever MIS returned at booking — the request id when the booking went through a request,
+the appointment id otherwise — and an approved request also carries `appointment_id`, which
+goes into the same lookup table so an approved request is still found.
+
+Rules the sweep follows:
+
+- Candidates are `SCHEDULED` rows dated within `MIS_APPOINTMENT_SYNC_LOOKBACK_DAYS` (7) of
+  now or later, ordered by `statusSyncedAt` ascending with nulls first — a just-booked visit
+  is confirmed before an old one is re-checked, and over a few passes the whole queue is
+  covered.
+- MIS status strings are mapped in `MIS_STATUS_MAP`. An unknown string is not an error: it is
+  stored raw in `Appointment.misStatus`, our `status` is left alone, and the string is logged
+  so it can be added deliberately.
+- A row MIS does not mention is left untouched and counted as `notFound`. Deletion in MIS and
+  silence from MIS are indistinguishable, and "cancel just in case" cancels live visits.
+- A patient MIS fails to answer for is skipped, not retried inside the run: their rows keep
+  the old `statusSyncedAt` and lead the next pass.
+- A real status change also fixes the reminders — `cancelAppointmentNotification` when the
+  visit leaves `SCHEDULED`, `scheduleAppointmentNotification` when it comes back — and is
+  written to the audit trail as `APPOINTMENT_STATUS_SYNCED`.
+
+The sweep syncs status only. It deliberately does not move `dateTime`: a visit rescheduled in
+MIS still shows its original time here.
+
+Env: `MIS_APPOINTMENT_SYNC_ENABLED` (default on — set `false` to stop the schedule, which the
+next boot then removes), `MIS_APPOINTMENT_SYNC_INTERVAL_SECONDS` (900),
+`MIS_APPOINTMENT_SYNC_BATCH_SIZE` (25 patients per run),
+`MIS_APPOINTMENT_SYNC_SPACING_MS` (300), `MIS_APPOINTMENT_SYNC_LOOKBACK_DAYS` (7). Keep
+`batchSize * spacing` below the interval or sweeps overlap.
+
 ### Notification queue
 
 BullMQ queue (`appointment-notifications`) schedules push notifications via OneSignal. The worker (`src/shared/queues/notification.worker.ts`) runs in the same process, started from `server.ts`. Two reminders fire per appointment — 3 hours and 1 hour before it (or 30s/60s after creation in test mode via `NOTIFICATION_TEST_MODE=true`). Offsets are declared in `APPOINTMENT_REMINDERS` in `notification.queue.ts`. Job IDs are `appointment-<appointmentId>-<3h|1h>` to prevent duplicates; cancelling also removes the legacy `appointment-<appointmentId>` job from the old single-reminder scheme.

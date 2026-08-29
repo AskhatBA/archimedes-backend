@@ -8,6 +8,7 @@ import { AuditEvent } from '@/shared/services/audit-log.service';
 
 import * as appointmentsService from './appointments.service';
 import * as appointmentsAdminService from './appointments.admin.service';
+import * as appointmentsSyncService from './appointments.sync.service';
 
 export const getAppointments = async (req: Request, res: Response) => {
   if (!req?.user) {
@@ -305,4 +306,16 @@ export const getAdminAppointment = async (req: Request, res: Response): Promise<
   );
 
   res.status(200).json({ success: true, appointment });
+};
+
+/**
+ * Ручной запуск сверки статусов с МИС.
+ *
+ * Фоновое расписание и так гоняет тот же проход, но оператору, который видит в МИС уже
+ * закрытый приём, не нужно ждать следующего интервала.
+ */
+export const syncAppointmentStatuses = async (_req: Request, res: Response): Promise<void> => {
+  const result = await appointmentsSyncService.syncAppointmentStatuses();
+
+  res.status(200).json({ success: true, ...result });
 };

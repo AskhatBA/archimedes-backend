@@ -17,6 +17,10 @@ export interface AdminAppointmentDto {
   externalId: string;
   dateTime: Date;
   status: AppointmentStatus;
+  /** Сырой статус МИС с последней сверки — у МИС состояний больше наших трёх. */
+  misStatus: string | null;
+  /** Когда статус последний раз сверялся с МИС; `null` — ещё ни разу. */
+  statusSyncedAt: Date | null;
   isTelemedicine: boolean;
   meetingUrl: string | null;
   notes: string | null;

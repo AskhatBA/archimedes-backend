@@ -85,6 +85,12 @@ model Appointment {
   externalId     String            @db.Uuid
   dateTime       DateTime
   status         AppointmentStatus @default(SCHEDULED)
+  /// Raw MIS status string the sync last saw, kept as-is: MIS has more states than our
+  /// three (`in_progress`, `pending`, `rejected`...), and the operator wants to see them.
+  misStatus      String?
+  /// When the status sync last managed to reach MIS about this visit. Null means never —
+  /// those go first, so a freshly booked visit is confirmed before an old one is re-checked.
+  statusSyncedAt DateTime?
   isTelemedicine Boolean           @default(false)
   meetingUrl     String?
   notes          String?
@@ -93,6 +99,8 @@ model Appointment {
   user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  // The sync sweep looks up open visits by status and date on every run.
+  @@index([status, dateTime])
 }
 
 model OTP {
@@ -246,6 +254,7 @@ enum AuditEvent {
   CHECKUP_DELETED
   PROGRAM_ORDER_CREATED
   PROGRAM_ORDER_STATUS_CHANGED
+  APPOINTMENT_STATUS_SYNCED
 }
 
 model AuditLog {

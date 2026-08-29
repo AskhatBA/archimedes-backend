@@ -134,6 +134,8 @@ const toAdminDto = (
     externalId: appointment.externalId,
     dateTime: appointment.dateTime,
     status: appointment.status,
+    misStatus: appointment.misStatus,
+    statusSyncedAt: appointment.statusSyncedAt,
     isTelemedicine: appointment.isTelemedicine,
     meetingUrl: appointment.meetingUrl || null,
     notes: appointment.notes || null,

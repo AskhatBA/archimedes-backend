@@ -4,6 +4,11 @@ import app from './app';
 import { config } from './config';
 import { logger } from './shared/lib/logger';
 import { startNotificationWorker } from './shared/queues/notification.worker';
+import {
+  scheduleAppointmentSync,
+  unscheduleAppointmentSync,
+} from './shared/queues/appointment-sync.queue';
+import { startAppointmentSyncWorker } from './shared/queues/appointment-sync.worker';
 import { schedulePaymentReconciliation } from './shared/queues/payment-reconciliation.queue';
 import { startPaymentReconciliationWorker } from './shared/queues/payment-reconciliation.worker';
 
@@ -16,6 +21,20 @@ startPaymentReconciliationWorker();
 void schedulePaymentReconciliation().catch((err) => {
   logger.error({ err }, 'Failed to schedule payment reconciliation');
 });
+
+// Статусы приёмов принадлежат МИС и меняются там без уведомлений, поэтому наши строки
+// сверяются с МИС по расписанию.
+if (config.mis.appointmentSync.enabled) {
+  startAppointmentSyncWorker();
+  void scheduleAppointmentSync().catch((err) => {
+    logger.error({ err }, 'Failed to schedule appointment status sync');
+  });
+} else {
+  // Иначе расписание, поставленное предыдущим запуском, продолжило бы будить воркер.
+  void unscheduleAppointmentSync().catch((err) => {
+    logger.error({ err }, 'Failed to unschedule appointment status sync');
+  });
+}
 
 // app.listen(config.port, () => {
 //   console.log(`Server is running on port ${config.port}`);
@@ -35,6 +54,11 @@ const shutdown = async (signal: string) => {
     './shared/queues/payment-reconciliation.worker'
   );
   await stopPaymentReconciliationWorker();
+
+  if (config.mis.appointmentSync.enabled) {
+    const { stopAppointmentSyncWorker } = await import('./shared/queues/appointment-sync.worker');
+    await stopAppointmentSyncWorker();
+  }
 
   server.close(() => {
     logger.info('HTTP server closed');

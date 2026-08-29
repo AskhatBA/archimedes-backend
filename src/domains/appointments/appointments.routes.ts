@@ -194,6 +194,49 @@ router.get(
 
 /**
  * @openapi
+ * /appointments/admin/sync:
+ *   post:
+ *     summary: Pull appointment statuses from MIS now (dashboard)
+ *     description: >
+ *       Runs the same sweep as the background schedule, on demand. Answers with what the
+ *       sweep did — how many local appointments were checked and how many changed.
+ *     tags: [Appointments]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Sweep result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 checked:
+ *                   type: integer
+ *                 patients:
+ *                   type: integer
+ *                 updated:
+ *                   type: integer
+ *                 notFound:
+ *                   type: integer
+ *                 failedPatients:
+ *                   type: integer
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Not an admin
+ */
+router.post(
+  '/admin/sync',
+  authenticate,
+  requireRole(Role.ADMIN),
+  asyncHandler(controller.syncAppointmentStatuses)
+);
+
+/**
+ * @openapi
  * /appointments/admin/{id}:
  *   get:
  *     summary: One appointment, unscoped (dashboard)

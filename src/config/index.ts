@@ -65,6 +65,24 @@ export const config = {
   mis: {
     apiUrl: `${process.env.MIS_API_URL}${process.env.MIS_API_PREFIX}`,
     devApiUrl: `${process.env.MIS_DEV_API_URL}${process.env.MIS_API_PREFIX}`,
+
+    // Статусы приёмов живут в МИС, колбэков оттуда нет — локальные строки подтягивает
+    // фоновая синхронизация.
+    appointmentSync: {
+      // Отключается без выкатки кода: например, пока МИС на обслуживании.
+      enabled: process.env.MIS_APPOINTMENT_SYNC_ENABLED !== 'false',
+      // Как часто запускается проход. Приём меняет статус редко, поэтому минуты, не секунды.
+      intervalSeconds: Number(process.env.MIS_APPOINTMENT_SYNC_INTERVAL_SECONDS) || 900,
+      // Сколько пациентов МИС опрашивается за один проход: запросы идут по пациенту,
+      // а не по приёму, поэтому это верхняя граница нагрузки на МИС.
+      // Держите batchSize * spacing меньше intervalSeconds, иначе проходы наложатся.
+      batchSize: Number(process.env.MIS_APPOINTMENT_SYNC_BATCH_SIZE) || 25,
+      // Пауза между запросами к МИС, чтобы проход не выглядел как всплеск трафика.
+      requestSpacingMs: Number(process.env.MIS_APPOINTMENT_SYNC_SPACING_MS) || 300,
+      // Насколько глубоко в прошлое смотреть: приём, который МИС так и не закрыл за это
+      // время, перестаёт опрашиваться, иначе выборка растёт бесконечно.
+      lookbackDays: Number(process.env.MIS_APPOINTMENT_SYNC_LOOKBACK_DAYS) || 7,
+    },
   },
 
   smsService: {
