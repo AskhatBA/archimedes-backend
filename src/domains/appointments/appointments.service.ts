@@ -34,7 +34,8 @@ export const getAppointmentById = (id: string, userId: string) => {
 // поэтому "тот же день" считаем в этой зоне, а не в зоне сервера — иначе вечерние
 // и ночные слоты на сервере в UTC попадают в соседние сутки.
 const CLINIC_TIME_ZONE = 'Asia/Almaty';
-const CLINIC_UTC_OFFSET = '+05:00';
+// Exported so the dashboard listing reads a day filter with the same clinic-day bounds.
+export const CLINIC_UTC_OFFSET = '+05:00';
 
 const clinicDayRange = (dateTime: Date) => {
   const dayKey = new Intl.DateTimeFormat('en-CA', {

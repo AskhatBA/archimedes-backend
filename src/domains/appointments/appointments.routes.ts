@@ -1,6 +1,10 @@
 import { Router } from 'express';
 
+import { Role } from '@prisma/client';
+
 import { authenticate } from '@/middlewares/auth.middleware';
+import { requireRole } from '@/middlewares/require-role.middleware';
+import { asyncHandler } from '@/shared/services/async-handler.service';
 
 import * as controller from './appointments.controller';
 
@@ -111,6 +115,115 @@ router.get('/', authenticate, controller.getAppointments);
 
 /**
  * @openapi
+ * /appointments/admin:
+ *   get:
+ *     summary: Clinic-wide appointment listing (dashboard)
+ *     description: Admin-only. Paginated and filtered server-side; day filters are read in clinic time (Asia/Almaty).
+ *     tags: [Appointments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: page
+ *         in: query
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - name: limit
+ *         in: query
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *           maximum: 100
+ *       - name: search
+ *         in: query
+ *         description: Patient name, IIN or phone — or a MIS appointment/patient/doctor id.
+ *         schema:
+ *           type: string
+ *       - name: status
+ *         in: query
+ *         schema:
+ *           type: string
+ *           enum: [SCHEDULED, COMPLETED, CANCELLED]
+ *       - name: telemedicine
+ *         in: query
+ *         schema:
+ *           type: boolean
+ *       - name: dateFrom
+ *         in: query
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - name: dateTo
+ *         in: query
+ *         schema:
+ *           type: string
+ *           format: date
+ *     responses:
+ *       200:
+ *         description: Page of appointments
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 items:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Appointment'
+ *                 total:
+ *                   type: integer
+ *                 page:
+ *                   type: integer
+ *                 limit:
+ *                   type: integer
+ *                 totalPages:
+ *                   type: integer
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Not an admin
+ */
+router.get(
+  '/admin',
+  authenticate,
+  requireRole(Role.ADMIN),
+  asyncHandler(controller.getAdminAppointments)
+);
+
+/**
+ * @openapi
+ * /appointments/admin/{id}:
+ *   get:
+ *     summary: One appointment, unscoped (dashboard)
+ *     tags: [Appointments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Appointment
+ *       403:
+ *         description: Not an admin
+ *       404:
+ *         description: Appointment not found
+ */
+router.get(
+  '/admin/:id',
+  authenticate,
+  requireRole(Role.ADMIN),
+  asyncHandler(controller.getAdminAppointment)
+);
+
+/**
+ * @openapi
  * /appointments/{id}:
  *   get:
  *     summary: Get appointment by ID
@@ -142,6 +255,7 @@ router.get('/', authenticate, controller.getAppointments);
  *       404:
  *         description: Appointment not found
  */
+// Registered after `/admin` so the dashboard routes are not swallowed by `:id`.
 router.get('/:id', authenticate, controller.getAppointmentById);
 
 /**

@@ -128,6 +128,34 @@ The `program-orders` domain serves them:
 moves are audited as `PROGRAM_ORDER_STATUS_CHANGED`, and the handler's write as
 `PROGRAM_ORDER_CREATED`.
 
+### Appointments in the dashboard
+
+Appointments are booked through MIS (`mis.service.createAppointment`), and our
+`Appointment` row is the local shadow of that booking: `patientId`, `doctorId` and
+`externalId` are **MIS** ids, while the account behind the visit is reachable only
+through `userId` → `User` → `Patient`. Booking for a relative stores the relative's MIS
+id, which is why a row whose `patientId` differs from the account's own `misPatientId` is
+flagged as a family-member visit rather than shown under the account owner's name.
+
+- `GET /v1/api/appointments/admin` — dashboard listing (`requireRole(Role.ADMIN)`),
+  paginated, filterable by status, telemedicine flag, day range and a search that matches
+  patient name / IIN / phone, or any of the three MIS ids when the term is a UUID
+- `GET /v1/api/appointments/admin/:id`
+
+Both live in `appointments.admin.service.ts`, not in `appointments.service.ts`: they need
+`mis.service` to put a name on `doctorId`, and `mis.service` already imports
+`appointments.service` for the booking-conflict rules, so the split is what keeps that
+import cycle open. Doctor lookups are per unique id per page and cached in-process for 10
+minutes; when MIS is unreachable the name comes back `null` and the row still carries
+`doctorId` — a MIS outage must not empty the queue.
+
+Day filters are `YYYY-MM-DD` and are read as whole **clinic** days (Asia/Almaty, the same
+`CLINIC_UTC_OFFSET` the conflict rules use), so an evening slot does not fall off the end
+of a range on a UTC server. As with program orders, `/admin` is registered before `/:id`.
+
+The dashboard never writes an appointment: the visit lives in MIS, and moving or
+cancelling it from the admin panel would leave the two systems disagreeing.
+
 ### Notification queue
 
 BullMQ queue (`appointment-notifications`) schedules push notifications via OneSignal. The worker (`src/shared/queues/notification.worker.ts`) runs in the same process, started from `server.ts`. Two reminders fire per appointment — 3 hours and 1 hour before it (or 30s/60s after creation in test mode via `NOTIFICATION_TEST_MODE=true`). Offsets are declared in `APPOINTMENT_REMINDERS` in `notification.queue.ts`. Job IDs are `appointment-<appointmentId>-<3h|1h>` to prevent duplicates; cancelling also removes the legacy `appointment-<appointmentId>` job from the old single-reminder scheme.

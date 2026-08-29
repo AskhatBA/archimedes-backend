@@ -1,12 +1,13 @@
 import { Request, Response } from 'express';
 import { body, param, validationResult } from 'express-validator';
-import { Role } from '@prisma/client';
+import { AppointmentStatus, Role } from '@prisma/client';
 
 import { AppError } from '@/shared/services/app-error.service';
 import * as auditLogService from '@/shared/services/audit-log.service';
 import { AuditEvent } from '@/shared/services/audit-log.service';
 
 import * as appointmentsService from './appointments.service';
+import * as appointmentsAdminService from './appointments.admin.service';
 
 export const getAppointments = async (req: Request, res: Response) => {
   if (!req?.user) {
@@ -245,4 +246,63 @@ export const cancelAppointment = async (req: Request, res: Response) => {
     success: true,
     message: 'Appointment cancelled successfully',
   });
+};
+
+/* ------------------------------------------------------------------ dashboard ---- */
+
+const ADMIN_DEFAULT_LIMIT = 20;
+const ADMIN_MAX_LIMIT = 100;
+
+const parsePositiveInt = (value: unknown, fallback: number, max?: number): number => {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) return fallback;
+  return max ? Math.min(parsed, max) : parsed;
+};
+
+const parseStatus = (value: unknown): AppointmentStatus | undefined => {
+  if (value === undefined || value === '') return undefined;
+  if (typeof value !== 'string' || !(value in AppointmentStatus)) {
+    throw new AppError('Invalid status', 400);
+  }
+  return value as AppointmentStatus;
+};
+
+const parseBoolean = (value: unknown): boolean | undefined => {
+  if (value === undefined || value === '') return undefined;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  throw new AppError('Invalid telemedicine flag', 400);
+};
+
+const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Day filters are calendar days, not timestamps — the service reads them in clinic time. */
+const parseDay = (value: unknown, field: string): string | undefined => {
+  if (value === undefined || value === '') return undefined;
+  if (typeof value !== 'string' || !DAY_PATTERN.test(value)) {
+    throw new AppError(`${field} must be a date in YYYY-MM-DD format`, 400);
+  }
+  return value;
+};
+
+export const getAdminAppointments = async (req: Request, res: Response): Promise<void> => {
+  const result = await appointmentsAdminService.getAdminAppointments({
+    page: parsePositiveInt(req.query.page, 1),
+    limit: parsePositiveInt(req.query.limit, ADMIN_DEFAULT_LIMIT, ADMIN_MAX_LIMIT),
+    search: typeof req.query.search === 'string' ? req.query.search.trim() : undefined,
+    status: parseStatus(req.query.status),
+    telemedicine: parseBoolean(req.query.telemedicine),
+    dateFrom: parseDay(req.query.dateFrom, 'dateFrom'),
+    dateTo: parseDay(req.query.dateTo, 'dateTo'),
+  });
+
+  res.status(200).json({ success: true, ...result });
+};
+
+export const getAdminAppointment = async (req: Request, res: Response): Promise<void> => {
+  const appointment = await appointmentsAdminService.getAdminAppointmentById(
+    req.params.id as string
+  );
+
+  res.status(200).json({ success: true, appointment });
 };
