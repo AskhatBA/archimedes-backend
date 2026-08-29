@@ -68,7 +68,11 @@ const router = Router();
  *           type: string
  *         status:
  *           type: string
- *           enum: [PENDING, SUCCESS, FAILED]
+ *           enum: [PENDING, SUCCESS, FAILED, CANCELLED]
+ *           description: |
+ *             `CANCELLED` is set when the payer gave up on the provider's page. It is
+ *             terminal for us but not for FreedomPay — a payment that settles afterwards
+ *             is still honoured and becomes `SUCCESS`.
  *         purpose:
  *           type: string
  *           enum: [BALANCE_TOPUP, APPOINTMENT, PAID_PROGRAM]
@@ -334,5 +338,47 @@ router.get('/history', authenticate, controller.getPaymentHistory);
  *         description: Payment not found
  */
 router.get('/status/:id', authenticate, controller.getPaymentStatus);
+
+/**
+ * @openapi
+ * /payment/{id}/cancel:
+ *   post:
+ *     summary: Give up on a payment the payer walked away from
+ *     description: |
+ *       Ends the wait for a payment the user started and abandoned, so the client can drop
+ *       the "waiting for payment" state instead of showing it until the provider's window
+ *       closes. Nothing is cancelled at FreedomPay: our payments are one-step, and their
+ *       `cancel` method only voids the hold of a two-step one.
+ *
+ *       The provider is asked for the authoritative state first, so a payment that was in
+ *       fact paid comes back `SUCCESS` (with whatever its purpose booked already done)
+ *       rather than being cancelled. A cancelled payment also stays reconcilable, so a card
+ *       charged just after this request still settles as `SUCCESS` later.
+ *
+ *       Idempotent: cancelling an already settled payment returns it unchanged.
+ *     tags: [Payment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Internal payment ID returned by /payment/init
+ *     responses:
+ *       200:
+ *         description: The payment as it stands after the request — check `status`
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Payment'
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Payment not found, or it belongs to someone else
+ */
+router.post('/:id/cancel', authenticate, controller.cancelPayment);
 
 export default router;

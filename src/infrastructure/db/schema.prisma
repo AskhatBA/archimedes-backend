@@ -180,6 +180,10 @@ enum PaymentStatus {
   PENDING
   SUCCESS
   FAILED
+  /// The payer walked away from the provider's page and said so. Terminal for us, but
+  /// not for FreedomPay — a one-step payment has nothing to cancel on their side, so a
+  /// payment that settles after this is still honoured.
+  CANCELLED
 }
 
 /// What the payment is for. Drives which post-success handler runs when it settles.

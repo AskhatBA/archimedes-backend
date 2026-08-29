@@ -54,6 +54,16 @@ export const getPaymentStatus = async (req: Request, res: Response) => {
   return res.status(200).json(payment);
 };
 
+export const cancelPayment = async (req: Request, res: Response) => {
+  if (!req.user) throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
+  const payment = await paymentService.cancelPayment(req.params.id, req.user.id);
+  if (!payment) throw new AppError('Payment not found', 404);
+  // The payment is returned rather than an empty 200 because cancelling is a request, not
+  // a guarantee: a payment that settled first comes back SUCCESS, and the caller has to
+  // show that outcome instead of the one it asked for.
+  return res.status(200).json(payment);
+};
+
 export const getPendingPayments = async (req: Request, res: Response) => {
   if (!req.user) throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
 

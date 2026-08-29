@@ -277,9 +277,19 @@ async function settlePayment(
   status: SettledStatus,
   pgPaymentId?: string
 ): Promise<boolean> {
+  // A payment the payer cancelled can still be paid: FreedomPay has nothing to cancel for
+  // a one-step payment, so the card may already have been charged by the time the cancel
+  // request lands. Money that moved always wins — SUCCESS settles a CANCELLED payment too,
+  // and the purpose handler books what was paid for. A failure does not: once the payer
+  // said they were done, `CANCELLED` is the more truthful of the two terminal states.
+  const settleableFrom =
+    status === PaymentStatus.SUCCESS
+      ? [PaymentStatus.PENDING, PaymentStatus.CANCELLED]
+      : [PaymentStatus.PENDING];
+
   const settled = await db.prismaClient.$transaction(async (tx) => {
     const { count } = await tx.payment.updateMany({
-      where: { id: payment.id, status: PaymentStatus.PENDING },
+      where: { id: payment.id, status: { in: settleableFrom } },
       data: { status, ...(pgPaymentId ? { pgPaymentId } : {}) },
     });
 
@@ -508,9 +518,14 @@ export async function reconcilePendingPayments(): Promise<ReconciliationSweepRes
 
   // Newer than RECONCILE_AFTER_MS is left alone: the result callback normally lands within
   // seconds, and asking the provider before that just burns a request.
+  //
+  // Cancelled payments are polled alongside the pending ones until they age out. Cancelling
+  // does not reach FreedomPay — for a one-step payment there is nothing there to cancel —
+  // so a payer who cancelled in the app and paid anyway must still get what they paid for,
+  // even if the result callback is the one that goes missing.
   const due = await db.prismaClient.payment.findMany({
     where: {
-      status: PaymentStatus.PENDING,
+      status: { in: [PaymentStatus.PENDING, PaymentStatus.CANCELLED] },
       createdAt: { lt: new Date(now - RECONCILE_AFTER_MS), gte: abandonedBefore },
     },
     select: {
@@ -593,6 +608,70 @@ export async function getPaymentStatus(paymentId: string, userId: string) {
 
   const status = await reconcilePayment(payment);
   return toPublicPayment({ ...payment, status });
+}
+
+/**
+ * Gives up on a payment the payer walked away from.
+ *
+ * There is no provider call behind this. FreedomPay's `cancel` only voids the hold of a
+ * two-step payment, and ours are one-step (`pg_auto_clearing`), so an unpaid order has
+ * nothing to cancel there — it simply expires at `pg_lifetime`. What this does is end the
+ * wait on our side: the payment leaves PENDING, so the "waiting for payment" card the app
+ * shows for an order that exists nowhere else disappears at once instead of hanging around
+ * until the provider's window closes.
+ *
+ * The provider is still asked first. Cancelling is only ever safe for a payment nobody has
+ * paid — if the card was charged while the payer was making up their mind, this settles it
+ * as SUCCESS instead and the purpose handler books what was paid for. The same holds after
+ * the fact: a CANCELLED payment stays reconcilable, so a late callback still wins.
+ *
+ * Returns the payment as the caller should now see it, or `null` if it is not theirs.
+ */
+export async function cancelPayment(paymentId: string, userId: string) {
+  const payment = await db.prismaClient.payment.findFirst({
+    where: { id: paymentId, userId },
+    select: PAYMENT_SELECT,
+  });
+
+  if (!payment) return null;
+
+  // Already settled — including a repeat of this very request, which must not be an error:
+  // the app fires it from a back button, and a retried tap has to land on the same answer.
+  if (payment.status !== PaymentStatus.PENDING) return toPublicPayment(payment);
+
+  const status = await reconcilePayment(payment);
+
+  if (status !== PaymentStatus.PENDING) {
+    const settled = await db.prismaClient.payment.findUnique({
+      where: { id: paymentId },
+      select: PAYMENT_SELECT,
+    });
+
+    paymentLogger.info(
+      { paymentId, status },
+      'Cancellation refused: payment had already settled'
+    );
+
+    return toPublicPayment(settled ?? { ...payment, status });
+  }
+
+  const { count } = await db.prismaClient.payment.updateMany({
+    where: { id: paymentId, status: PaymentStatus.PENDING },
+    data: { status: PaymentStatus.CANCELLED },
+  });
+
+  // Lost the race against a callback that landed in between; that outcome is the real one.
+  if (count === 0) {
+    const settled = await db.prismaClient.payment.findUnique({
+      where: { id: paymentId },
+      select: PAYMENT_SELECT,
+    });
+    if (settled) return toPublicPayment(settled);
+  }
+
+  paymentLogger.info({ paymentId, purpose: payment.purpose }, 'Payment cancelled by payer');
+
+  return toPublicPayment({ ...payment, status: PaymentStatus.CANCELLED });
 }
 
 /**
