@@ -1,3 +1,5 @@
+import path from 'path';
+
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -44,6 +46,18 @@ app.use(helmet());
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Public documents (offer, policies). Resolved from the compiled file's own
+// location, so it works both from src/ in dev and from dist/ in the image.
+app.use(
+  '/v1/api/static',
+  express.static(path.resolve(__dirname, '../static'), {
+    maxAge: '1h',
+    // The app and the site fetch these from another origin - helmet's default
+    // same-origin resource policy would block them.
+    setHeaders: (res) => res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin'),
+  }),
+);
 
 setupRoutes(app);
 setupSwagger(app);

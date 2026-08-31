@@ -12,6 +12,8 @@ RUN npm install
 # .git, local logs and other secrets even when .dockerignore looks correct.
 COPY tsconfig.json ./
 COPY src ./src
+# Publicly served documents (offer, policies) - see /v1/api/static in app.ts
+COPY static ./static
 
 # Generate Prisma client
 RUN npm run db:generate
