@@ -22,6 +22,7 @@ import {
   PriceListItem,
   MedicServiceItem,
   PayProgramItem,
+  MedAccount,
 } from './insurance.types';
 import {
   INSURANCE_API_GET_CITIES,
@@ -46,6 +47,7 @@ import {
   INSURANCE_API_GET_PRICE_LIST,
   INSURANCE_API_GET_MEDIC_SERVICE,
   INSURANCE_API_GET_PAY_PROGRAMS,
+  INSURANCE_API_GET_MED_ACCOUNT,
   ElectronicReferralServiceStatus,
 } from './insurance.constants';
 
@@ -334,6 +336,22 @@ export const getMedicService = async (
 export const getPayPrograms = async (beneficiaryId: string) => {
   const response = await insuranceRequest<PayProgramItem[]>({
     resolverName: INSURANCE_API_GET_PAY_PROGRAMS,
+    beneficiaryId,
+  });
+  return response;
+};
+
+/**
+ * Balance of the beneficiary's medical account ("медсчёт") — the prepaid money the clinic
+ * lets a patient spend on services.
+ *
+ * The insurance API answers `{ errorCode, totalBalance }` for any beneficiary it accepts,
+ * and an id it does not know is not an error there: it comes back as `errorCode: 0` with a
+ * zero balance rather than a 404, so there is nothing to distinguish here.
+ */
+export const getMedAccount = async (beneficiaryId: string) => {
+  const response = await insuranceRequest<MedAccount>({
+    resolverName: INSURANCE_API_GET_MED_ACCOUNT,
     beneficiaryId,
   });
   return response;

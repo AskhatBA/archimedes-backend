@@ -187,3 +187,10 @@ export interface PayProgramItem {
   description: string;
   programUrl: string;
 }
+
+export interface MedAccount {
+  /** `0` when the insurance API served the balance; anything else is its own failure. */
+  errorCode: number;
+  /** Balance of the beneficiary's medical account, in KZT. */
+  totalBalance: number;
+}

@@ -22,6 +22,7 @@ export const INSURANCE_API_GET_CLINICS_MO = '/v3/getClinicsMO';
 export const INSURANCE_API_GET_PRICE_LIST = '/v3/getPriceList';
 export const INSURANCE_API_GET_MEDIC_SERVICE = '/v3/getMedicService';
 export const INSURANCE_API_GET_PAY_PROGRAMS = '/v3/getPayPrograms';
+export const INSURANCE_API_GET_MED_ACCOUNT = '/v3/getMedAccount';
 
 export const HARDCODED_TEST_BENEFICIARY_ID = '4CB21009-5A2B-4166-9F90-020B28D7ED2C';
 export const HARDCODED_TEST_CLINIC_ID = '45089042-F446-4E32-8BE1-B6D281232A91';
@@ -122,6 +123,10 @@ export const insuranceApiResolverDefault = {
     defaultPayload: {},
   },
   [INSURANCE_API_GET_PAY_PROGRAMS]: {
+    method: 'GET',
+    defaultPayload: {},
+  },
+  [INSURANCE_API_GET_MED_ACCOUNT]: {
     method: 'GET',
     defaultPayload: {},
   },

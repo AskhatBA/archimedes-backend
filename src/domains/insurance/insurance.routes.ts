@@ -1263,6 +1263,52 @@ router.get('/pay-programs', authenticate, controller.getPayPrograms);
 
 /**
  * @openapi
+ * components:
+ *   schemas:
+ *     MedAccount:
+ *       type: object
+ *       required: [errorCode, totalBalance]
+ *       properties:
+ *         errorCode:
+ *           type: number
+ *           description: 0 when the insurance API served the balance
+ *           example: 0
+ *         totalBalance:
+ *           type: number
+ *           description: Balance of the medical account, in KZT
+ *           example: 0
+ * /insurance/med-account:
+ *   get:
+ *     summary: Get the balance of the caller's medical account
+ *     description: >
+ *       Proxies the insurance API's `/v3/getMedAccount` for the beneficiary behind the
+ *       caller's account. A beneficiary the insurance API does not know is not an error
+ *       there — it answers `errorCode: 0` with a zero balance.
+ *     tags: [Insurance]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 medAccount:
+ *                   $ref: '#/components/schemas/MedAccount'
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Insurance not found in MIS
+ */
+router.get('/med-account', authenticate, controller.getMedAccount);
+
+/**
+ * @openapi
  * /insurance/admin/refund-requests:
  *   get:
  *     summary: List every refund request (dashboard, admin only)
