@@ -1,5 +1,6 @@
 import { registerAppointmentPaymentHandler } from '@/domains/appointments/appointment.payment-handler';
 import { registerProgramOrderPaymentHandler } from '@/domains/program-orders/program-order.payment-handler';
+import { registerMedAccountPaymentHandler } from '@/domains/med-account/med-account.payment-handler';
 
 /**
  * Wires every purpose handler into the payment lifecycle.
@@ -12,4 +13,5 @@ import { registerProgramOrderPaymentHandler } from '@/domains/program-orders/pro
 export const registerPaymentSuccessHandlers = (): void => {
   registerAppointmentPaymentHandler();
   registerProgramOrderPaymentHandler();
+  registerMedAccountPaymentHandler();
 };

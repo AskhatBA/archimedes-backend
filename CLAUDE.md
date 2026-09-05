@@ -15,6 +15,7 @@ npm run db:push      # Push schema to DB without migration file
 npm run db:studio    # Open Prisma Studio UI
 
 npm run db:seed-checkups  # Seed/refresh the check-up catalogue
+npm run db:seed-med-account-options  # Seed/refresh the med-account top-up amounts
 ```
 
 There are no tests. `npm test` exits with an error.
@@ -127,6 +128,76 @@ The `program-orders` domain serves them:
 `/admin` is registered before `/:id`, otherwise the by-id handler swallows it. Status
 moves are audited as `PROGRAM_ORDER_STATUS_CHANGED`, and the handler's write as
 `PROGRAM_ORDER_CREATED`.
+
+### Medical-account top-ups
+
+The medical account ("медсчёт") is the prepaid balance the clinic keeps for a patient. It
+lives in the **insurer's** system — we only read it, through
+`GET /v1/api/insurance/med-account` → `/v3/getMedAccount` — and the insurer has no endpoint
+to credit it yet. Everything below is built around that fact.
+
+The amounts the app offers are ours and live in `MedAccountTopupOption`, served by the
+`med-account` domain:
+
+- `GET /v1/api/med-account/options` — the app's list, active rows only, in `sortOrder`
+- `GET|POST /v1/api/med-account/options/admin`, `PATCH|DELETE /options/admin/:id` — the
+  dashboard's editor, gated on `requireRole(Role.ADMIN)` and audited
+  (`MED_ACCOUNT_TOPUP_OPTION_CREATED` / `_UPDATED` / `_DELETED`)
+
+`amount` is unique: the screen is a set of distinct sums, so a duplicate is an editing
+mistake rather than a second offer. Deleting an amount is `SetNull` on the top-ups bought
+at it — a paid row keeps its own `amount` snapshot and only loses the catalogue pointer.
+Seed a fresh database with `npm run db:seed-med-account-options`.
+
+Paying is the `MED_ACCOUNT_TOPUP` purpose. The app posts `POST /v1/api/payment/init` with
+`metadata: { optionId }` and nothing else — the **amount is the catalogue's, not the
+client's**, and `beforePayment` refuses the checkout while the payer still has an unspent
+card if the option has been retired (`MED_ACCOUNT_OPTION_NOT_FOUND`) or if the sum being
+charged disagrees with it (`MED_ACCOUNT_TOPUP_AMOUNT_MISMATCH`). There is deliberately no
+free-form amount.
+
+When the payment settles the purpose's handler
+(`med-account.payment-handler.ts`) writes a `MedAccountTopup`. `paymentId` is unique, so a
+replayed FreedomPay callback or the reconciliation sweep cannot record the same top-up
+twice, and a top-up therefore never exists without money behind it. The row snapshots the
+`beneficiaryId` resolved from MIS at that moment — best effort, because MIS can be down
+when a payment settles.
+
+### Crediting a top-up to the insurer
+
+`MedAccountTopup.status` is what makes the missing endpoint survivable: every top-up starts
+`PENDING`, and only becomes `CREDITED` once the money is actually on the medical account —
+by an operator posting it from the dashboard today, by the insurer's API once it exists.
+
+The whole path is already wired; **only `creditViaInsurer` in
+`med-account.credit.service.ts` is left to fill in.** The handler enqueues the top-up on
+the `med-account-credit` BullMQ queue (never inline — the FreedomPay callback waits on the
+handler, and the insurer is an external system), whose worker calls `creditTopup`, which:
+
+- leaves anything that is no longer `PENDING` alone, so a retried job cannot credit the
+  same money twice;
+- returns immediately while `MED_ACCOUNT_CREDIT_ENABLED` is false (the default), logging
+  that the top-up is waiting for an operator;
+- re-resolves `beneficiaryId` when the row has none, so a MIS outage at payment time does
+  not strand a top-up;
+- marks the row `CREDITED` with whatever reference the insurer returned, or `FAILED` with
+  the error, and audits both as `MED_ACCOUNT_TOPUP_CREDITED`.
+
+`creditTopup` never throws: the payment has settled and the record must survive whatever
+the insurer does. To switch it on: declare the path in `insurance.constants.ts` and a
+wrapper in `insurance.service.ts` the way `getMedAccount` is declared, replace the throw in
+`creditViaInsurer` with that call, and set `MED_ACCOUNT_CREDIT_ENABLED=true`.
+
+The dashboard works the queue:
+
+- `GET /v1/api/med-account/topups/admin` — paginated, filterable by status/date/search
+  (patient name, IIN, phone), with the summed amount of the filtered set
+- `PATCH /v1/api/med-account/topups/admin/:id` — only `status` and `comment`; the amount
+  belongs to the payment and is immutable. `creditedAt` follows `status` rather than being
+  editable on its own, so the queue cannot lie about what has been posted. Audited as
+  `MED_ACCOUNT_TOPUP_STATUS_CHANGED`.
+- `GET /v1/api/med-account/topups` — the caller's own history. Registered **after**
+  `/topups/admin`, otherwise the admin listing is swallowed.
 
 ### Order emails
 

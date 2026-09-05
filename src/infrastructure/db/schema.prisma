@@ -42,6 +42,7 @@ model User {
   payments                Payment[]
   auditLogs               AuditLog[]
   programOrders           ProgramOrder[]
+  medAccountTopups        MedAccountTopup[]
 }
 
 model Patient {
@@ -192,26 +193,30 @@ enum PaymentPurpose {
   APPOINTMENT
   /// A paid-programs cart (med plans and/or check-ups) bought from the mobile app.
   PAID_PROGRAM
+  /// A top-up of the patient's medical account ("медсчёт"), from a fixed amount they picked.
+  MED_ACCOUNT_TOPUP
 }
 
 model Payment {
-  id               String         @id @default(uuid()) @db.Uuid
-  userId           String         @db.Uuid
+  id               String           @id @default(uuid()) @db.Uuid
+  userId           String           @db.Uuid
   amount           Float
   description      String
-  status           PaymentStatus  @default(PENDING)
-  purpose          PaymentPurpose @default(BALANCE_TOPUP)
+  status           PaymentStatus    @default(PENDING)
+  purpose          PaymentPurpose   @default(BALANCE_TOPUP)
   /// Payload the post-success handler for `purpose` needs, validated at init time.
   metadata         Json?
   /// Why the post-success handler failed, if it did — the payment went through but what
   /// it was for did not happen.
   postSuccessError String?
-  pgPaymentId      String?        @unique
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pgPaymentId      String?          @unique
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// Set only for `PAID_PROGRAM` payments — the order its success handler created.
   programOrder     ProgramOrder?
+  /// Set only for `MED_ACCOUNT_TOPUP` payments — the top-up its success handler recorded.
+  medAccountTopup  MedAccountTopup?
 
   @@index([userId])
   @@index([createdAt])
@@ -259,6 +264,12 @@ enum AuditEvent {
   PROGRAM_ORDER_CREATED
   PROGRAM_ORDER_STATUS_CHANGED
   APPOINTMENT_STATUS_SYNCED
+  MED_ACCOUNT_TOPUP_OPTION_CREATED
+  MED_ACCOUNT_TOPUP_OPTION_UPDATED
+  MED_ACCOUNT_TOPUP_OPTION_DELETED
+  MED_ACCOUNT_TOPUP_CREATED
+  MED_ACCOUNT_TOPUP_CREDITED
+  MED_ACCOUNT_TOPUP_STATUS_CHANGED
 }
 
 model AuditLog {
@@ -396,4 +407,76 @@ model ProgramOrderItem {
   order ProgramOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
+}
+
+/// One selectable amount on the mobile app's "пополнить медсчёт" screen.
+///
+/// The patient picks exactly one of these and is sent straight to payment, so the row is
+/// the whole offer: there is no cart and no free-form amount. The dashboard owns the list.
+model MedAccountTopupOption {
+  id        String   @id @default(uuid()) @db.Uuid
+  /// Amount in tenge. Unique — the screen is a set of distinct amounts, and a duplicate
+  /// is an editing mistake rather than a second offer.
+  amount    Int      @unique
+  /// Optional caption under the amount, e.g. "Хватит на приём терапевта". Hidden when empty.
+  label     String?
+  /// Draws the "выгодно" badge on the card. Purely presentational.
+  popular   Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  topups MedAccountTopup[]
+
+  @@index([isActive, sortOrder])
+}
+
+/// How far a paid top-up has got on its way onto the patient's medical account.
+enum MedAccountTopupStatus {
+  /// Paid, not yet on the medical account. Every top-up starts here.
+  PENDING
+  /// The money is on the account — credited by the insurer's API, or by an operator by hand.
+  CREDITED
+  /// The insurer refused the transfer. Needs an operator; the money has already been taken.
+  FAILED
+}
+
+/// A top-up the patient has actually paid for.
+///
+/// Written by the `MED_ACCOUNT_TOPUP` post-success handler, so a row here always has money
+/// behind it. The medical account itself lives in the insurer's system and we have no
+/// endpoint to credit it yet, which is why the row carries its own status: until that
+/// endpoint exists, the dashboard is the record that the money arrived and an operator
+/// moves the row to CREDITED after posting it on their side.
+model MedAccountTopup {
+  id            String                @id @default(uuid()) @db.Uuid
+  userId        String                @db.Uuid
+  /// The settled payment behind it. Unique, so a replayed provider callback or the
+  /// reconciliation sweep cannot record the same top-up twice.
+  paymentId     String                @unique @db.Uuid
+  /// The catalogue entry the patient picked; nulled if that amount is later removed.
+  optionId      String?               @db.Uuid
+  /// Amount actually paid, in tenge. Snapshotted so the row reads on its own.
+  amount        Int
+  status        MedAccountTopupStatus @default(PENDING)
+  /// Insurer beneficiary the money is for, resolved from MIS at payment time. The credit
+  /// call needs it, and it is what an operator searches the insurer's system by.
+  beneficiaryId String?
+  /// Reference the insurer returned when it accepted the transfer, once that API exists.
+  externalRef   String?
+  /// Why the credit failed, or the operator's own note.
+  comment       String?
+  /// When the money reached the medical account.
+  creditedAt    DateTime?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  user    User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment Payment                @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  option  MedAccountTopupOption? @relation(fields: [optionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status, createdAt])
+  @@index([createdAt])
 }

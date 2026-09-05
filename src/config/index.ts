@@ -180,6 +180,14 @@ export const config = {
     ],
   },
 
+  medAccount: {
+    // Пополнение медсчёта делается в системе страховой, а её эндпоинта на зачисление
+    // пока нет. Пока флаг выключен, оплаченное пополнение остаётся PENDING и его
+    // проводит оператор из дашборда; включать только вместе с реализацией
+    // `creditViaInsurer` в med-account.credit.service.ts.
+    creditEnabled: process.env.MED_ACCOUNT_CREDIT_ENABLED === 'true',
+  },
+
   appVersion: {
     iosUrl: process.env.APP_VERSION_IOS_URL || '',
     androidUrl: process.env.APP_VERSION_ANDROID_URL || '',
