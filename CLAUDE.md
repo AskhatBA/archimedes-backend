@@ -132,9 +132,10 @@ moves are audited as `PROGRAM_ORDER_STATUS_CHANGED`, and the handler's write as
 ### Medical-account top-ups
 
 The medical account ("медсчёт") is the prepaid balance the clinic keeps for a patient. It
-lives in the **insurer's** system — we only read it, through
-`GET /v1/api/insurance/med-account` → `/v3/getMedAccount` — and the insurer has no endpoint
-to credit it yet. Everything below is built around that fact.
+lives in the **insurer's** system: we read the balance through
+`GET /v1/api/insurance/med-account` → `/v3/getMedAccount` and credit it through
+`/v3/topupBalance`. Both sides of that money are someone else's system, which is what
+everything below is shaped around.
 
 The amounts the app offers are ours and live in `MedAccountTopupOption`, served by the
 `med-account` domain:
@@ -165,28 +166,41 @@ when a payment settles.
 
 ### Crediting a top-up to the insurer
 
-`MedAccountTopup.status` is what makes the missing endpoint survivable: every top-up starts
-`PENDING`, and only becomes `CREDITED` once the money is actually on the medical account —
-by an operator posting it from the dashboard today, by the insurer's API once it exists.
+Every top-up starts `PENDING` and becomes `CREDITED` once the money is actually on the
+medical account — normally by the insurer's `/v3/topupBalance` seconds after the payment
+settles, and by an operator posting it from the dashboard when that call could not be made.
 
-The whole path is already wired; **only `creditViaInsurer` in
-`med-account.credit.service.ts` is left to fill in.** The handler enqueues the top-up on
-the `med-account-credit` BullMQ queue (never inline — the FreedomPay callback waits on the
-handler, and the insurer is an external system), whose worker calls `creditTopup`, which:
+The payment handler enqueues the top-up on the `med-account-credit` BullMQ queue (never
+inline — the FreedomPay callback waits on the handler, and the insurer is an external
+system), whose worker calls `creditTopup`, which:
 
 - leaves anything that is no longer `PENDING` alone, so a retried job cannot credit the
   same money twice;
-- returns immediately while `MED_ACCOUNT_CREDIT_ENABLED` is false (the default), logging
-  that the top-up is waiting for an operator;
+- returns immediately when `MED_ACCOUNT_CREDIT_ENABLED=false`, logging that the top-up is
+  waiting for an operator — the switch to pull if the insurer's endpoint misbehaves;
 - re-resolves `beneficiaryId` when the row has none, so a MIS outage at payment time does
   not strand a top-up;
 - marks the row `CREDITED` with whatever reference the insurer returned, or `FAILED` with
   the error, and audits both as `MED_ACCOUNT_TOPUP_CREDITED`.
 
-`creditTopup` never throws: the payment has settled and the record must survive whatever
-the insurer does. To switch it on: declare the path in `insurance.constants.ts` and a
-wrapper in `insurance.service.ts` the way `getMedAccount` is declared, replace the throw in
-`creditViaInsurer` with that call, and set `MED_ACCOUNT_CREDIT_ENABLED=true`.
+`creditViaInsurer` builds the insurer's payload. `/v3/topupBalance` identifies the payer by
+their **own details** — `lastName` / `firstName` / `middleName` / `iin` / `dateBirth` /
+`phoneMobile`, read from our `Patient` row and `User.phone`; the `beneficiaryId` only
+authenticates the call in the `Authorization` header. `dateBirth` is the stored `YYYY-MM-DD`
+widened to midnight **UTC**, so a birthday cannot slip a day on an eastern offset. A user
+with no `Patient` profile cannot be identified at all and goes straight to `FAILED`.
+
+`insuranceId` is the patient's current insurance program, chosen from
+`GET /v3/client/programs` by date (first program as the fallback). A patient with no program
+gets `''` — a documented, valid value — and so does a patient whose program list could not
+be read, since an unreadable list is not worth failing a settled payment over.
+
+`creditTopup` never throws: the payment has settled and the record must survive whatever the
+insurer does. The insurer call sits **outside** the bookkeeping around it, because
+`/v3/topupBalance` takes no idempotency key and a second call would credit the money twice —
+so a DB write that fails after a successful credit is logged and swallowed, never rethrown
+into a retry. That leaves the row `PENDING` for an operator, which is the recoverable
+direction.
 
 The dashboard works the queue:
 

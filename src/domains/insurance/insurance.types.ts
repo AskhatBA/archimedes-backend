@@ -194,3 +194,41 @@ export interface MedAccount {
   /** Balance of the beneficiary's medical account, in KZT. */
   totalBalance: number;
 }
+
+/**
+ * Body of `/v3/topupBalance` — the insurer credits money onto a patient's medical account.
+ *
+ * The patient is identified by their own details rather than by the beneficiary id in the
+ * Authorization header, so all of these are required. `insuranceId` is the exception: it is
+ * sent as an empty string when the patient has no insurance program at all, which is the
+ * normal case for someone who only ever pays out of pocket.
+ */
+export interface TopupBalancePayload {
+  /** Insurance program id, or `''` when the patient has no program. */
+  insuranceId: string;
+  lastName: string;
+  firstName: string;
+  middleName: string;
+  iin: string;
+  /** ISO-8601 date-time, e.g. `1963-03-01T00:00:00.000Z`. */
+  dateBirth: string;
+  phoneMobile: string;
+  /** Amount in tenge. */
+  amount: number;
+}
+
+/**
+ * What `/v3/topupBalance` answers with.
+ *
+ * `errorCode: 0` is the only success; anything else means the money did not land, and the
+ * top-up has to be picked up by an operator. The reference field is not documented, so the
+ * candidates below are all optional and whichever comes back is stored on the top-up.
+ */
+export interface TopupBalanceResponse {
+  errorCode: number;
+  message?: string;
+  /** Reference the insurer books the transfer under, under whichever name it returns it. */
+  transactionId?: string | number;
+  documentNumber?: string | number;
+  id?: string | number;
+}

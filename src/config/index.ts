@@ -181,11 +181,10 @@ export const config = {
   },
 
   medAccount: {
-    // Пополнение медсчёта делается в системе страховой, а её эндпоинта на зачисление
-    // пока нет. Пока флаг выключен, оплаченное пополнение остаётся PENDING и его
-    // проводит оператор из дашборда; включать только вместе с реализацией
-    // `creditViaInsurer` в med-account.credit.service.ts.
-    creditEnabled: process.env.MED_ACCOUNT_CREDIT_ENABLED === 'true',
+    // Зачисление на медсчёт идёт в систему страховой (`/v3/topupBalance`) сразу после
+    // успешной оплаты. Выключатель на случай, если страховая ляжет: с `false`
+    // оплаченное пополнение остаётся PENDING и его проводит оператор из дашборда.
+    creditEnabled: process.env.MED_ACCOUNT_CREDIT_ENABLED !== 'false',
   },
 
   appVersion: {

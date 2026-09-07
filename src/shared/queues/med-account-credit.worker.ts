@@ -1,9 +1,6 @@
 import { Worker } from 'bullmq';
 
-import {
-  MedAccountCreditNotImplementedError,
-  creditTopup,
-} from '@/domains/med-account/med-account.credit.service';
+import { creditTopup } from '@/domains/med-account/med-account.credit.service';
 import { redisConnection } from '@/infrastructure/redis';
 import { createLogger } from '@/shared/lib/logger';
 
@@ -30,10 +27,9 @@ export const medAccountCreditWorker = new Worker<MedAccountCreditJobData>(
 );
 
 medAccountCreditWorker.on('failed', (job, err) => {
-  // Пока эндпоинта у страховой нет, повторять бессмысленно — пополнение ждёт оператора.
-  const level = err instanceof MedAccountCreditNotImplementedError ? 'warn' : 'error';
-
-  workerLogger[level](
+  // `creditTopup` сама переводит пополнение в FAILED, так что сюда попадает только
+  // неожиданная ошибка инфраструктуры — деньги уже взяты, поэтому это всегда error.
+  workerLogger.error(
     { jobId: job?.id, topupId: job?.data?.topupId, attempts: job?.attemptsMade, err },
     'Med-account topup credit job failed'
   );

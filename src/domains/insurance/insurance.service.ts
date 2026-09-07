@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 
 import * as db from '@/infrastructure/db';
+import { AppError } from '@/shared/services/app-error.service';
 
 import { RefundRequestDTO } from './insurance.dto';
 import { insuranceRequest } from './insurance.helpers';
@@ -23,6 +24,8 @@ import {
   MedicServiceItem,
   PayProgramItem,
   MedAccount,
+  TopupBalancePayload,
+  TopupBalanceResponse,
 } from './insurance.types';
 import {
   INSURANCE_API_GET_CITIES,
@@ -48,6 +51,7 @@ import {
   INSURANCE_API_GET_MEDIC_SERVICE,
   INSURANCE_API_GET_PAY_PROGRAMS,
   INSURANCE_API_GET_MED_ACCOUNT,
+  INSURANCE_API_TOPUP_BALANCE,
   ElectronicReferralServiceStatus,
 } from './insurance.constants';
 
@@ -354,6 +358,38 @@ export const getMedAccount = async (beneficiaryId: string) => {
     resolverName: INSURANCE_API_GET_MED_ACCOUNT,
     beneficiaryId,
   });
+  return response;
+};
+
+/**
+ * Credits money onto the beneficiary's medical account.
+ *
+ * The counterpart of `getMedAccount`: this is the only way money gets onto the медсчёт on
+ * the insurer's side, and it is called once per settled `MED_ACCOUNT_TOPUP` payment.
+ *
+ * Unlike the read endpoints, a non-zero `errorCode` here means real money was taken from a
+ * patient and did not arrive, so it is raised rather than returned — the caller records the
+ * top-up as FAILED for an operator to pick up. HTTP failures already come out of
+ * `insuranceRequest` as an `AppError`.
+ */
+export const topupMedAccount = async (
+  beneficiaryId: string,
+  payload: TopupBalancePayload
+): Promise<TopupBalanceResponse> => {
+  const response = await insuranceRequest<TopupBalanceResponse>({
+    resolverName: INSURANCE_API_TOPUP_BALANCE,
+    beneficiaryId,
+    payload,
+  });
+
+  if (!response || typeof response.errorCode !== 'number') {
+    throw new AppError('INSURANCE_TOPUP_MALFORMED_RESPONSE', 502);
+  }
+
+  if (response.errorCode !== 0) {
+    throw new AppError(response.message || `INSURANCE_TOPUP_REJECTED_${response.errorCode}`, 502);
+  }
+
   return response;
 };
 
