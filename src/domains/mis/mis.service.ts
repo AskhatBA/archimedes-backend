@@ -35,6 +35,7 @@ import {
   MIS_API_LABORATORY_RESULTS,
   MIS_API_GET_APPOINTMENT_DETAILS,
   MIS_API_GET_APPOINTMENT_REQUESTS,
+  MIS_API_REMOVE_APPOINTMENT_REQUEST,
   MIS_API_REMOVE_USER_APPOINTMENT,
 } from './mis.constants';
 import {
@@ -277,6 +278,7 @@ export const createAppointment = async (newAppointment: CreateAppointmentDto) =>
     meetingUrl: meeting?.joinUrl || '',
     isTelemedicine: !!newAppointment.isTelemedicine,
     dateTime: new Date(new Date(newAppointment.startTime).toISOString()),
+    ...(newAppointment.paymentId ? { paymentId: newAppointment.paymentId } : {}),
   });
 
   return response.request;
@@ -330,6 +332,20 @@ export const removeAppointment = async (misPatientId: string, appointmentId: str
   return misRequest({
     resolverName: MIS_API_REMOVE_USER_APPOINTMENT,
     params: { userId: misPatientId, appointmentId },
+  });
+};
+
+/**
+ * Снимает запись в МИС по id заявки.
+ *
+ * Приём и платный, и по программе заводится через заявку (`request`), и её id — это то,
+ * что при бронировании легло в `Appointment.externalId`, поэтому отменяются оба одинаково.
+ * Возврат денег за платный приём — уже наша сторона, МИС о нём ничего не знает.
+ */
+export const removeAppointmentRequest = async (misPatientId: string, requestId: string) => {
+  return misRequest({
+    resolverName: MIS_API_REMOVE_APPOINTMENT_REQUEST,
+    params: { userId: misPatientId, requestId },
   });
 };
 

@@ -13,6 +13,7 @@ import {
   FREEDOMPAY_ENDPOINTS,
   FREEDOMPAY_LANGUAGE,
   FREEDOMPAY_PAYMENT_STATUS,
+  FREEDOMPAY_REFUND_STATUS,
   FREEDOMPAY_STATUS,
   scriptNameOf,
 } from './payment.constants';
@@ -251,6 +252,70 @@ export async function initPayment(
   );
 
   return { paymentId: payment.id, paymentUrl: parsed.pg_redirect_url };
+}
+
+/** What FreedomPay made of a reversal request. */
+export type RefundOutcome =
+  /** The money is on its way back to the card. */
+  | { result: 'accepted'; reference: string | null }
+  /**
+   * FreedomPay took the request but has not finished it. Nothing may be re-sent after this:
+   * `revoke.php` has no idempotency key, and partial refunds *accumulate*, so a retry of a
+   * reversal that did go through returns the money a second time.
+   */
+  | { result: 'pending'; reference: string | null; description: string }
+  /** Refused, and nothing was reversed. */
+  | { result: 'refused'; errorCode: string | null; description: string };
+
+/**
+ * Asks FreedomPay to return `amount` of a settled payment to the card.
+ *
+ * Partial refunds are the same `revoke.php` with `pg_refund_amount` set, and several of them
+ * can be made against one payment until they add up to the order — which is exactly why this
+ * must never be called speculatively or twice for the same debt. The caller is responsible
+ * for that: `processAppointmentRefund` only ever calls it for a `PENDING` refund row it has
+ * already claimed.
+ *
+ * Throws only when the provider could not be reached or answered something unreadable — a
+ * refusal comes back as `{ result: 'refused' }`, because "FreedomPay said no" and "we do not
+ * know what FreedomPay did" have to be told apart by the caller.
+ */
+export async function refundPayment({
+  pgPaymentId,
+  amount,
+}: {
+  /** FreedomPay's own transaction id — `pg_order_id` is not enough for a reversal. */
+  pgPaymentId: string;
+  /** Tenge to return. Rounded to whole tiyn, since that is all the provider accepts. */
+  amount: number;
+}): Promise<RefundOutcome> {
+  const parsed = await callFreedomPay(FREEDOMPAY_ENDPOINTS.refund, {
+    pg_payment_id: pgPaymentId,
+    pg_refund_amount: Math.round(amount * 100) / 100,
+  });
+
+  const status = String(parsed.pg_status ?? '').toLowerCase();
+  // Not a documented response field, so whichever of the plausible names comes back is
+  // taken: it is only ever read by an operator reconciling our row against theirs.
+  const reference = parsed.pg_payment_id ?? parsed.pg_refund_payment_id ?? null;
+
+  if ((FREEDOMPAY_REFUND_STATUS.accepted as readonly string[]).includes(status)) {
+    return { result: 'accepted', reference };
+  }
+
+  if (status === FREEDOMPAY_REFUND_STATUS.pending) {
+    return {
+      result: 'pending',
+      reference,
+      description: parsed.pg_error_description || 'Возврат принят провайдером в обработку',
+    };
+  }
+
+  return {
+    result: 'refused',
+    errorCode: parsed.pg_error_code ?? null,
+    description: parsed.pg_error_description || `FreedomPay ответил pg_status=${status || 'пусто'}`,
+  };
 }
 
 /** The two terminal states a PENDING payment can settle into. */
@@ -647,10 +712,7 @@ export async function cancelPayment(paymentId: string, userId: string) {
       select: PAYMENT_SELECT,
     });
 
-    paymentLogger.info(
-      { paymentId, status },
-      'Cancellation refused: payment had already settled'
-    );
+    paymentLogger.info({ paymentId, status }, 'Cancellation refused: payment had already settled');
 
     return toPublicPayment(settled ?? { ...payment, status });
   }

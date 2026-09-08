@@ -34,6 +34,8 @@ export interface CreateAppointmentDto {
   insuranceProgramId?: string;
   familyMemberId?: string;
   isTelemedicine?: boolean;
+  /** Платёж, которым оплачен визит. Только для приёма без программы. */
+  paymentId?: string;
 }
 
 export interface MISAppointmentResponse {

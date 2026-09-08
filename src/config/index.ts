@@ -34,6 +34,18 @@ function parseEmailList(value?: string): string[] | undefined {
   return emails.length > 0 ? emails : undefined;
 }
 
+/**
+ * Reads a numeric env var, keeping `0` as a real value.
+ *
+ * `Number(x) || fallback` silently swaps a configured zero for the default, which for a
+ * percentage is the difference between "keep nothing" and "keep 30%".
+ */
+function numberFromEnv(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+
+  return value !== undefined && value !== '' && Number.isFinite(parsed) ? parsed : fallback;
+}
+
 export const config = {
   port: process.env.PORT || DEFAULT_PORT,
   nodeEnv,
@@ -178,6 +190,22 @@ export const config = {
     programOrderRecipients: parseEmailList(process.env.PROGRAM_ORDER_EMAIL_TO) ?? [
       'baltabaev.a2509@gmail.com',
     ],
+  },
+
+  // Отмена приёма пациентом: платный приём возвращается через FreedomPay, приём по
+  // программе просто снимается в МИС.
+  appointmentCancellation: {
+    // Возвраты можно выключить без выкатки кода — например, пока FreedomPay недоступен:
+    // возврат остаётся PENDING, и его проводит оператор из кабинета мерчанта.
+    refundEnabled: process.env.APPOINTMENT_REFUND_ENABLED !== 'false',
+    // За сколько часов до приёма отмена ещё бесплатная.
+    fullRefundWindowHours: numberFromEnv(process.env.APPOINTMENT_REFUND_FULL_WINDOW_HOURS, 12),
+    // Сколько процентов удерживается при отмене позже этого срока. 0 — валидное
+    // значение, поэтому читаем через numberFromEnv, а не через `||`.
+    lateCancellationFeePercent: numberFromEnv(
+      process.env.APPOINTMENT_LATE_CANCELLATION_FEE_PERCENT,
+      30
+    ),
   },
 
   medAccount: {

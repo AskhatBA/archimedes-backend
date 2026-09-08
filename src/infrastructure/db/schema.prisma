@@ -43,6 +43,7 @@ model User {
   auditLogs               AuditLog[]
   programOrders           ProgramOrder[]
   medAccountTopups        MedAccountTopup[]
+  appointmentRefunds      AppointmentRefund[]
 }
 
 model Patient {
@@ -79,25 +80,33 @@ enum AppointmentStatus {
 }
 
 model Appointment {
-  id             String            @id @default(uuid()) @db.Uuid
-  userId         String            @db.Uuid
-  patientId      String            @db.Uuid
-  doctorId       String            @db.Uuid
-  externalId     String            @db.Uuid
+  id             String             @id @default(uuid()) @db.Uuid
+  userId         String             @db.Uuid
+  patientId      String             @db.Uuid
+  doctorId       String             @db.Uuid
+  externalId     String             @db.Uuid
   dateTime       DateTime
-  status         AppointmentStatus @default(SCHEDULED)
+  status         AppointmentStatus  @default(SCHEDULED)
   /// Raw MIS status string the sync last saw, kept as-is: MIS has more states than our
   /// three (`in_progress`, `pending`, `rejected`...), and the operator wants to see them.
   misStatus      String?
   /// When the status sync last managed to reach MIS about this visit. Null means never —
   /// those go first, so a freshly booked visit is confirmed before an old one is re-checked.
   statusSyncedAt DateTime?
-  isTelemedicine Boolean           @default(false)
+  isTelemedicine Boolean            @default(false)
   meetingUrl     String?
   notes          String?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The settled payment that bought this visit, for a patient paying per booking. Null
+  /// means the visit went through an insurance programme and there is no money of ours
+  /// behind it — which is what decides whether cancelling owes a refund.
+  paymentId      String?            @unique @db.Uuid
+  /// When the patient cancelled. Kept apart from `updatedAt`, which any sync pass moves.
+  cancelledAt    DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment        Payment?           @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  refund         AppointmentRefund?
 
   @@index([userId])
   // The sync sweep looks up open visits by status and date on every run.
@@ -198,25 +207,29 @@ enum PaymentPurpose {
 }
 
 model Payment {
-  id               String           @id @default(uuid()) @db.Uuid
-  userId           String           @db.Uuid
-  amount           Float
-  description      String
-  status           PaymentStatus    @default(PENDING)
-  purpose          PaymentPurpose   @default(BALANCE_TOPUP)
+  id                String             @id @default(uuid()) @db.Uuid
+  userId            String             @db.Uuid
+  amount            Float
+  description       String
+  status            PaymentStatus      @default(PENDING)
+  purpose           PaymentPurpose     @default(BALANCE_TOPUP)
   /// Payload the post-success handler for `purpose` needs, validated at init time.
-  metadata         Json?
+  metadata          Json?
   /// Why the post-success handler failed, if it did — the payment went through but what
   /// it was for did not happen.
-  postSuccessError String?
-  pgPaymentId      String?          @unique
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postSuccessError  String?
+  pgPaymentId       String?            @unique
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// Set only for `PAID_PROGRAM` payments — the order its success handler created.
-  programOrder     ProgramOrder?
+  programOrder      ProgramOrder?
   /// Set only for `MED_ACCOUNT_TOPUP` payments — the top-up its success handler recorded.
-  medAccountTopup  MedAccountTopup?
+  medAccountTopup   MedAccountTopup?
+  /// Set only for `APPOINTMENT` payments — the visit its success handler booked.
+  appointment       Appointment?
+  /// Refund of this payment, when the visit it paid for was cancelled.
+  appointmentRefund AppointmentRefund?
 
   @@index([userId])
   @@index([createdAt])
@@ -270,6 +283,10 @@ enum AuditEvent {
   MED_ACCOUNT_TOPUP_CREATED
   MED_ACCOUNT_TOPUP_CREDITED
   MED_ACCOUNT_TOPUP_STATUS_CHANGED
+  APPOINTMENT_CANCELLED
+  APPOINTMENT_REFUND_CREATED
+  APPOINTMENT_REFUND_PROCESSED
+  APPOINTMENT_REFUND_STATUS_CHANGED
 }
 
 model AuditLog {
@@ -475,6 +492,63 @@ model MedAccountTopup {
   user    User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   payment Payment                @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   option  MedAccountTopupOption? @relation(fields: [optionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status, createdAt])
+  @@index([createdAt])
+}
+
+/// How far a refund for a cancelled paid visit has got with FreedomPay.
+enum AppointmentRefundStatus {
+  /// Owed to the patient, not yet sent to the provider. Every refund starts here.
+  PENDING
+  /// FreedomPay accepted the reversal.
+  COMPLETED
+  /// FreedomPay refused it, or we never managed to ask. Needs an operator — the patient
+  /// has been charged and their visit is already cancelled.
+  FAILED
+}
+
+/// The money owed back for a paid visit the patient cancelled.
+///
+/// Written the moment the visit is cancelled, before FreedomPay is asked: the cancellation
+/// has already happened and the debt exists whether or not the provider is reachable.
+/// `appointmentId` is unique, so a double-tapped cancel cannot owe the same money twice.
+///
+/// The row also records *why* the amount is what it is: cancelling at least
+/// `APPOINTMENT_REFUND_FULL_WINDOW_HOURS` before the visit returns everything, later than
+/// that keeps a `feePercent` compensation, and `hoursBeforeAppointment` is the number the
+/// decision was made on — none of which can be recomputed later, since `now` has moved.
+model AppointmentRefund {
+  id            String                  @id @default(uuid()) @db.Uuid
+  appointmentId String                  @unique @db.Uuid
+  /// The payment being reversed. Unique — one refund per payment, so a replayed
+  /// cancellation cannot revoke the same charge twice.
+  paymentId     String                  @unique @db.Uuid
+  userId        String                  @db.Uuid
+  /// What the visit cost, in tenge. Snapshotted so the row reads on its own.
+  paidAmount    Float
+  /// Share of `paidAmount` being returned: 100 outside the free window, 100 - fee inside it.
+  refundPercent Int
+  /// What the patient gets back, in tenge — this is the `pg_refund_amount` sent.
+  amount        Float
+  /// Compensation kept by the clinic for a late cancellation. `paidAmount - amount`.
+  feeAmount     Float
+  /// Hours between the cancellation and the visit, as measured when it was cancelled.
+  hoursBefore   Float
+  status        AppointmentRefundStatus @default(PENDING)
+  /// Whatever reference FreedomPay handed back for the reversal.
+  externalRef   String?
+  /// Why the refund failed, or the operator's own note.
+  comment       String?
+  /// When FreedomPay accepted it.
+  refundedAt    DateTime?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  payment     Payment     @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([status, createdAt])

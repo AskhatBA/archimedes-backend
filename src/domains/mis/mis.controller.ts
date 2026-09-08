@@ -6,6 +6,7 @@ import { ErrorCodes } from '@/shared/constants/error-codes';
 import * as auditLogService from '@/shared/services/audit-log.service';
 import { AuditEvent } from '@/shared/services/audit-log.service';
 
+import * as appointmentCancellationService from '../appointments/appointment-cancellation.service';
 import * as patientService from '../patient/patient.service';
 
 import * as misService from './mis.service';
@@ -301,12 +302,22 @@ export const getLaboratoryResults = async (req: Request, res: Response) => {
   });
 };
 
+/**
+ * Отмена приёма из приложения.
+ *
+ * Приложение знает приём по id из МИС, поэтому исторически ходит сюда, а не в
+ * `/appointments/:id/cancel`. Работа при этом одна и та же: отмену ведёт
+ * `appointment-cancellation.service`, который снимает запись в МИС и, если приём был
+ * платным, ставит возврат в очередь. Прямой вызов МИС остался только запасным путём — для
+ * записей, у которых нет нашей строки (заведены не через приложение), и возвращать по ним
+ * всё равно нечего.
+ */
 export const removeAppointment = async (req: Request, res: Response) => {
   if (!req.user) {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
 
-  await param('appointmentId').notEmpty().withMessage('Doctor ID is required').run(req);
+  await param('appointmentId').notEmpty().withMessage('Appointment ID is required').run(req);
 
   const patient = await patientService.getPatientById(req.user.id);
 
@@ -315,6 +326,23 @@ export const removeAppointment = async (req: Request, res: Response) => {
       success: false,
       message: 'Patient not found',
     });
+  }
+
+  try {
+    const result = await appointmentCancellationService.cancelAppointment(
+      req.params.appointmentId,
+      req.user.id,
+      { phone: req.user.phone }
+    );
+
+    return res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    // Только «приёма у нас нет» переводит на прямой вызов МИС. Отказ по статусу или по
+    // времени — это правило отмены, и его нельзя обойти, зайдя через этот маршрут.
+    const isUnknownAppointment =
+      error instanceof AppError && error.message === ErrorCodes.APPOINTMENT_NOT_FOUND;
+
+    if (!isUnknownAppointment) throw error;
   }
 
   await misService.removeAppointment(patient.misPatientId, req.params.appointmentId);

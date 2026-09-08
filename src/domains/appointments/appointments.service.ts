@@ -104,6 +104,11 @@ export const createAppointment = async (data: {
   status?: AppointmentStatus;
   meetingUrl?: string;
   isTelemedicine?: boolean;
+  /**
+   * Платёж, которым куплен приём. Есть только у пациента без программы — по нему отмена
+   * и понимает, что за визит взяты деньги и их надо вернуть.
+   */
+  paymentId?: string;
 }) => {
   await checkAppointmentConflicts(data.patientId, data.doctorId, data.dateTime);
 
@@ -118,6 +123,7 @@ export const createAppointment = async (data: {
       isTelemedicine: data.isTelemedicine || false,
       meetingUrl: data.meetingUrl || '',
       userId: data.userId,
+      ...(data.paymentId ? { paymentId: data.paymentId } : {}),
     },
   });
 
@@ -230,8 +236,4 @@ export const deleteAppointment = async (id: string, userId: string, role: Role) 
   }
 
   return result;
-};
-
-export const cancelAppointment = (id: string, userId: string) => {
-  return updateAppointment(id, userId, { status: AppointmentStatus.CANCELLED });
 };

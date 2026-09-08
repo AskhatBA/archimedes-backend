@@ -139,6 +139,9 @@ const bookPaidAppointment = async (context: PaymentSuccessContext): Promise<void
     startTime: metadata.startTime,
     endTime: metadata.endTime,
     isTelemedicine: metadata.isTelemedicine,
+    // Связь с платежом — это то, чем отмена отличает платный приём от приёма по программе,
+    // и заодно источник суммы, от которой считается возврат.
+    paymentId: context.paymentId,
     ...(metadata.familyMemberId ? { familyMemberId: metadata.familyMemberId } : {}),
   });
 

@@ -280,6 +280,91 @@ of a range on a UTC server. As with program orders, `/admin` is registered befor
 The dashboard never writes an appointment: the visit lives in MIS, and moving or
 cancelling it from the admin panel would leave the two systems disagreeing.
 
+### Cancelling an appointment
+
+A patient cancels a visit with `PATCH /v1/api/appointments/:id/cancel`, and the app can ask
+`GET /v1/api/appointments/:id/cancellation` first for what that would cost — the confirmation
+screen has to show the retained compensation before the tap, not after. Both accept **either**
+our `Appointment.id` or the MIS id the visit is known by, because the app's list is proxied
+live from MIS and what it holds is `externalId`. The old MIS proxy
+`DELETE /v1/api/mis/appointments/:appointmentId` now runs the same flow, falling back to a
+direct MIS delete only for a visit we have no row for — otherwise an existing app build would
+keep cancelling paid visits without refunding them.
+
+Cancellation is refused for anything that is not a future `SCHEDULED` visit:
+`APPOINTMENT_NOT_CANCELLABLE` for one already cancelled or completed, and
+`APPOINTMENT_ALREADY_STARTED` once its time has passed — a visit that has begun is the front
+desk's to close, and refunding a completed one is exactly what that guard prevents.
+
+The order of operations is the whole design. MIS goes **first**
+(`DELETE /beneficiary/:userId/appointment-requests/:requestId/`, keyed by the appointment's own
+`patientId` so a relative's booking resolves, same as the status sweep reads it), and any error
+from it propagates untouched: cancelling locally — let alone refunding — while the booking is
+still live in MIS is the one outcome worth failing the request over. A visit already gone from
+MIS is not special-cased either, since `parseApiError` folds 401s and network errors into 404;
+the status sweep will bring that row to `CANCELLED` on its own.
+
+Only then, in one transaction, the row moves to `CANCELLED` and — for a paid visit — an
+`AppointmentRefund` is written. The update is conditional on `status = SCHEDULED`, so a
+double-tapped cancel has exactly one winner, and `AppointmentRefund.appointmentId` is unique
+behind that.
+
+### Refunding a cancelled paid visit
+
+What separates a paid visit from a programme one is **our** payment, not anything MIS says:
+`Appointment.paymentId` is set by the `APPOINTMENT` purpose handler when the booking is made,
+so a visit with no payment was covered by the insurer and there is nothing to return. Visits
+booked before that column existed are matched to their payment by metadata instead — a
+successful `APPOINTMENT` payment of the same user whose `doctorId` and `startTime` are the ones
+the visit was created from — and the link is written back so it is found directly next time.
+
+`planRefund` splits the money: cancelling at least `APPOINTMENT_REFUND_FULL_WINDOW_HOURS` (12)
+before the visit returns 100%, later than that keeps
+`APPOINTMENT_LATE_CANCELLATION_FEE_PERCENT` (30), so the patient gets 70%. The decision is made
+on the unrounded difference while `hoursBefore` is stored rounded, and `feeAmount` is
+`paidAmount - amount` rather than a second percentage, so the two always add back up to what
+was charged. The row records the percentage and the hours it was decided on, because none of it
+can be recomputed later — `now` has moved.
+
+The refund is enqueued on the `appointment-refund` BullMQ queue, never sent inline: FreedomPay
+is external, and the patient's cancel request must not wait on it. Failing to enqueue is logged
+and swallowed — the debt is already written and visible in the dashboard, and losing the job
+must not fail a cancellation the patient already made in MIS.
+
+`processAppointmentRefund` calls `revoke.php` with `pg_refund_amount` (`refundPayment` in
+`payment.service.ts`, signed as `revoke.php` like every other FreedomPay script) and then:
+
+- leaves anything not `PENDING` alone, so it cannot reverse the same charge twice;
+- returns immediately when `APPOINTMENT_REFUND_ENABLED=false`, leaving the refund for an
+  operator — the switch to pull if the provider misbehaves;
+- marks the row `COMPLETED` with whatever reference came back, or `FAILED` with the reason,
+  and audits both as `APPOINTMENT_REFUND_PROCESSED`;
+- treats `pending` from the provider as an acceptance it must not re-send: the row stays
+  `PENDING` with a comment for an operator to confirm.
+
+It never throws, and the queue is configured with **`attempts: 1` on purpose**. `revoke.php`
+takes no idempotency key and partial refunds against one payment *accumulate*, so an automatic
+retry of a job that died between the provider call and the DB write would return the money a
+second time. Anything unresolved therefore stays `PENDING` or lands in `FAILED` for a human —
+the recoverable direction. For the same reason an unreachable provider is recorded as `FAILED`
+rather than retried: "FreedomPay said no" and "we do not know what FreedomPay did" both need
+eyes on the merchant cabinet.
+
+The dashboard works that queue:
+
+- `GET /v1/api/appointments/admin/refunds` — paginated, filterable by status/date/search
+  (patient name, IIN, phone), with the summed amount of the filtered set
+- `PATCH /v1/api/appointments/admin/refunds/:id` — only `status` and `comment`; the amount
+  belongs to the payment and is immutable, and `refundedAt` follows `status` so the queue
+  cannot lie about what has been posted. Audited as `APPOINTMENT_REFUND_STATUS_CHANGED`. It
+  deliberately does **not** call FreedomPay — that would be a second `revoke` on the same
+  payment; it records a reversal an operator already made by hand.
+
+`/admin/refunds` is registered before `/admin/:id`, otherwise the by-id handler swallows it.
+
+Env: `APPOINTMENT_REFUND_ENABLED` (default on), `APPOINTMENT_REFUND_FULL_WINDOW_HOURS` (12),
+`APPOINTMENT_LATE_CANCELLATION_FEE_PERCENT` (30 — `0` is a valid value and is read as one).
+
 ### Appointment status sync
 
 MIS owns the status of a visit and never calls us back when it changes, so an `Appointment`

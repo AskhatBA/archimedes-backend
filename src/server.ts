@@ -13,6 +13,7 @@ import { schedulePaymentReconciliation } from './shared/queues/payment-reconcili
 import { startPaymentReconciliationWorker } from './shared/queues/payment-reconciliation.worker';
 import { startProgramOrderEmailWorker } from './shared/queues/program-order-email.worker';
 import { startMedAccountCreditWorker } from './shared/queues/med-account-credit.worker';
+import { startAppointmentRefundWorker } from './shared/queues/appointment-refund.worker';
 
 // Start the notification worker
 startNotificationWorker();
@@ -22,6 +23,10 @@ startProgramOrderEmailWorker();
 
 // Зачисление оплаченных пополнений медсчёта на стороне страховой
 startMedAccountCreditWorker();
+
+// Возвраты за отменённые платные приёмы: FreedomPay внешний и медленный, поэтому запрос
+// пациента на отмену его не ждёт.
+startAppointmentRefundWorker();
 
 // Settles payments whose FreedomPay result callback never arrived. Runs in the background
 // so no client has to poll for an outcome.
@@ -72,6 +77,11 @@ const shutdown = async (signal: string) => {
     './shared/queues/med-account-credit.worker'
   );
   await stopMedAccountCreditWorker();
+
+  const { stopAppointmentRefundWorker } = await import(
+    './shared/queues/appointment-refund.worker'
+  );
+  await stopAppointmentRefundWorker();
 
   if (config.mis.appointmentSync.enabled) {
     const { stopAppointmentSyncWorker } = await import('./shared/queues/appointment-sync.worker');

@@ -8,6 +8,9 @@
 export const FREEDOMPAY_ENDPOINTS = {
   initPayment: '/init_payment.php',
   getStatus: '/get_status3.php',
+  // Возврат средств, полный и частичный. Частичный — тот же скрипт с `pg_refund_amount`,
+  // и таких по одному платежу может быть несколько, пока сумма не превысит заказ.
+  refund: '/revoke.php',
 } as const;
 
 /** Currency of every payment we create. */
@@ -24,6 +27,21 @@ export const FREEDOMPAY_STATUS = {
   ok: 'ok',
   error: 'error',
   rejected: 'rejected',
+} as const;
+
+/**
+ * `pg_status` values `revoke.php` answers with.
+ *
+ * The refund scripts speak `success` where the payment scripts speak `ok`, and both spellings
+ * are accepted rather than guessed at — a reversal misread as a failure is refunded twice by
+ * an operator, and `revoke.php` takes no idempotency key to stop that.
+ *
+ * `pending` means FreedomPay took the reversal but has not finished it; it is an acceptance,
+ * not a result, so nothing may be re-sent after seeing it.
+ */
+export const FREEDOMPAY_REFUND_STATUS = {
+  accepted: ['ok', 'success'] as const,
+  pending: 'pending',
 } as const;
 
 /**
