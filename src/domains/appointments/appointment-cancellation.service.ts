@@ -1,11 +1,4 @@
-import {
-  Appointment,
-  AppointmentRefund,
-  AppointmentStatus,
-  PaymentPurpose,
-  PaymentStatus,
-  Prisma,
-} from '@prisma/client';
+import { Appointment, AppointmentRefund, AppointmentStatus } from '@prisma/client';
 
 import * as misService from '@/domains/mis/mis.service';
 import * as patientService from '@/domains/patient/patient.service';
@@ -18,6 +11,7 @@ import { AppError } from '@/shared/services/app-error.service';
 import * as auditLogService from '@/shared/services/audit-log.service';
 import { AuditEvent } from '@/shared/services/audit-log.service';
 
+import { resolveAppointmentPayment } from './appointment-payment.service';
 import {
   AppointmentRefundDto,
   planRefund,
@@ -141,82 +135,6 @@ const assertCancellable = (appointment: CancellableAppointment, now: Date): void
   if (appointment.dateTime.getTime() <= now.getTime()) {
     throw new AppError(ErrorCodes.APPOINTMENT_ALREADY_STARTED, 409);
   }
-};
-
-interface AppointmentPayment {
-  id: string;
-  amount: number;
-}
-
-/**
- * Ищет платёж, которым оплачен приём.
- *
- * Обычно это просто `Appointment.paymentId`, который проставляет обработчик оплаты. Но
- * приёмы, забронированные до появления этой связи, её не имеют, а деньги за них взяты
- * настоящие — поэтому для них платёж подбирается по метаданным: у платежа с назначением
- * `APPOINTMENT` там лежат `doctorId` и `startTime`, из которых приём и создавался, так что
- * совпадение по обоим однозначно. Найденная связь тут же записывается, чтобы второй раз
- * её не искать.
- *
- * `null` означает «приём по программе»: платить было нечем и возвращать нечего.
- */
-const resolveAppointmentPayment = async (
-  appointment: CancellableAppointment
-): Promise<AppointmentPayment | null> => {
-  if (appointment.paymentId) {
-    const payment = await prismaClient.payment.findUnique({
-      where: { id: appointment.paymentId },
-      select: { id: true, amount: true, status: true },
-    });
-
-    // Оплаченным считаем только успешный платёж: отменённый или проваленный денег не взял.
-    return payment && payment.status === PaymentStatus.SUCCESS
-      ? { id: payment.id, amount: payment.amount }
-      : null;
-  }
-
-  const candidates = await prismaClient.payment.findMany({
-    where: {
-      userId: appointment.userId,
-      purpose: PaymentPurpose.APPOINTMENT,
-      status: PaymentStatus.SUCCESS,
-      // Уже привязанный к другому приёму платёж не наш.
-      appointment: { is: null },
-    },
-    select: { id: true, amount: true, metadata: true },
-    orderBy: { createdAt: 'desc' },
-    take: 50,
-  });
-
-  const match = candidates.find((payment) => {
-    const metadata = payment.metadata as Prisma.JsonObject | null;
-    if (!metadata || typeof metadata !== 'object') return false;
-
-    const startTime = metadata.startTime;
-    if (metadata.doctorId !== appointment.doctorId || typeof startTime !== 'string') return false;
-
-    const paidFor = new Date(startTime).getTime();
-
-    return !Number.isNaN(paidFor) && paidFor === appointment.dateTime.getTime();
-  });
-
-  if (!match) return null;
-
-  try {
-    await prismaClient.appointment.update({
-      where: { id: appointment.id },
-      data: { paymentId: match.id },
-    });
-  } catch (error) {
-    // Связь — удобство, а не условие возврата: его защищает уникальный `paymentId` самой
-    // строки возврата. Проиграли гонку за уникальный индекс — просто идём дальше.
-    cancellationLogger.warn(
-      { err: error, appointmentId: appointment.id, paymentId: match.id },
-      'Could not link the appointment to its payment'
-    );
-  }
-
-  return { id: match.id, amount: match.amount };
 };
 
 export interface CancellationPreview {

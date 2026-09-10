@@ -3,7 +3,7 @@ import { MedAccountTopupStatus } from '@prisma/client';
 import { config } from '@/config';
 import { prismaClient } from '@/infrastructure/db';
 import * as insuranceService from '@/domains/insurance/insurance.service';
-import type { Program } from '@/domains/insurance/insurance.types';
+import type { Program, TopupBalancePayload } from '@/domains/insurance/insurance.types';
 import * as misService from '@/domains/mis/mis.service';
 import { createLogger } from '@/shared/lib/logger';
 import * as auditLogService from '@/shared/services/audit-log.service';
@@ -12,7 +12,7 @@ import { AuditEvent } from '@/shared/services/audit-log.service';
 const creditLogger = createLogger('med-account-credit');
 
 /** Patient details `/v3/topupBalance` identifies the payer by. */
-interface CreditPatient {
+export interface CreditPatient {
   firstName: string;
   lastName: string;
   patronymic: string;
@@ -53,32 +53,40 @@ const isCurrentProgram = (program: Program, now: number): boolean => {
 };
 
 /**
- * The insurance program the top-up should be booked against, or `''` when there is none.
+ * The program whose medical account the top-up is credited to, or `null` when there is none.
  *
- * An empty `insuranceId` is a documented, valid value — a patient who only ever pays out of
- * pocket has no program at all — so a failure to read the list is not worth failing a
- * settled payment over: it degrades to the same empty value rather than stranding the money
- * on our side. Statuses are free-form strings on the insurer's side, so the choice is made
- * on the dates, with the first program as the fallback.
+ * Only a program the insurer flags `isMedAccount` carries a medical account — any other is
+ * plain insurance cover and must not be sent — so a patient without one gets `null`. Should
+ * more than one be flagged, the one in force today wins, with the first as the fallback.
+ *
+ * A failure to read the list is not worth failing a settled payment over: it degrades to the
+ * same `null` rather than stranding the money on our side.
  */
-const resolveInsuranceProgramId = async (beneficiaryId: string): Promise<string> => {
+const resolveMedAccountProgramId = async (beneficiaryId: string): Promise<string | null> => {
   try {
     const programs = await insuranceService.getPrograms(beneficiaryId);
 
-    if (!Array.isArray(programs) || programs.length === 0) {
-      return '';
+    const medAccountPrograms = Array.isArray(programs)
+      ? programs.filter((program) => program.isMedAccount === true)
+      : [];
+
+    if (medAccountPrograms.length === 0) {
+      return null;
     }
 
     const now = Date.now();
+    const program =
+      medAccountPrograms.find((candidate) => isCurrentProgram(candidate, now)) ??
+      medAccountPrograms[0];
 
-    return (programs.find((program) => isCurrentProgram(program, now)) ?? programs[0]).id ?? '';
+    return program.id || null;
   } catch (error) {
     creditLogger.warn(
       { err: error, beneficiaryId },
       'Could not read insurance programs, crediting topup without insuranceId'
     );
 
-    return '';
+    return null;
   }
 };
 
@@ -100,12 +108,39 @@ const extractExternalRef = (response: {
 };
 
 /**
- * Posts a paid top-up onto the patient's medical account in the insurer's system.
+ * The body `/v3/topupBalance` is called with.
  *
- * `/v3/topupBalance` identifies the payer by their own details rather than by the
- * beneficiary id — that only authenticates the call — so the patient row travels with the
- * amount. `insuranceId` is the one field allowed to be empty, for a patient with no
- * insurance program.
+ * It identifies the payer by their own details rather than by the beneficiary id — that
+ * only authenticates the call — so the patient row travels with the amount. `insuranceId`
+ * is the one field allowed to be `null`, for a patient with no `isMedAccount` program.
+ *
+ * Exported so the sandbox endpoint can send the exact same body the paid path sends
+ * instead of a hand-rolled copy of it.
+ */
+export const buildTopupPayload = async ({
+  beneficiaryId,
+  amount,
+  patient,
+  phone,
+}: {
+  beneficiaryId: string;
+  /** Amount in tenge. */
+  amount: number;
+  patient: CreditPatient;
+  phone: string;
+}): Promise<TopupBalancePayload> => ({
+  insuranceId: await resolveMedAccountProgramId(beneficiaryId),
+  lastName: patient.lastName,
+  firstName: patient.firstName,
+  middleName: patient.patronymic || '',
+  iin: patient.iin,
+  dateBirth: toIsoDateBirth(patient.birthDate),
+  phoneMobile: phone,
+  amount,
+});
+
+/**
+ * Posts a paid top-up onto the patient's medical account in the insurer's system.
  *
  * Throws to fail the credit: the caller marks the top-up `FAILED` with the message, and the
  * money has already left the patient, so a failure here is an operator's problem to pick up
@@ -126,23 +161,14 @@ const creditViaInsurer = async ({
   patient: CreditPatient;
   phone: string;
 }): Promise<string | null> => {
-  const insuranceId = await resolveInsuranceProgramId(beneficiaryId);
+  const payload = await buildTopupPayload({ beneficiaryId, amount, patient, phone });
 
   creditLogger.debug(
-    { topupId, beneficiaryId, insuranceId, amount },
+    { topupId, beneficiaryId, insuranceId: payload.insuranceId, amount },
     'Sending med-account topup to the insurer'
   );
 
-  const response = await insuranceService.topupMedAccount(beneficiaryId, {
-    insuranceId,
-    lastName: patient.lastName,
-    firstName: patient.firstName,
-    middleName: patient.patronymic || '',
-    iin: patient.iin,
-    dateBirth: toIsoDateBirth(patient.birthDate),
-    phoneMobile: phone,
-    amount,
-  });
+  const response = await insuranceService.topupMedAccount(beneficiaryId, payload);
 
   return extractExternalRef(response);
 };

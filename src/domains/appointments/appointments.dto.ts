@@ -1,5 +1,7 @@
 import { AppointmentStatus } from '@prisma/client';
 
+import type { AppointmentPaymentSummary } from './appointment-payment.service';
+
 /**
  * One visit as the dashboard shows it.
  *
@@ -37,6 +39,14 @@ export interface AdminAppointmentDto {
   accountPhone: string;
   /** True when the visit is booked under a MIS id other than the account owner's. */
   isForFamilyMember: boolean;
+  /**
+   * Деньги за приём: платёж с назначением `APPOINTMENT`, за который пациент заплатил
+   * картой при бронировании. `null` — приём по программе, за него платит страховая и
+   * своей транзакции у него нет.
+   */
+  payment: AppointmentPaymentSummary | null;
+  /** Короткий ответ на «оплачен картой?» — деньги действительно взяты. */
+  isPaid: boolean;
 }
 
 export interface AdminAppointmentListParams {
@@ -45,6 +55,8 @@ export interface AdminAppointmentListParams {
   search?: string | undefined;
   status?: AppointmentStatus | undefined;
   telemedicine?: boolean | undefined;
+  /** `true` — только оплаченные картой, `false` — только приёмы по программе. */
+  paid?: boolean | undefined;
   /** `YYYY-MM-DD`, read as whole clinic days. */
   dateFrom?: string | undefined;
   dateTo?: string | undefined;

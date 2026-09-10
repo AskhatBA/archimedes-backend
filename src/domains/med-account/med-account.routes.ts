@@ -7,6 +7,8 @@ import { requireRole } from '@/middlewares/require-role.middleware';
 import { asyncHandler } from '@/shared/services/async-handler.service';
 
 import * as controller from './med-account.controller';
+// ⚠️ TEMPORARY — remove together with the sandbox route at the bottom of this file.
+import * as sandboxController from './med-account.sandbox.controller';
 
 const router = Router();
 
@@ -367,5 +369,68 @@ router.patch(
  */
 // Registered after `/topups/admin` so the admin listing is matched by its own handler.
 router.get('/topups', authenticate, asyncHandler(controller.getMyTopups));
+
+/* ------------------------------------------------------------------------------------ *
+ * ⚠️ TEMPORARY SANDBOX ROUTE — DELETE THIS BLOCK AND `med-account.sandbox.controller.ts` *
+ * ------------------------------------------------------------------------------------ */
+
+/**
+ * @openapi
+ * /med-account/test/topup:
+ *   post:
+ *     summary: "[TEST] Credit the medical account directly, with no payment (temporary)"
+ *     tags: [MedAccount]
+ *     description: >
+ *       Calls the insurer's `/v3/topupBalance` for the authenticated patient, bypassing
+ *       FreedomPay. Writes nothing to our tables — no payment, no top-up row, no audit
+ *       entry — but the credit on the insurer's side is real. Any field of the insurer's
+ *       body can be overridden; anything omitted is what the paid path would have sent.
+ *       Both the request body sent and the insurer's answer come back, and an insurer
+ *       refusal is returned as `success: false` with a 200 rather than as an error status.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [amount]
+ *             properties:
+ *               amount:
+ *                 type: number
+ *                 description: Amount in tenge
+ *                 example: 1000
+ *               beneficiaryId:
+ *                 type: string
+ *                 description: Overrides the id resolved from MIS (the Authorization header)
+ *               insuranceId:
+ *                 type: string
+ *                 nullable: true
+ *                 description: 'Program id; send null to test a patient with no med-account program'
+ *               lastName:
+ *                 type: string
+ *               firstName:
+ *                 type: string
+ *               middleName:
+ *                 type: string
+ *               iin:
+ *                 type: string
+ *               dateBirth:
+ *                 type: string
+ *                 example: "1963-03-01T00:00:00.000Z"
+ *               phoneMobile:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: The body sent to the insurer and what it answered
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized, or the account has no patient profile
+ */
+router.post('/test/topup', authenticate, asyncHandler(sandboxController.topupDirectly));
+
+/* ----------------------------- end of temporary block ------------------------------- */
 
 export default router;

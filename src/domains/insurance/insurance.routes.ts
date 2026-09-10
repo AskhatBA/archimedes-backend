@@ -169,7 +169,7 @@ router.post('/refund-request', authenticate, controller.refundRequest);
  *   schemas:
  *     InsuranceProgram:
  *       type: object
- *       required: [id, code, title, status, cardNo, dateStart, dateEnd]
+ *       required: [id, code, title, status, cardNo, dateStart, dateEnd, isMedAccount]
  *       properties:
  *         id:
  *           type: string
@@ -194,6 +194,10 @@ router.post('/refund-request', authenticate, controller.refundRequest);
  *           type: string
  *           format: date
  *           example: "2025-12-31"
+ *         isMedAccount:
+ *           type: boolean
+ *           description: The program that carries the patient's medical account (медсчёт)
+ *           example: false
  *     InsuranceProgramsResponse:
  *       type: object
  *       properties:

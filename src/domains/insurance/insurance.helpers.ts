@@ -39,6 +39,7 @@ export const insuranceRequest = async <T>({
   query = {},
   beneficiaryId,
 }: InsuranceRequestPayload) => {
+  console.log('beneficiaryId: ', beneficiaryId);
   const apiResolver =
     insuranceApiResolverDefault[resolverName as keyof typeof insuranceApiResolverDefault];
   const startedAt = Date.now();
@@ -59,6 +60,8 @@ export const insuranceRequest = async <T>({
         Authorization: beneficiaryId || '',
       },
     });
+
+    console.log('response insurance: ', response);
 
     insuranceLogger.debug(
       {

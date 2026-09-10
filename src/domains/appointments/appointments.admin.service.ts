@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { PaymentStatus, Prisma } from '@prisma/client';
 
 import * as misService from '@/domains/mis/mis.service';
 import { prismaClient } from '@/infrastructure/db';
@@ -6,6 +6,11 @@ import { AppError } from '@/shared/services/app-error.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
 import { createLogger } from '@/shared/lib/logger';
 
+import {
+  AppointmentPaymentSummary,
+  PAYMENT_SUMMARY_SELECT,
+  resolveLegacyAppointmentPayments,
+} from './appointment-payment.service';
 import { CLINIC_UTC_OFFSET } from './appointments.service';
 import type { AdminAppointmentDto, AdminAppointmentListParams } from './appointments.dto';
 
@@ -79,6 +84,7 @@ const buildWhere = ({
   search,
   status,
   telemedicine,
+  paid,
   dateFrom,
   dateTo,
 }: Omit<AdminAppointmentListParams, 'page' | 'limit'>): Prisma.AppointmentWhereInput => {
@@ -86,6 +92,9 @@ const buildWhere = ({
 
   if (status) where.status = status;
   if (telemedicine !== undefined) where.isTelemedicine = telemedicine;
+  // Фильтр читает только записанную связь: приём старше неё попадёт в «по программе», пока
+  // его платёж не будет подобран по метаданным — что и делает показ страницы со строкой.
+  if (paid !== undefined) where.paymentId = paid ? { not: null } : null;
 
   if (dateFrom || dateTo) {
     where.dateTime = {
@@ -110,22 +119,28 @@ const buildWhere = ({
   return where;
 };
 
-type AppointmentRow = Prisma.AppointmentGetPayload<{
-  include: {
-    user: {
-      select: {
-        phone: true;
-        patient: { select: { fullName: true; iin: true; misPatientId: true } };
-      };
-    };
-  };
-}>;
+const listInclude = {
+  user: {
+    select: {
+      phone: true,
+      patient: { select: { fullName: true, iin: true, misPatientId: true } },
+    },
+  },
+  // Платёж, если приём оплачен картой: `paymentId` проставляет обработчик оплаты при
+  // бронировании, так что связь тут — это и есть ответ «за приёмом стоят наши деньги».
+  payment: { select: PAYMENT_SUMMARY_SELECT },
+} as const;
+
+type AppointmentRow = Prisma.AppointmentGetPayload<{ include: typeof listInclude }>;
 
 const toAdminDto = (
-  { user, ...appointment }: AppointmentRow,
-  doctors: Map<string, DoctorSummary>
+  { user, payment, ...appointment }: AppointmentRow,
+  doctors: Map<string, DoctorSummary>,
+  legacyPayments: Map<string, AppointmentPaymentSummary>
 ): AdminAppointmentDto => {
   const doctor = doctors.get(appointment.doctorId) ?? UNKNOWN_DOCTOR;
+  // Приёмы, забронированные до появления `paymentId`, узнают свой платёж по метаданным.
+  const paidWith = payment ?? legacyPayments.get(appointment.id) ?? null;
 
   return {
     id: appointment.id,
@@ -153,17 +168,23 @@ const toAdminDto = (
     isForFamilyMember: Boolean(
       user.patient?.misPatientId && user.patient.misPatientId !== appointment.patientId
     ),
+    payment: paidWith,
+    // Оплаченным считаем только успешный платёж — тот же критерий, по которому отмена
+    // решает, должна ли клиника возврат.
+    isPaid: paidWith?.status === PaymentStatus.SUCCESS,
   };
 };
 
-const listInclude = {
-  user: {
-    select: {
-      phone: true,
-      patient: { select: { fullName: true, iin: true, misPatientId: true } },
-    },
-  },
-} as const;
+/**
+ * Подбирает платежи строкам, у которых нет `paymentId`.
+ *
+ * Приём по программе его и не получит — платить было нечем, — а вот приём, забронированный
+ * до появления связи, оплачен настоящими деньгами, и без этого дашборд назвал бы его
+ * бесплатным, хотя его отмена вернула бы пациенту всю сумму. Один запрос на страницу, и
+ * найденное записывается в приём, так что второй раз искать уже не придётся.
+ */
+const readLegacyPayments = (rows: AppointmentRow[]) =>
+  resolveLegacyAppointmentPayments(rows.filter((row) => row.paymentId === null));
 
 /**
  * Clinic-wide appointment listing for the dashboard. Not scoped to a user — the caller is
@@ -175,10 +196,11 @@ export const getAdminAppointments = async ({
   search,
   status,
   telemedicine,
+  paid,
   dateFrom,
   dateTo,
 }: AdminAppointmentListParams) => {
-  const where = buildWhere({ search, status, telemedicine, dateFrom, dateTo });
+  const where = buildWhere({ search, status, telemedicine, paid, dateFrom, dateTo });
 
   const [total, rows] = await Promise.all([
     prismaClient.appointment.count({ where }),
@@ -191,10 +213,13 @@ export const getAdminAppointments = async ({
     }),
   ]);
 
-  const doctors = await readDoctors(rows.map((row) => row.doctorId));
+  const [doctors, legacyPayments] = await Promise.all([
+    readDoctors(rows.map((row) => row.doctorId)),
+    readLegacyPayments(rows),
+  ]);
 
   return {
-    items: rows.map((row) => toAdminDto(row, doctors)),
+    items: rows.map((row) => toAdminDto(row, doctors, legacyPayments)),
     total,
     page,
     limit,
@@ -212,7 +237,10 @@ export const getAdminAppointmentById = async (id: string): Promise<AdminAppointm
     throw new AppError(ErrorCodes.APPOINTMENT_NOT_FOUND, 404);
   }
 
-  const doctors = await readDoctors([appointment.doctorId]);
+  const [doctors, legacyPayments] = await Promise.all([
+    readDoctors([appointment.doctorId]),
+    readLegacyPayments([appointment]),
+  ]);
 
-  return toAdminDto(appointment, doctors);
+  return toAdminDto(appointment, doctors, legacyPayments);
 };

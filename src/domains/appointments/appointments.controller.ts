@@ -296,11 +296,11 @@ const parseStatus = (value: unknown): AppointmentStatus | undefined => {
   return value as AppointmentStatus;
 };
 
-const parseBoolean = (value: unknown): boolean | undefined => {
+const parseBoolean = (value: unknown, field: string): boolean | undefined => {
   if (value === undefined || value === '') return undefined;
   if (value === 'true') return true;
   if (value === 'false') return false;
-  throw new AppError('Invalid telemedicine flag', 400);
+  throw new AppError(`Invalid ${field} flag`, 400);
 };
 
 const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -320,7 +320,8 @@ export const getAdminAppointments = async (req: Request, res: Response): Promise
     limit: parsePositiveInt(req.query.limit, ADMIN_DEFAULT_LIMIT, ADMIN_MAX_LIMIT),
     search: typeof req.query.search === 'string' ? req.query.search.trim() : undefined,
     status: parseStatus(req.query.status),
-    telemedicine: parseBoolean(req.query.telemedicine),
+    telemedicine: parseBoolean(req.query.telemedicine, 'telemedicine'),
+    paid: parseBoolean(req.query.paid, 'paid'),
     dateFrom: parseDay(req.query.dateFrom, 'dateFrom'),
     dateTo: parseDay(req.query.dateTo, 'dateTo'),
   });

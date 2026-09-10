@@ -134,9 +134,9 @@ export const insuranceApiResolverDefault = {
   [INSURANCE_API_TOPUP_BALANCE]: {
     method: 'POST',
     // Every field is filled in per call; the insurer expects all of them present, and
-    // `insuranceId` is deliberately an empty string for a patient with no program.
+    // `insuranceId` is deliberately `null` for a patient with no `isMedAccount` program.
     defaultPayload: {
-      insuranceId: '',
+      insuranceId: null,
       lastName: '',
       firstName: '',
       middleName: '',

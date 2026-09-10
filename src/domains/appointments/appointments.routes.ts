@@ -207,6 +207,13 @@ router.get('/', authenticate, controller.getAppointments);
  *         in: query
  *         schema:
  *           type: boolean
+ *       - name: paid
+ *         in: query
+ *         description: >
+ *           `true` — only visits paid for by card (there is a settled payment behind them),
+ *           `false` — only visits booked through an insurance programme.
+ *         schema:
+ *           type: boolean
  *       - name: dateFrom
  *         in: query
  *         schema:

@@ -190,10 +190,12 @@ authenticates the call in the `Authorization` header. `dateBirth` is the stored 
 widened to midnight **UTC**, so a birthday cannot slip a day on an eastern offset. A user
 with no `Patient` profile cannot be identified at all and goes straight to `FAILED`.
 
-`insuranceId` is the patient's current insurance program, chosen from
-`GET /v3/client/programs` by date (first program as the fallback). A patient with no program
-gets `''` — a documented, valid value — and so does a patient whose program list could not
-be read, since an unreadable list is not worth failing a settled payment over.
+`insuranceId` is the patient's medical-account program: the one `GET /v3/client/programs`
+flags `isMedAccount: true` (if several are flagged, the one in force today by date, else the
+first). Any other program is plain insurance cover and is never sent. A patient with no such
+program gets `null` — a valid value for the insurer — and so does a patient whose program
+list could not be read, since an unreadable list is not worth failing a settled payment over.
+`isMedAccount` is also passed through to the app on `GET /v1/api/insurance/programs`.
 
 `creditTopup` never throws: the payment has settled and the record must survive whatever the
 insurer does. The insurer call sits **outside** the bookkeeping around it, because
@@ -262,9 +264,24 @@ id, which is why a row whose `patientId` differs from the account's own `misPati
 flagged as a family-member visit rather than shown under the account owner's name.
 
 - `GET /v1/api/appointments/admin` — dashboard listing (`requireRole(Role.ADMIN)`),
-  paginated, filterable by status, telemedicine flag, day range and a search that matches
-  patient name / IIN / phone, or any of the three MIS ids when the term is a UUID
+  paginated, filterable by status, telemedicine flag, `paid`, day range and a search that
+  matches patient name / IIN / phone, or any of the three MIS ids when the term is a UUID
 - `GET /v1/api/appointments/admin/:id`
+
+Both carry the visit's `payment` — amount, `status`, `description`, the FreedomPay
+`pgPaymentId` an operator searches the merchant cabinet by, and when it was charged — plus
+`isPaid`, which is that payment being `SUCCESS`. `payment: null` means the visit went
+through an insurance programme: the insurer paid and there is no transaction of ours.
+
+What counts as "paid" is decided in one place, `appointment-payment.service.ts`, because
+two callers answer with it: the dashboard listing and the cancellation, which uses the same
+rule to decide whether the clinic owes a refund. Normally it is `Appointment.paymentId`,
+set by the `APPOINTMENT` purpose handler at booking. Visits booked before that column
+existed have real money behind them and no link, so their payment is matched by metadata —
+a successful, unlinked `APPOINTMENT` payment of the same user whose `doctorId` and
+`startTime` are the ones the visit was created from — and the link is written back, one
+query per page rather than one per row. The `paid` filter reads only the stored column, so
+such a visit files under "по программе" until a page showing it back-fills the link.
 
 Both live in `appointments.admin.service.ts`, not in `appointments.service.ts`: they need
 `mis.service` to put a name on `doctorId`, and `mis.service` already imports

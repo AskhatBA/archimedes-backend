@@ -28,6 +28,8 @@ export interface Program {
   cardNo: string;
   dateStart: string;
   dateEnd: string;
+  /** True for the program that carries the patient's medical account (медсчёт). */
+  isMedAccount: boolean;
 }
 
 export interface Family {
@@ -200,12 +202,11 @@ export interface MedAccount {
  *
  * The patient is identified by their own details rather than by the beneficiary id in the
  * Authorization header, so all of these are required. `insuranceId` is the exception: it is
- * sent as an empty string when the patient has no insurance program at all, which is the
- * normal case for someone who only ever pays out of pocket.
+ * sent as `null` when the patient has no program flagged `isMedAccount`.
  */
 export interface TopupBalancePayload {
-  /** Insurance program id, or `''` when the patient has no program. */
-  insuranceId: string;
+  /** Id of the patient's `isMedAccount` program, or `null` when they have none. */
+  insuranceId: string | null;
   lastName: string;
   firstName: string;
   middleName: string;
