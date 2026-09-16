@@ -26,6 +26,8 @@ import {
   MedAccount,
   TopupBalancePayload,
   TopupBalanceResponse,
+  ServicePrice,
+  ServicePriceResponse,
 } from './insurance.types';
 import {
   INSURANCE_API_GET_CITIES,
@@ -49,6 +51,7 @@ import {
   INSURANCE_API_GET_CLINICS_MO,
   INSURANCE_API_GET_PRICE_LIST,
   INSURANCE_API_GET_MEDIC_SERVICE,
+  INSURANCE_API_GET_SERVICE_PRICE,
   INSURANCE_API_GET_PAY_PROGRAMS,
   INSURANCE_API_GET_MED_ACCOUNT,
   INSURANCE_API_TOPUP_BALANCE,
@@ -335,6 +338,44 @@ export const getMedicService = async (
     query: { clinicId, medicIIN },
   });
   return response;
+};
+
+/** A positive amount, or `null` for whatever the insurer sends in place of a price. */
+const toPrice = (value: unknown): number | null => {
+  const amount = typeof value === 'string' ? Number(value) : value;
+  return typeof amount === 'number' && Number.isFinite(amount) && amount > 0 ? amount : null;
+};
+
+/**
+ * Price of a service at a clinic: the full one, and the one charged to the medical account
+ * ("медсчёт"), which is lower. A visit booked under the `isMedAccount` program is shown
+ * this, and so is a paid visit, which the app then charges the lower price; any other
+ * program is paid by the insurer.
+ *
+ * An empty or zero `priceMedAccount` means there is no med-account price for the service,
+ * and both fold into `null`, so the app has one signal to read: a number is a discounted
+ * price to show next to the struck-out full one, `null` means the full price alone. A
+ * service with no usable full price is not priced at that clinic, which is `null` for the
+ * whole thing.
+ */
+export const getServicePrice = async (
+  beneficiaryId: string,
+  clinicId: string,
+  serviceId: string
+): Promise<ServicePrice | null> => {
+  const response = await insuranceRequest<ServicePriceResponse>({
+    resolverName: INSURANCE_API_GET_SERVICE_PRICE,
+    beneficiaryId,
+    query: { clinicId, serviceId },
+  });
+
+  const price = toPrice(response?.price?.price);
+
+  if (price === null) {
+    return null;
+  }
+
+  return { price, priceMedAccount: toPrice(response?.price?.priceMedAccount) };
 };
 
 export const getPayPrograms = async (beneficiaryId: string) => {

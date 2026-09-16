@@ -38,6 +38,30 @@ export interface AdminPatientListItem {
   refundsCount: number;
 }
 
+/**
+ * What the dashboard may change on a patient profile. Everything else is either derived
+ * (`fullName`, `misPatientId`) or not ours to edit here — the phone lives on `User` and
+ * is the login, so it is deliberately absent.
+ */
+export interface AdminUpdatePatientBody {
+  firstName?: string;
+  lastName?: string;
+  /** `null` or `''` clears it; the column stores `''` for "no patronymic". */
+  patronymic?: string | null;
+  iin?: string;
+}
+
+export interface AdminUpdatePatientResult {
+  patient: AdminPatientListItem;
+  /** Fields whose value actually changed — enough to review the edit in the audit trail. */
+  changedFields: string[];
+  /** Set only when the IIN changed, so the audit trail can say what it was re-linked from. */
+  relinked?: {
+    previousIin: string;
+    previousMisPatientId: string;
+  };
+}
+
 export interface AdminPatientListResponse {
   items: AdminPatientListItem[];
   total: number;

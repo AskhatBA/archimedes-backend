@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { body, query, validationResult } from 'express-validator';
+import { ValidationChain, body, param, query, validationResult } from 'express-validator';
 
 import { AppError } from '@/shared/services/app-error.service';
 import * as auditLogService from '@/shared/services/audit-log.service';
@@ -9,6 +9,8 @@ import { Gender } from '@/shared/types/gender';
 
 import * as misService from '../mis/mis.service';
 
+import * as patientAdminService from './patient.admin.service';
+import type { AdminUpdatePatientBody } from './patient.dto';
 import * as patientService from './patient.service';
 
 export const getPatientProfile = async (req: Request, res: Response) => {
@@ -220,4 +222,167 @@ export const getAdminPatients = async (req: Request, res: Response) => {
     success: true,
     ...result,
   });
+};
+
+/** `phone` is not here on purpose: it lives on `User` and is the login. */
+const EDITABLE_PATIENT_FIELDS = ['firstName', 'lastName', 'patronymic', 'iin'];
+
+const NAME_MAX_LENGTH = 100;
+
+const IIN_REGEX = /^\d{12}$/;
+
+const patientIdRule = param('id').isUUID().withMessage('id must be a UUID');
+
+/**
+ * Unknown keys are refused rather than ignored: a dashboard that sends `phone` or
+ * `birthDate` must hear that nothing happened, not get a 200 for an edit that was dropped.
+ */
+const patientUpdateRules: ValidationChain[] = [
+  patientIdRule,
+  body().custom((value: unknown) => {
+    const keys = value && typeof value === 'object' ? Object.keys(value) : [];
+
+    if (keys.includes('phone')) {
+      throw new Error('phone cannot be changed');
+    }
+
+    const rejected = keys.filter((key) => !EDITABLE_PATIENT_FIELDS.includes(key));
+
+    if (rejected.length) {
+      throw new Error(
+        `Only ${EDITABLE_PATIENT_FIELDS.join(', ')} can be edited, got: ${rejected.join(', ')}`
+      );
+    }
+
+    if (!keys.length) {
+      throw new Error(`Send at least one of ${EDITABLE_PATIENT_FIELDS.join(', ')}`);
+    }
+
+    return true;
+  }),
+  body('firstName')
+    .optional()
+    .isString()
+    .bail()
+    .trim()
+    .notEmpty()
+    .withMessage('firstName cannot be empty')
+    .isLength({ max: NAME_MAX_LENGTH })
+    .withMessage(`firstName must be at most ${NAME_MAX_LENGTH} characters`),
+  body('lastName')
+    .optional()
+    .isString()
+    .bail()
+    .trim()
+    .notEmpty()
+    .withMessage('lastName cannot be empty')
+    .isLength({ max: NAME_MAX_LENGTH })
+    .withMessage(`lastName must be at most ${NAME_MAX_LENGTH} characters`),
+  body('patronymic')
+    .optional({ values: 'null' })
+    .isString()
+    .bail()
+    .trim()
+    .isLength({ max: NAME_MAX_LENGTH })
+    .withMessage(`patronymic must be at most ${NAME_MAX_LENGTH} characters`),
+  body('iin')
+    .optional()
+    .isString()
+    .bail()
+    .trim()
+    .matches(IIN_REGEX)
+    .withMessage('iin must be exactly 12 digits'),
+];
+
+const failedValidation = async (
+  req: Request,
+  res: Response,
+  chains: ValidationChain[]
+): Promise<boolean> => {
+  await Promise.all(chains.map((chain) => chain.run(req)));
+
+  const errors = validationResult(req);
+
+  if (errors.isEmpty()) {
+    return false;
+  }
+
+  res.status(400).json({ success: false, errors: errors.array() });
+
+  return true;
+};
+
+/**
+ * Dashboard edit of a patient's ФИО and IIN. Admin-only — the route is behind
+ * `requireRole(Role.ADMIN)`. A changed IIN re-links the profile to its MIS patient.
+ */
+export const updateAdminPatient = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError('User not found', 401);
+  }
+
+  if (await failedValidation(req, res, patientUpdateRules)) {
+    return;
+  }
+
+  const { patient, changedFields, relinked } = await patientAdminService.updatePatient(
+    req.params.id as string,
+    req.body as AdminUpdatePatientBody
+  );
+
+  auditLogService.log({
+    event: AuditEvent.PATIENT_PROFILE_UPDATED,
+    success: true,
+    userId: req.user.id,
+    phone: req.user.phone,
+    req,
+    metadata: {
+      patientId: patient.id,
+      patientUserId: patient.userId,
+      // Names are encrypted at rest, so only which fields changed is recorded — never
+      // their values in the clear. The IIN is stored in the clear anyway.
+      fields: changedFields,
+      ...(relinked && {
+        previousIin: relinked.previousIin,
+        iin: patient.iin,
+        previousMisPatientId: relinked.previousMisPatientId,
+        misPatientId: patient.misPatientId,
+      }),
+    },
+  });
+
+  return res.status(200).json({ success: true, patient });
+};
+
+/**
+ * Deletes the patient profile only — the `User` row is never touched. Admin-only.
+ */
+export const deleteAdminPatient = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError('User not found', 401);
+  }
+
+  if (await failedValidation(req, res, [patientIdRule])) {
+    return;
+  }
+
+  const patient = await patientAdminService.deletePatient(req.params.id as string);
+
+  auditLogService.log({
+    event: AuditEvent.PATIENT_PROFILE_DELETED,
+    success: true,
+    userId: req.user.id,
+    phone: req.user.phone,
+    req,
+    metadata: {
+      patientId: patient.id,
+      patientUserId: patient.userId,
+      iin: patient.iin,
+      misPatientId: patient.misPatientId,
+    },
+  });
+
+  return res
+    .status(200)
+    .json({ success: true, patient: { id: patient.id, userId: patient.userId } });
 };

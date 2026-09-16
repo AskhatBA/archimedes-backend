@@ -21,6 +21,7 @@ export const INSURANCE_API_QR_SUBMIT_APPOINTMENT = '/v3/qr/submitAppointment';
 export const INSURANCE_API_GET_CLINICS_MO = '/v3/getClinicsMO';
 export const INSURANCE_API_GET_PRICE_LIST = '/v3/getPriceList';
 export const INSURANCE_API_GET_MEDIC_SERVICE = '/v3/getMedicService';
+export const INSURANCE_API_GET_SERVICE_PRICE = '/v3/getServicePrice';
 export const INSURANCE_API_GET_PAY_PROGRAMS = '/v3/getPayPrograms';
 export const INSURANCE_API_GET_MED_ACCOUNT = '/v3/getMedAccount';
 export const INSURANCE_API_TOPUP_BALANCE = '/v3/topupBalance';
@@ -120,6 +121,10 @@ export const insuranceApiResolverDefault = {
     defaultPayload: {},
   },
   [INSURANCE_API_GET_MEDIC_SERVICE]: {
+    method: 'GET',
+    defaultPayload: {},
+  },
+  [INSURANCE_API_GET_SERVICE_PRICE]: {
     method: 'GET',
     defaultPayload: {},
   },

@@ -64,6 +64,39 @@ The script refuses to create a second ADMIN, hashes the password with bcrypt (co
 
 Every login failure returns the same `INVALID_CREDENTIALS` regardless of cause (unknown email, non-admin account, wrong password), and a missing account still pays the bcrypt cost, so neither the body nor the timing reveals which emails exist. Failures are counted per email in Redis by `login-throttle.service.ts` (`ADMIN_MAX_LOGIN_ATTEMPTS`, default 5, over `ADMIN_LOCK_MINUTES`, default 15) and audited as `ADMIN_LOGIN_SUCCESS` / `ADMIN_LOGIN_FAILED` / `ADMIN_LOGIN_THROTTLED`.
 
+### Patient profiles in the dashboard
+
+`GET /v1/api/patient/admin/patients` lists every profile; the dashboard can also edit and
+delete one. Both writes are admin-only (`requireRole(Role.ADMIN)`), keyed by the
+**`Patient.id`** (not the user id), and live in `patient.admin.service.ts` — apart from
+`patient.service` because a changed IIN has to go through `mis.service`, which already
+imports `patient.service`.
+
+- `PATCH /v1/api/patient/admin/patients/:id` — only `firstName`, `lastName`, `patronymic`,
+  `iin`, and only the keys sent are written. Anything else is a 400, `phone` included: the
+  phone lives on `User` and is the login, so it is never editable here. `fullName` is
+  recomposed on every edit (`"<firstName> <lastName>"`, as registration writes it), which
+  also re-encrypts it — that repairs a row whose old `fullName` ciphertext no longer
+  decrypts. Audited as `PATIENT_PROFILE_UPDATED` with the names of the changed fields,
+  never their values.
+- A **changed IIN re-links the profile in MIS.** `misPatientId` keys every MIS call for the
+  account (visits, history, lab results), so keeping the old one would show one person's
+  record under another's IIN. The new IIN is looked up with `findPatientByIinAndPhone` and
+  refused unless MIS answers for exactly that IIN (`MIS_PATIENT_NOT_FOUND` — which also
+  covers MIS being unreachable, since `misRequest` folds that into 404). A duplicate is a 409:
+  `PATIENT_IIN_TAKEN`, or `PATIENT_MIS_PATIENT_TAKEN` when the MIS patient is already linked
+  to another profile. The audit entry keeps the previous IIN and `misPatientId`. `birthDate`
+  and `gender` are not touched.
+- `DELETE /v1/api/patient/admin/patients/:id` — hard-deletes the `Patient` row and nothing
+  else. Nothing references `Patient.id`, so it cascades nowhere: the `User` (phone, PIN,
+  payments, appointments, orders) stays, can still sign in by phone
+  (`findAccountByIinOrPhone` falls back to it) and gets `isProfileComplete: false` until a new
+  profile is created with `POST /patient/profile`. Audited as `PATIENT_PROFILE_DELETED` with
+  the IIN and `misPatientId` that were removed.
+
+Reads in the edit/delete path never select `fullName`, for the same broken-ciphertext reason
+as the listing — otherwise exactly the rows that need fixing could not be edited or deleted.
+
 ### Check-up catalogue
 
 The mobile app's paid-programs screen has two tabs. `MED_PLAN` is proxied from the MIS
@@ -214,6 +247,21 @@ The dashboard works the queue:
   `MED_ACCOUNT_TOPUP_STATUS_CHANGED`.
 - `GET /v1/api/med-account/topups` — the caller's own history. Registered **after**
   `/topups/admin`, otherwise the admin listing is swallowed.
+
+### Med-account visit price
+
+A visit booked under the `isMedAccount` program is paid from the medical account, so unlike
+any other program it has a price the patient is shown. `GET /v1/api/insurance/service-price`
+proxies the insurer's `/v3/getServicePrice` — `clinicId` is the branch's `externalId`,
+`serviceId` the `oid` from `/insurance/medic-service` — and answers
+`servicePrice: { price, priceMedAccount }`. An empty or zero `priceMedAccount` is folded into
+`null` (the full price applies), and a service with no usable full price comes back as
+`servicePrice: null`.
+
+A paid visit gets the same discount: the app shows `/insurance/medic-service`'s price struck
+out next to `priceMedAccount` and sends that lower sum as the `APPOINTMENT` payment's
+`amount`. Nothing server-side checks it — the amount of an `APPOINTMENT` payment has always
+been the client's. Nothing is charged through us for a med-account visit.
 
 ### Order emails
 

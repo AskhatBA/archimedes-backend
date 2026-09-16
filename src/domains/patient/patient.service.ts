@@ -45,7 +45,7 @@ export const createPatient = (patient: PatientDto) => {
  * from those instead; that also gives a consistent `Фамилия Имя Отчество` order, which
  * the stored column does not have.
  */
-const PATIENT_LIST_SELECT = {
+export const PATIENT_LIST_SELECT = {
   id: true,
   userId: true,
   firstName: true,
@@ -71,7 +71,7 @@ type PatientNameParts = Pick<PatientListRow, 'firstName' | 'lastName' | 'patrony
 const composeFullName = ({ firstName, lastName, patronymic }: PatientNameParts) =>
   [lastName, firstName, patronymic].filter(Boolean).join(' ');
 
-const toListItem = ({ user, ...patient }: PatientListRow): AdminPatientListItem => ({
+export const toListItem = ({ user, ...patient }: PatientListRow): AdminPatientListItem => ({
   ...patient,
   fullName: composeFullName(patient),
   phone: user.phone,

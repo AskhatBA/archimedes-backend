@@ -1213,6 +1213,77 @@ router.get('/medic-service', authenticate, controller.getMedicService);
  * @openapi
  * components:
  *   schemas:
+ *     ServicePrice:
+ *       type: object
+ *       required: [price, priceMedAccount]
+ *       properties:
+ *         price:
+ *           type: number
+ *           description: Full price of the service, in KZT
+ *           example: 9500
+ *         priceMedAccount:
+ *           type: number
+ *           nullable: true
+ *           description: >
+ *             Price when paid from the medical account (медсчёт), in KZT. `null` when the
+ *             insurer has no such price for the service — the full `price` applies.
+ *           example: 8075
+ * /insurance/service-price:
+ *   get:
+ *     summary: Get the price of a service at a clinic, with its medical-account price
+ *     description: >
+ *       Proxies the insurance API's `/v3/getServicePrice`. The app shows it for a visit
+ *       booked under the program flagged `isMedAccount` and for a paid visit: the full
+ *       price struck out next to `priceMedAccount` when the latter is set, the full price
+ *       alone otherwise — and a paid visit is charged `priceMedAccount` when it is set. An
+ *       empty or zero `priceMedAccount` comes back as `null`, and a service with no price
+ *       at that clinic comes back as `servicePrice: null`.
+ *     tags: [Insurance]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: clinicId
+ *         in: query
+ *         description: Clinic OID (from getClinicsMO — the branch's externalId)
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - name: serviceId
+ *         in: query
+ *         description: Service OID (`oid` from /insurance/medic-service)
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 servicePrice:
+ *                   allOf:
+ *                     - $ref: '#/components/schemas/ServicePrice'
+ *                   nullable: true
+ *       400:
+ *         description: clinicId or serviceId is required
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Insurance not found in MIS
+ */
+router.get('/service-price', authenticate, controller.getServicePrice);
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
  *     PayProgramItem:
  *       type: object
  *       required: [oid, code, name, price, description, programUrl]

@@ -181,6 +181,28 @@ export interface MedicServiceItem {
   price: number;
 }
 
+/** What `/v3/getServicePrice` answers with: `{ price: { price, priceMedAccount } }`. */
+export interface ServicePriceResponse {
+  price?: {
+    price?: number | null;
+    priceMedAccount?: number | null;
+  } | null;
+}
+
+/**
+ * Price of one service at one clinic, as the app shows it for a visit booked under the
+ * medical-account program.
+ */
+export interface ServicePrice {
+  /** Full price of the service, in KZT. */
+  price: number;
+  /**
+   * What the service costs when paid from the medical account, in KZT. `null` when the
+   * insurer gives no such price for this service — the visit then costs the full `price`.
+   */
+  priceMedAccount: number | null;
+}
+
 export interface PayProgramItem {
   oid: string;
   code: string;

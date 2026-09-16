@@ -293,4 +293,103 @@ router.get(
   controller.getAdminPatients
 );
 
+/**
+ * @openapi
+ * /patient/admin/patients/{id}:
+ *   patch:
+ *     summary: Edit a patient's ФИО and IIN (dashboard, admin only)
+ *     description: >
+ *       Partial update — only the keys sent are written. The phone is not editable here:
+ *       it lives on the user account and is the login, so sending `phone` (or any other
+ *       key) is a 400. Changing the IIN re-resolves the patient in MIS and re-links
+ *       `misPatientId`; an IIN MIS does not know (or MIS being unreachable) is refused with
+ *       `MIS_PATIENT_NOT_FOUND`, never saved with a stale link.
+ *     tags: [Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: Patient profile id (not the user id)
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             minProperties: 1
+ *             additionalProperties: false
+ *             properties:
+ *               firstName:
+ *                 type: string
+ *               lastName:
+ *                 type: string
+ *               patronymic:
+ *                 type: string
+ *                 nullable: true
+ *               iin:
+ *                 type: string
+ *                 pattern: '^\d{12}$'
+ *     responses:
+ *       200:
+ *         description: The updated row, in the same shape as the listing
+ *       400:
+ *         description: Invalid or non-editable fields, or `MIS_PATIENT_NOT_FOUND` for the new IIN
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Authenticated, but not an admin
+ *       404:
+ *         description: "`PATIENT_PROFILE_NOT_FOUND`"
+ *       409:
+ *         description: >
+ *           `PATIENT_IIN_TAKEN` — another profile has this IIN;
+ *           `PATIENT_MIS_PATIENT_TAKEN` — the MIS patient is already linked to another profile
+ *   delete:
+ *     summary: Delete a patient profile, keeping the user account (dashboard, admin only)
+ *     description: >
+ *       Hard-deletes the `Patient` row only. The user account — phone, PIN, payments,
+ *       appointments, orders — is left as is, so the person can still sign in by phone and
+ *       create a new profile from the app.
+ *     tags: [Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: Patient profile id (not the user id)
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Deleted
+ *       400:
+ *         description: Invalid id
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Authenticated, but not an admin
+ *       404:
+ *         description: "`PATIENT_PROFILE_NOT_FOUND`"
+ */
+router.patch(
+  '/admin/patients/:id',
+  authenticate,
+  requireRole(Role.ADMIN),
+  controller.updateAdminPatient
+);
+
+router.delete(
+  '/admin/patients/:id',
+  authenticate,
+  requireRole(Role.ADMIN),
+  controller.deleteAdminPatient
+);
+
 export default router;
