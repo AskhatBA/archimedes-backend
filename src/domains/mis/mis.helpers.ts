@@ -37,6 +37,16 @@ export const parsePatientFullName = (fullName: string) => {
   return { firstName, lastName, patronymic };
 };
 
+/**
+ * MIS rejections that come as `{ code, detail }` and that the app has its own wording for.
+ * `detail` is MIS's Russian text with raw amounts ("0,0000 KZT"), so only our code travels on
+ * and the app translates it.
+ */
+const knownMisErrors: Record<string, { message: string; status: number }> = {
+  // The insurer's limit left on the programme does not cover the booked service.
+  reserve_limit_exceeded: { message: ErrorCodes.MIS_INSURANCE_LIMIT_EXCEEDED, status: 422 },
+};
+
 export const parseApiError = (
   error: unknown,
   defaultErrorMessage: keyof typeof ErrorCodes = ErrorCodes.UNKNOWN_ERROR
@@ -45,7 +55,12 @@ export const parseApiError = (
   const errorData = axiosError?.response?.data as {
     error: string;
     errors: Record<string, string | string[]>;
+    code?: string;
   };
+
+  const knownError = errorData?.code ? knownMisErrors[errorData.code] : undefined;
+  if (knownError) return knownError;
+
   const errorMessage = errorData?.errors
     ? Object.values(errorData.errors).join('; ')
     : errorData?.error || defaultErrorMessage;

@@ -27,6 +27,8 @@ export interface AppointmentPaymentMetadata {
   isTelemedicine: boolean;
   /** MIS id of a family member, when booking for someone other than the account owner. */
   familyMemberId?: string;
+  /** `oid` of the doctor's service from `/insurance/medic-service`, sent to MIS as `booked_service`. */
+  medicServiceOid?: string;
   /**
    * Display-only copies of what the patient picked. MIS knows none of this until the
    * appointment exists, so they are carried here to describe the visit while the payment
@@ -79,6 +81,9 @@ const validateMetadata = (metadata: unknown): AppointmentPaymentMetadata => {
     isTelemedicine: raw.isTelemedicine === true,
     ...(raw.familyMemberId
       ? { familyMemberId: requireString(raw.familyMemberId, 'familyMemberId') }
+      : {}),
+    ...(raw.medicServiceOid
+      ? { medicServiceOid: requireString(raw.medicServiceOid, 'medicServiceOid') }
       : {}),
     ...Object.fromEntries(Object.entries(display).filter(([, value]) => value !== undefined)),
   };
@@ -143,6 +148,7 @@ const bookPaidAppointment = async (context: PaymentSuccessContext): Promise<void
     // и заодно источник суммы, от которой считается возврат.
     paymentId: context.paymentId,
     ...(metadata.familyMemberId ? { familyMemberId: metadata.familyMemberId } : {}),
+    ...(metadata.medicServiceOid ? { medicServiceOid: metadata.medicServiceOid } : {}),
   });
 
   handlerLogger.info(

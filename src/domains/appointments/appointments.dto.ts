@@ -1,4 +1,4 @@
-import { AppointmentStatus } from '@prisma/client';
+import { AppointmentRefundStatus, AppointmentStatus } from '@prisma/client';
 
 import type { AppointmentPaymentSummary } from './appointment-payment.service';
 
@@ -60,4 +60,35 @@ export interface AdminAppointmentListParams {
   /** `YYYY-MM-DD`, read as whole clinic days. */
   dateFrom?: string | undefined;
   dateTo?: string | undefined;
+}
+
+/**
+ * One visit in the patient's own history — a row of our `Appointment` table, not the MIS
+ * proxy. The status is ours as well, kept honest by the MIS status sweep.
+ */
+export interface AppointmentHistoryItemDto {
+  id: string;
+  /** MIS id the visit is known by; what the cancellation endpoints also accept. */
+  externalId: string;
+  dateTime: Date;
+  status: AppointmentStatus;
+  isTelemedicine: boolean;
+  /** Resolved from MIS, `null` when MIS is unreachable. */
+  doctorName: string | null;
+  doctorSpecialty: string | null;
+  branchName: string | null;
+  branchAddress: string | null;
+  /** True when the visit is booked under a MIS id other than the account owner's. */
+  isForFamilyMember: boolean;
+  /** Сколько заплачено картой; `null` — приём по программе, платила страховая. */
+  paidAmount: number | null;
+  /** Возврат за отменённый платный приём; `null`, если возвращать было нечего. */
+  refund: {
+    amount: number;
+    feeAmount: number;
+    status: AppointmentRefundStatus;
+    refundedAt: Date | null;
+  } | null;
+  cancelledAt: Date | null;
+  createdAt: Date;
 }

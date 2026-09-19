@@ -174,6 +174,98 @@ router.get('/', authenticate, controller.getAppointments);
 
 /**
  * @openapi
+ * /appointments/history:
+ *   get:
+ *     summary: The caller's own booking history
+ *     description: >
+ *       Every visit booked through the app, read from our own table rather than proxied
+ *       from MIS — cancelled ones included — newest first. Doctor and branch are resolved
+ *       from MIS and come back `null` when it is unreachable. `paidAmount` is `null` for a
+ *       visit booked through an insurance programme; `refund` is set for a cancelled paid one.
+ *     tags: [Appointments]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Booking history
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 appointments:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/AppointmentHistoryItem'
+ *       401:
+ *         description: Unauthorized
+ * components:
+ *   schemas:
+ *     AppointmentHistoryItem:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *         externalId:
+ *           type: string
+ *           format: uuid
+ *           description: MIS id the visit is known by
+ *         dateTime:
+ *           type: string
+ *           format: date-time
+ *         status:
+ *           type: string
+ *           enum: [SCHEDULED, COMPLETED, CANCELLED]
+ *         isTelemedicine:
+ *           type: boolean
+ *         doctorName:
+ *           type: string
+ *           nullable: true
+ *         doctorSpecialty:
+ *           type: string
+ *           nullable: true
+ *         branchName:
+ *           type: string
+ *           nullable: true
+ *         branchAddress:
+ *           type: string
+ *           nullable: true
+ *         isForFamilyMember:
+ *           type: boolean
+ *         paidAmount:
+ *           type: number
+ *           nullable: true
+ *         refund:
+ *           type: object
+ *           nullable: true
+ *           properties:
+ *             amount:
+ *               type: number
+ *             feeAmount:
+ *               type: number
+ *             status:
+ *               type: string
+ *               enum: [PENDING, COMPLETED, FAILED]
+ *             refundedAt:
+ *               type: string
+ *               format: date-time
+ *               nullable: true
+ *         cancelledAt:
+ *           type: string
+ *           format: date-time
+ *           nullable: true
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ */
+// Registered before `/:id`, otherwise the by-id handler swallows it.
+router.get('/history', authenticate, asyncHandler(controller.getAppointmentHistory));
+
+/**
+ * @openapi
  * /appointments/admin:
  *   get:
  *     summary: Clinic-wide appointment listing (dashboard)

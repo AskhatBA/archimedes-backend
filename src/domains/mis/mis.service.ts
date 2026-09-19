@@ -265,6 +265,7 @@ export const createAppointment = async (newAppointment: CreateAppointmentDto) =>
       insurance: familyMemberProgramId || newAppointment.insuranceProgramId,
       meeting: meeting,
       is_telemedicine: newAppointment.isTelemedicine,
+      booked_service: newAppointment.medicServiceOid,
     },
   });
 

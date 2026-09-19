@@ -345,6 +345,20 @@ of a range on a UTC server. As with program orders, `/admin` is registered befor
 The dashboard never writes an appointment: the visit lives in MIS, and moving or
 cancelling it from the admin panel would leave the two systems disagreeing.
 
+### Patient booking history
+
+`GET /v1/api/appointments/history` is the app's "История записей": the caller's own
+`Appointment` rows (by `userId`, newest first, capped at 200), cancelled ones included —
+unlike `GET /mis/appointment-history`, which proxies MIS and knows nothing of our
+cancellations or refunds. Each row carries doctor/specialty/branch resolved through
+`appointment-doctors.service` (the same 10-minute cache the dashboard uses; `null` when MIS
+is down), `isForFamilyMember`, `paidAmount` (a `SUCCESS` payment, found by the same
+`appointment-payment.service` rule as the dashboard — `null` means a programme visit) and
+the `refund` of a cancelled paid visit. The status is ours, so it is only as fresh as the
+status sweep: a visit older than its lookback can stay `SCHEDULED`. Lives in
+`appointments.history.service.ts` for the same import-cycle reason as the admin service.
+Registered before `/:id`.
+
 ### Cancelling an appointment
 
 A patient cancels a visit with `PATCH /v1/api/appointments/:id/cancel`, and the app can ask

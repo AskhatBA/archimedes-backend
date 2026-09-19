@@ -442,6 +442,11 @@ router.get('/doctor/:doctorId/available-slots', authenticate, controller.getDoct
  *         isTelemedicine:
  *           type: boolean
  *           example: false
+ *         medicServiceOid:
+ *           type: string
+ *           format: uuid
+ *           description: "`oid` of the doctor's service from /insurance/medic-service, sent to MIS as `booked_service`."
+ *           example: "128e28d0-7431-4300-8592-71def440f16e"
  * /mis/create-appointment:
  *   post:
  *     summary: Create a new appointment

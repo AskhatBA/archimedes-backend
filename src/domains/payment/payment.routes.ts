@@ -36,7 +36,7 @@ const router = Router();
  *           description: |
  *             Payload for the purpose's post-success handler, validated here at init time.
  *             For `APPOINTMENT`: `doctorId`, `branchId`, `startTime`, `endTime`,
- *             `isTelemedicine` and an optional `familyMemberId`.
+ *             `isTelemedicine`, plus optional `familyMemberId` and `medicServiceOid`.
  *             For `PAID_PROGRAM`: `items` (each with `category`, `id`/`externalId`, `code`,
  *             `title`, `price`) plus optional `contactPhone` and `comment`. The item prices
  *             must add up to `amount`, and check-up prices must match the catalogue.

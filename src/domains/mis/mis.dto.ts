@@ -34,6 +34,11 @@ export interface CreateAppointmentDto {
   insuranceProgramId?: string;
   familyMemberId?: string;
   isTelemedicine?: boolean;
+  /**
+   * `oid` of the doctor's service from `GET /insurance/medic-service`, sent to MIS as
+   * `booked_service`. Optional because app builds released before it was added do not send it.
+   */
+  medicServiceOid?: string;
   /** Платёж, которым оплачен визит. Только для приёма без программы. */
   paymentId?: string;
 }

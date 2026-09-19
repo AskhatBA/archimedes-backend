@@ -9,6 +9,7 @@ import { AuditEvent } from '@/shared/services/audit-log.service';
 
 import * as appointmentsService from './appointments.service';
 import * as appointmentsAdminService from './appointments.admin.service';
+import * as appointmentsHistoryService from './appointments.history.service';
 import * as appointmentCancellationService from './appointment-cancellation.service';
 import * as appointmentRefundService from './appointment-refund.service';
 import * as appointmentsSyncService from './appointments.sync.service';
@@ -32,6 +33,29 @@ export const getAppointments = async (req: Request, res: Response) => {
     success: true,
     appointments,
   });
+};
+
+/**
+ * The caller's own bookings from our table — cancelled ones and their refunds included —
+ * newest first. This is what the app's "История записей" shows.
+ */
+export const getAppointmentHistory = async (req: Request, res: Response): Promise<void> => {
+  if (!req?.user) {
+    throw new AppError('User not found', 401);
+  }
+
+  const appointments = await appointmentsHistoryService.getAppointmentHistory(req.user.id);
+
+  auditLogService.log({
+    event: AuditEvent.APPOINTMENT_HISTORY_VIEWED,
+    success: true,
+    userId: req.user.id,
+    phone: req.user.phone,
+    req,
+    metadata: { source: 'db' },
+  });
+
+  res.status(200).json({ success: true, appointments });
 };
 
 export const getAppointmentById = async (req: Request, res: Response) => {
