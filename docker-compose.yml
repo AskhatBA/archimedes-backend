@@ -22,9 +22,8 @@ services:
   backend:
     build: ./
     extra_hosts:
-      - "misapi.archimedes.kz:192.168.10.2"
+      - "misapi.archimedes.kz:192.168.10.1"
       - "mobileapi.archimedes.kz:10.0.2.254"
-      - "lis.archimedes.kz:10.0.2.254"
     volumes:
       - .:/app
       - /app/node_modules
