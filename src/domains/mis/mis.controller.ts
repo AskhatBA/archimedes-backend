@@ -10,6 +10,31 @@ import * as appointmentCancellationService from '../appointments/appointment-can
 import * as patientService from '../patient/patient.service';
 
 import * as misService from './mis.service';
+import { FamilyMemberQuery, resolveAppointmentsPatientId } from './mis.family.service';
+
+/**
+ * `?familyMemberId=&programId=` — смотреть приёмы родственника вместо своих. Проверку, что
+ * это действительно семья вызывающего, делает `resolveAppointmentsPatientId`.
+ */
+const readFamilyMemberQuery = async (req: Request): Promise<FamilyMemberQuery> => {
+  await query('familyMemberId')
+    .optional()
+    .isString()
+    .withMessage('familyMemberId must be a string')
+    .run(req);
+  await query('programId').optional().isString().withMessage('programId must be a string').run(req);
+
+  const errors = validationResult(req);
+
+  if (!errors.isEmpty()) {
+    throw new AppError(String(errors.array()[0]?.msg), 400);
+  }
+
+  return {
+    familyMemberId: (req.query.familyMemberId as string) || undefined,
+    programId: (req.query.programId as string) || undefined,
+  };
+};
 
 export const findPatient = async (req: Request, res: Response) => {
   if (!req?.user) {
@@ -238,16 +263,10 @@ export const getAppointments = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
 
-  const patient = await patientService.getPatientById(req.user.id);
+  const familyMember = await readFamilyMemberQuery(req);
+  const misPatientId = await resolveAppointmentsPatientId(req.user, familyMember);
 
-  if (!patient) {
-    return res.status(400).json({
-      success: false,
-      message: 'Patient not found',
-    });
-  }
-
-  const appointments = await misService.getAppointments(patient.misPatientId);
+  const appointments = await misService.getAppointments(misPatientId);
 
   auditLogService.log({
     event: AuditEvent.APPOINTMENT_LIST_VIEWED,
@@ -255,7 +274,10 @@ export const getAppointments = async (req: Request, res: Response) => {
     userId: req.user.id,
     phone: req.user.phone,
     req,
-    metadata: { source: 'mis' },
+    metadata: {
+      source: 'mis',
+      ...(familyMember.familyMemberId && { familyMemberId: familyMember.familyMemberId }),
+    },
   });
 
   return res.status(200).json({
@@ -269,16 +291,10 @@ export const getAppointmentHistory = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
 
-  const patient = await patientService.getPatientById(req.user.id);
+  const familyMember = await readFamilyMemberQuery(req);
+  const misPatientId = await resolveAppointmentsPatientId(req.user, familyMember);
 
-  if (!patient?.misPatientId) {
-    return res.status(400).json({
-      success: false,
-      message: 'Patient not found',
-    });
-  }
-
-  const appointmentHistory = await misService.getAppointmentHistory(patient.misPatientId);
+  const appointmentHistory = await misService.getAppointmentHistory(misPatientId);
 
   auditLogService.log({
     event: AuditEvent.APPOINTMENT_HISTORY_VIEWED,
@@ -286,6 +302,9 @@ export const getAppointmentHistory = async (req: Request, res: Response) => {
     userId: req.user.id,
     phone: req.user.phone,
     req,
+    ...(familyMember.familyMemberId && {
+      metadata: { familyMemberId: familyMember.familyMemberId },
+    }),
   });
 
   return res.status(200).json({
@@ -371,18 +390,12 @@ export const getAppointmentRequests = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
 
-  const patient = await patientService.getPatientById(req.user.id);
-
-  if (!patient?.misPatientId) {
-    return res.status(400).json({
-      success: false,
-      message: 'Patient not found',
-    });
-  }
+  const familyMember = await readFamilyMemberQuery(req);
+  const misPatientId = await resolveAppointmentsPatientId(req.user, familyMember);
 
   const { include_past, status } = req.query;
 
-  const requests = await misService.getAppointmentRequests(patient.misPatientId, {
+  const requests = await misService.getAppointmentRequests(misPatientId, {
     includePast: include_past === 'true',
     status: status as string,
   });
@@ -393,6 +406,9 @@ export const getAppointmentRequests = async (req: Request, res: Response) => {
     userId: req.user.id,
     phone: req.user.phone,
     req,
+    ...(familyMember.familyMemberId && {
+      metadata: { familyMemberId: familyMember.familyMemberId },
+    }),
   });
 
   return res.status(200).json({
@@ -419,16 +435,10 @@ export const getAppointmentDetails = async (req: Request, res: Response) => {
 
   const { appointmentId } = req.params;
 
-  const patient = await patientService.getPatientById(req.user.id);
+  const familyMember = await readFamilyMemberQuery(req);
+  const misPatientId = await resolveAppointmentsPatientId(req.user, familyMember);
 
-  if (!patient) {
-    return res.status(400).json({
-      success: false,
-      message: 'Patient not found',
-    });
-  }
-
-  const appointment = await misService.getAppointmentDetails(patient.misPatientId, appointmentId);
+  const appointment = await misService.getAppointmentDetails(misPatientId, appointmentId);
 
   auditLogService.log({
     event: AuditEvent.APPOINTMENT_VIEWED,
@@ -436,7 +446,11 @@ export const getAppointmentDetails = async (req: Request, res: Response) => {
     userId: req.user.id,
     phone: req.user.phone,
     req,
-    metadata: { appointmentId, source: 'mis' },
+    metadata: {
+      appointmentId,
+      source: 'mis',
+      ...(familyMember.familyMemberId && { familyMemberId: familyMember.familyMemberId }),
+    },
   });
 
   return res.status(200).json({

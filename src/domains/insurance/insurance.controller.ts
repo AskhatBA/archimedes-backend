@@ -295,9 +295,15 @@ export const getFamily = async (req: Request, res: Response) => {
     req.query.programId as string
   );
 
+  // Страховая перечисляет в семье и самого вызывающего, а `benId` — её id, не наш
+  // `misPatientId`, и приложению не с чем его сравнить. Отличить эту строку может только тот,
+  // кто знает beneficiaryId вызывающего, — здесь.
   return res.status(200).json({
     success: true,
-    family,
+    family: (family || []).map((member) => ({
+      ...member,
+      isSelf: member.benId === misInsurance.beneficiaryId,
+    })),
   });
 };
 

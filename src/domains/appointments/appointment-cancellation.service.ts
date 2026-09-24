@@ -60,31 +60,49 @@ const APPOINTMENT_SELECT = {
  * `appointment_id`, и это единственное, что связывает два идентификатора; сверка статусов
  * читает тот же список по той же причине.
  *
+ * Заявки МИС отдаёт по пациенту, а приём мог быть записан на родственника — тогда его заявка
+ * лежит у родственника. Поэтому спрашиваем по очереди самого владельца и всех, на кого он
+ * записывал (`patientId` его строк): это его собственные записи, чужих id здесь нет.
+ *
  * `null`, если МИС не ответил или такой заявки нет: тогда наверху это обычный 404.
  */
 const findRequestIdByMisAppointmentId = async (
   misAppointmentId: string,
   userId: string
 ): Promise<string | null> => {
-  try {
-    const patient = await patientService.getPatientById(userId);
-    if (!patient?.misPatientId) return null;
+  const [patient, bookedFor] = await Promise.all([
+    patientService.getPatientById(userId),
+    prismaClient.appointment.findMany({
+      where: { userId },
+      select: { patientId: true },
+      distinct: ['patientId'],
+    }),
+  ]);
 
-    const requests = await misService.getAppointmentRequests(patient.misPatientId, {
-      includePast: true,
-    });
+  const misPatientIds = [
+    ...new Set([patient?.misPatientId, ...bookedFor.map((row) => row.patientId)]),
+  ].filter((id): id is string => !!id);
 
-    return (
-      (requests || []).find((request) => request?.appointment_id === misAppointmentId)?.id ?? null
-    );
-  } catch (error) {
-    cancellationLogger.warn(
-      { err: error, misAppointmentId, userId },
-      'Could not ask MIS which request this appointment came from'
-    );
+  for (const misPatientId of misPatientIds) {
+    try {
+      const requests = await misService.getAppointmentRequests(misPatientId, {
+        includePast: true,
+      });
 
-    return null;
+      const requestId = (requests || []).find(
+        (request) => request?.appointment_id === misAppointmentId
+      )?.id;
+
+      if (requestId) return requestId;
+    } catch (error) {
+      cancellationLogger.warn(
+        { err: error, misAppointmentId, userId, misPatientId },
+        'Could not ask MIS which request this appointment came from'
+      );
+    }
   }
+
+  return null;
 };
 
 /**

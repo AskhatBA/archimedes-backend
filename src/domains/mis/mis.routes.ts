@@ -522,10 +522,32 @@ router.post('/create-appointment', authenticate, controller.createAppointment);
  *         meeting_start_url:
  *           type: string
  *           example: "https://us05web.zoom.us/s/82621241232?zak=eyJ0eXAiOiJKV1QiLCJzdiI6IjAwMDAwMiIsInptX3NrbSI6InptX28ybSIsImFsZyI6IkhTMjU2In0.eyJpc3MiOiJ3ZWIiLCJjbHQiOjAsIm1udW0iOiI4MjYyMTI0MjYxMiIsImF1ZCI6ImNsaWVudHNtIiwidWlkIjoiMlJpRjZWLVhRaHlXNDBkaVpOV3NsZyIsInppZCI6ImE0MmUyMTVlMzU0MDRhZTc4NWFjMzc0YjgyMzBjNDQ3Iiwic2siOiIwIiwic3R5IjoxMDAsIndjZCI6InVzMDUiLCJleHAiOjE3NzExMDEzMDc3ImlhdCI6Mfc3MTA5NDEwNywigWlkIjoiNkpDNWlsRFfTY3k4RmVGYmZZQUVuZyIsIrNpZCI6IiJ9.wfFK-x91l1FFedCFgquu7fYq4zxlmrDi-e80OH08zkI"
+ *   parameters:
+ *     FamilyMemberIdQuery:
+ *       name: familyMemberId
+ *       in: query
+ *       required: false
+ *       description: >-
+ *         `benId` of a family member (from `/insurance/family`) whose appointments to read
+ *         instead of the caller's own. Requires `programId`; refused with 403
+ *         `INSURANCE_FAMILY_MEMBER_NOT_FOUND` unless the insurer lists them in the family of
+ *         that programme and the programme is the caller's.
+ *       schema:
+ *         type: string
+ *     FamilyMemberProgramIdQuery:
+ *       name: programId
+ *       in: query
+ *       required: false
+ *       description: The caller's programme the family member is on. Required with `familyMemberId`.
+ *       schema:
+ *         type: string
  * /mis/appointments:
  *   get:
  *     summary: Get patient appointments from MIS
  *     tags: [MIS]
+ *     parameters:
+ *       - $ref: '#/components/parameters/FamilyMemberIdQuery'
+ *       - $ref: '#/components/parameters/FamilyMemberProgramIdQuery'
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -624,6 +646,9 @@ router.get('/appointments', authenticate, controller.getAppointments);
  *   get:
  *     summary: Get patient appointment history from MIS
  *     tags: [MIS]
+ *     parameters:
+ *       - $ref: '#/components/parameters/FamilyMemberIdQuery'
+ *       - $ref: '#/components/parameters/FamilyMemberProgramIdQuery'
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -752,6 +777,8 @@ router.delete('/appointments/:appointmentId', authenticate, controller.removeApp
  *         required: true
  *         schema:
  *           type: string
+ *       - $ref: '#/components/parameters/FamilyMemberIdQuery'
+ *       - $ref: '#/components/parameters/FamilyMemberProgramIdQuery'
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -860,6 +887,8 @@ router.get('/appointments/:appointmentId', authenticate, controller.getAppointme
  *         required: false
  *         schema:
  *           type: string
+ *       - $ref: '#/components/parameters/FamilyMemberIdQuery'
+ *       - $ref: '#/components/parameters/FamilyMemberProgramIdQuery'
  *     security:
  *       - bearerAuth: []
  *     responses:

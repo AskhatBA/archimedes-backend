@@ -343,6 +343,13 @@ router.get('/programs/:programId', authenticate, controller.getProgramById);
  *         cardNo:
  *           type: string
  *           example: "1234567890"
+ *         isSelf:
+ *           type: boolean
+ *           description: >-
+ *             The row of the caller themselves — the insurer lists the policy holder and
+ *             dependants alike. `benId` is the insurer's id, not `misPatientId`, so the app
+ *             cannot tell this row apart on its own.
+ *           example: false
  *     InsuranceFamilyResponse:
  *       type: object
  *       properties:

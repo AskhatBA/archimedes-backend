@@ -359,6 +359,35 @@ status sweep: a visit older than its lookback can stay `SCHEDULED`. Lives in
 `appointments.history.service.ts` for the same import-cycle reason as the admin service.
 Registered before `/:id`.
 
+### A family member's appointments
+
+A visit can be booked for a relative on the caller's programme (`familyMemberId` on
+`/mis/create-appointment`), but the MIS proxies read appointments by the patient id in the
+path, and that used to be the caller's own `misPatientId` — so the relative's bookings never
+showed up. `GET /mis/appointments`, `/mis/appointment-history`, `/mis/appointment-requests`
+and `/mis/appointments/:appointmentId` now take optional `?familyMemberId=&programId=` and
+then ask MIS with the relative's id instead. MIS accepts the insurer's `benId` from
+`/insurance/family` there — the same id the booking was created with and the status sweep
+reads the row by.
+
+That id comes from the client and opens someone's medical record, so
+`resolveAppointmentsPatientId` (`mis.family.service.ts`) accepts it only when `programId` is
+one of the caller's own programmes (the insurer answers `/family` for any id, so ownership is
+checked here) and the insurer lists `familyMemberId` in that programme's family. Anything
+else is a 403 `INSURANCE_FAMILY_MEMBER_NOT_FOUND`, and `familyMemberId` without `programId`
+is a 400. The family is cached in-process per user and programme for 10 minutes, because the
+app polls these lists every 40 seconds and one check costs three external calls. Views are
+audited with `familyMemberId` in the metadata.
+
+`GET /insurance/family` marks the caller's own row with `isSelf`: the insurer lists the
+policy holder in their own family, and its `benId` is the insurer's id rather than
+`misPatientId`, so the app has nothing to compare it with — only the backend, which resolved
+the caller's `beneficiaryId` for the call, can tell that row apart.
+
+Cancelling needs no parameter: the cancellation finds our row by the MIS appointment id
+through the requests of the account owner **and** of everyone the owner has booked for (the
+distinct `patientId`s of their own `Appointment` rows).
+
 ### Cancelling an appointment
 
 A patient cancels a visit with `PATCH /v1/api/appointments/:id/cancel`, and the app can ask
