@@ -544,7 +544,7 @@ the 3-hour reminder for the hot tier.
 
 ### Notification queue
 
-BullMQ queue (`appointment-notifications`) schedules push notifications via OneSignal. The worker (`src/shared/queues/notification.worker.ts`) runs in the same process, started from `server.ts`. Two reminders fire per appointment — 3 hours and 1 hour before it (or 30s/60s after creation in test mode via `NOTIFICATION_TEST_MODE=true`). Offsets are declared in `APPOINTMENT_REMINDERS` in `notification.queue.ts`. Job IDs are `appointment-<appointmentId>-<3h|1h>` to prevent duplicates; cancelling also removes the legacy `appointment-<appointmentId>` job from the old single-reminder scheme.
+BullMQ queue (`appointment-notifications`) schedules push notifications via Firebase Cloud Messaging (`firebase-admin`, `src/shared/lib/firebase`, credentials from `FIREBASE_PROJECT_ID` / `FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY`). `DeviceToken.deviceId` holds the FCM registration token; tokens FCM reports as unregistered are deleted on send, and a send that reaches no device throws so the job retries. The worker (`src/shared/queues/notification.worker.ts`) runs in the same process, started from `server.ts`. Two reminders fire per appointment — 3 hours and 1 hour before it (or 30s/60s after creation in test mode via `NOTIFICATION_TEST_MODE=true`). Offsets are declared in `APPOINTMENT_REMINDERS` in `notification.queue.ts`. Job IDs are `appointment-<appointmentId>-<3h|1h>` to prevent duplicates; cancelling also removes the legacy `appointment-<appointmentId>` job from the old single-reminder scheme.
 
 ### Path aliases
 

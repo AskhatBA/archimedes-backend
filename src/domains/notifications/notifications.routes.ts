@@ -53,7 +53,7 @@ const router = Router();
  *       properties:
  *         deviceId:
  *           type: string
- *           description: Unique device identifier (OneSignal player ID or FCM token)
+ *           description: FCM registration token of the device
  *           example: "abc123-def456-ghi789"
  *         platform:
  *           type: string

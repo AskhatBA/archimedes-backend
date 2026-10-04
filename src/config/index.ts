@@ -158,9 +158,12 @@ export const config = {
     apiUrl: process.env.ZOOM_API_URL || 'https://api.zoom.us/v2',
   },
 
-  oneSignal: {
-    appId: process.env.ONE_SIGNAL_APP_ID,
-    apiAuthKey: process.env.ONE_SIGNAL_API_AUTH_KEY,
+  // Service account from Firebase Console → Project settings → Service accounts.
+  firebase: {
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    // A one-line env var keeps the key's line breaks as literal `\n`.
+    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
   },
 
   notifications: {

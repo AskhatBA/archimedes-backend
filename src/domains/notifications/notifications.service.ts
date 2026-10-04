@@ -1,6 +1,6 @@
 import { Platform } from '@prisma/client';
 
-import { sendOneSignalPushNotification } from '@/shared/lib/one-signal/one-signal.service';
+import { FcmSendResult, sendFcmPushNotification } from '@/shared/lib/firebase/firebase.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
 import { AppError } from '@/shared/services/app-error.service';
 import * as db from '@/infrastructure/db';
@@ -68,6 +68,21 @@ export const getUserDeviceTokens = async (userId: string) => {
   });
 };
 
+// Drops tokens FCM reported as dead, so the next push to the user does not try them again.
+const removeStaleDeviceTokens = async (staleTokens: string[]) => {
+  if (staleTokens.length === 0) return;
+  const { count } = await db.prismaClient.deviceToken.deleteMany({
+    where: { deviceId: { in: staleTokens } },
+  });
+  notificationsLogger.info({ count }, 'Removed stale device tokens');
+};
+
+const toPushResponse = (result: FcmSendResult) => ({
+  successCount: result.successCount,
+  failureCount: result.failureCount,
+  errors: result.errors,
+});
+
 export const sendPushNotification = async (
   userId: string,
   title: string,
@@ -84,27 +99,32 @@ export const sendPushNotification = async (
     throw new AppError(ErrorCodes.NOTIFICATIONS_DEVICE_NOT_FOUND, 404);
   }
 
-  const playerIds = devices.map((device: { deviceId: string }) => device.deviceId);
+  const tokens = devices.map((device: { deviceId: string }) => device.deviceId);
 
-  // Send notification via OneSignal
-  const notification = {
-    playerIds,
-    heading: { en: title, ru: title },
-    content: { en: message, ru: message },
-    data: data || {},
-  };
-
-  // Device ids identify a user's handset, so only their count is logged.
+  // Device tokens identify a user's handset, so only their count is logged.
   notificationsLogger.debug(
-    { userId, deviceCount: playerIds.length, title },
+    { userId, deviceCount: tokens.length, title },
     'Sending push notification'
   );
 
   try {
-    const response = await sendOneSignalPushNotification(notification);
+    const result = await sendFcmPushNotification({ tokens, title, body: message, data });
+    await removeStaleDeviceTokens(result.staleTokens);
+
+    // Nothing delivered is a failure, so the reminder worker retries it.
+    if (result.successCount === 0) {
+      throw new Error(
+        `FCM delivered to none of ${tokens.length} device(s): ${result.errors.join(', ')}`
+      );
+    }
 
     notificationsLogger.info(
-      { userId, deviceCount: playerIds.length, oneSignalId: response?.data?.id ?? null },
+      {
+        userId,
+        deviceCount: tokens.length,
+        successCount: result.successCount,
+        pushMessageId: result.messageId,
+      },
       'Push notification sent'
     );
 
@@ -116,13 +136,13 @@ export const sendPushNotification = async (
         message,
         data: data || {},
         status: 'SENT',
-        oneSignalId: response?.data?.id || null,
-        oneSignalResponse: response?.data || null,
+        pushMessageId: result.messageId,
+        pushResponse: toPushResponse(result),
       },
     });
   } catch (error) {
     notificationsLogger.error(
-      { err: error, userId, deviceCount: playerIds.length },
+      { err: error, userId, deviceCount: tokens.length },
       'Push notification failed'
     );
 
@@ -134,7 +154,7 @@ export const sendPushNotification = async (
         message,
         data: data || {},
         status: 'FAILED',
-        oneSignalResponse: error instanceof Error ? { error: error.message } : {},
+        pushResponse: error instanceof Error ? { error: error.message } : {},
       },
     });
     throw error;
@@ -159,18 +179,11 @@ export const sendBulkPushNotification = async (
     return;
   }
 
-  const playerIds = devices.map((device: { deviceId: string }) => device.deviceId);
-
-  // Send notification via OneSignal
-  const notification = {
-    playerIds,
-    heading: { en: title, ru: title },
-    content: { en: message, ru: message },
-    data: data || {},
-  };
+  const tokens = devices.map((device: { deviceId: string }) => device.deviceId);
 
   try {
-    const response = await sendOneSignalPushNotification(notification);
+    const result = await sendFcmPushNotification({ tokens, title, body: message, data });
+    await removeStaleDeviceTokens(result.staleTokens);
 
     // Save notification to database for each user
     const notificationRecords = userIds.map((userId) => ({
@@ -179,8 +192,8 @@ export const sendBulkPushNotification = async (
       message,
       data: data || {},
       status: 'SENT' as const,
-      oneSignalId: response?.data?.id || null,
-      oneSignalResponse: response?.data || null,
+      pushMessageId: result.messageId,
+      pushResponse: toPushResponse(result),
     }));
 
     await db.prismaClient.notification.createMany({
@@ -194,7 +207,7 @@ export const sendBulkPushNotification = async (
       message,
       data: data || {},
       status: 'FAILED' as const,
-      oneSignalResponse: error instanceof Error ? { error: error.message } : {},
+      pushResponse: error instanceof Error ? { error: error.message } : {},
     }));
 
     await db.prismaClient.notification.createMany({
