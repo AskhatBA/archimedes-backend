@@ -116,7 +116,8 @@ export interface AppointmentItem {
 
 export interface InsuranceRequestPayload {
   resolverName: keyof typeof insuranceApiResolverDefault;
-  beneficiaryId?: string;
+  /** `null` sends no `Authorization` header at all; omitted sends it empty. */
+  beneficiaryId?: string | null;
   payload?: any;
   params?: any;
   query?: any;

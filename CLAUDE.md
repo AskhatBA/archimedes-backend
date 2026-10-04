@@ -222,7 +222,7 @@ their **own details** — `lastName` / `firstName` / `middleName` / `iin` / `dat
 authenticates the call in the `Authorization` header. That id is the insurer's own
 (`beneficiary_external_id`, else the MIS `external_id`) and never the MIS patient id the
 other `/insurance/*` calls fall back to: a patient with neither — a new user without
-insurance — is sent as the literal `Authorization: null`, with `insuranceId: null` and no
+insurance — is sent with `Authorization` null (axios then omits the header), with `insuranceId: null` and no
 programs lookup. Only a patient MIS cannot resolve at all is left `FAILED` for an operator.
 `dateBirth` is the stored `YYYY-MM-DD`
 widened to midnight **UTC**, so a birthday cannot slip a day on an eastern offset. A user

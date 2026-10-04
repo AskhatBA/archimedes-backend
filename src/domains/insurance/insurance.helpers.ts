@@ -57,7 +57,7 @@ export const insuranceRequest = async <T>({
       },
       params: query,
       headers: {
-        Authorization: beneficiaryId || '',
+        Authorization: beneficiaryId === null ? null : beneficiaryId || '',
       },
     });
 

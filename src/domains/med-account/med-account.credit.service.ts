@@ -186,7 +186,7 @@ const creditViaInsurer = async ({
  *
  * Only the insurer's own id counts here, never the MIS patient id the other insurance
  * calls fall back to: it resolves to `null` for a patient the insurer does not know (a new
- * user without insurance), whose top-up is then sent with `Authorization: null`, and to
+ * user without insurance), whose top-up is then sent with `Authorization` null, and to
  * `undefined` when MIS could not be asked or does not know the patient at all.
  *
  * Resolved again here rather than trusted from the row: MIS can be unreachable at the
