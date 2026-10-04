@@ -102,7 +102,7 @@ const recordTopup = async (context: PaymentSuccessContext): Promise<void> => {
     // between the payment starting and settling, but what was paid cannot change.
     amount: Math.round(context.amount),
     optionId: option?.id ?? null,
-    beneficiaryId: user ? await resolveBeneficiaryId(context.userId, user.phone) : null,
+    beneficiaryId: user ? ((await resolveBeneficiaryId(context.userId, user.phone)) ?? null) : null,
   });
 
   handlerLogger.info(

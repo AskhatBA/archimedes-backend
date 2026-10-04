@@ -74,11 +74,16 @@ export const getUserInsuranceDetails = async (userId: string, phone: string) => 
   //   };
   // }
 
+  // The insurer's own id for the patient, `null` for a patient the insurer does not know
+  // (no insurance, or a patient we created in MIS ourselves).
+  const externalId =
+    misPatientProfile?.profile?.insurance?.beneficiary_external_id ||
+    misPatient?.externalId ||
+    null;
+
   return {
-    beneficiaryId:
-      misPatientProfile?.profile?.insurance?.beneficiary_external_id ||
-      misPatient?.externalId ||
-      misPatient?.id,
+    beneficiaryId: externalId || misPatient?.id,
+    externalId,
   };
 };
 

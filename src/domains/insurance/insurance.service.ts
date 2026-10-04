@@ -412,14 +412,17 @@ export const getMedAccount = async (beneficiaryId: string) => {
  * patient and did not arrive, so it is raised rather than returned — the caller records the
  * top-up as FAILED for an operator to pick up. HTTP failures already come out of
  * `insuranceRequest` as an `AppError`.
+ *
+ * A patient the insurer has no id for (a new user without insurance) is sent as the literal
+ * `Authorization: null` — the payer is identified by the details in the body anyway.
  */
 export const topupMedAccount = async (
-  beneficiaryId: string,
+  beneficiaryId: string | null,
   payload: TopupBalancePayload
 ): Promise<TopupBalanceResponse> => {
   const response = await insuranceRequest<TopupBalanceResponse>({
     resolverName: INSURANCE_API_TOPUP_BALANCE,
-    beneficiaryId,
+    beneficiaryId: beneficiaryId ?? 'null',
     payload,
   });
 

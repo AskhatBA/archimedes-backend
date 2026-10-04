@@ -69,7 +69,7 @@ export const topupDirectly = async (req: Request, res: Response): Promise<void> 
   const beneficiaryId =
     overrides.beneficiaryId ?? (await resolveBeneficiaryId(req.user.id, req.user.phone));
 
-  if (!beneficiaryId) {
+  if (beneficiaryId === undefined) {
     throw new AppError('Не удалось определить beneficiaryId в МИС', 502);
   }
 

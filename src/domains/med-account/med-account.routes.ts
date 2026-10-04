@@ -403,7 +403,7 @@ router.get('/topups', authenticate, asyncHandler(controller.getMyTopups));
  *                 example: 1000
  *               beneficiaryId:
  *                 type: string
- *                 description: Overrides the id resolved from MIS (the Authorization header)
+ *                 description: Overrides the insurer id resolved from MIS (the Authorization header, "null" when the patient has none)
  *               insuranceId:
  *                 type: string
  *                 nullable: true

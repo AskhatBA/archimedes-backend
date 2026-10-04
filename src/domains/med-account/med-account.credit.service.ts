@@ -62,7 +62,14 @@ const isCurrentProgram = (program: Program, now: number): boolean => {
  * A failure to read the list is not worth failing a settled payment over: it degrades to the
  * same `null` rather than stranding the money on our side.
  */
-const resolveMedAccountProgramId = async (beneficiaryId: string): Promise<string | null> => {
+const resolveMedAccountProgramId = async (
+  beneficiaryId: string | null
+): Promise<string | null> => {
+  // A patient the insurer has no id for has no programs to read either.
+  if (!beneficiaryId) {
+    return null;
+  }
+
   try {
     const programs = await insuranceService.getPrograms(beneficiaryId);
 
@@ -112,7 +119,8 @@ const extractExternalRef = (response: {
  *
  * It identifies the payer by their own details rather than by the beneficiary id — that
  * only authenticates the call — so the patient row travels with the amount. `insuranceId`
- * is the one field allowed to be `null`, for a patient with no `isMedAccount` program.
+ * is the one field allowed to be `null`, for a patient with no `isMedAccount` program —
+ * which includes every patient without a `beneficiaryId`.
  *
  * Exported so the sandbox endpoint can send the exact same body the paid path sends
  * instead of a hand-rolled copy of it.
@@ -123,7 +131,7 @@ export const buildTopupPayload = async ({
   patient,
   phone,
 }: {
-  beneficiaryId: string;
+  beneficiaryId: string | null;
   /** Amount in tenge. */
   amount: number;
   patient: CreditPatient;
@@ -153,7 +161,7 @@ const creditViaInsurer = async ({
   patient,
   phone,
 }: {
-  beneficiaryId: string;
+  beneficiaryId: string | null;
   /** Amount in tenge. */
   amount: number;
   /** Our top-up id, logged so our row can be paired with the insurer's. */
@@ -176,6 +184,11 @@ const creditViaInsurer = async ({
 /**
  * Best-effort lookup of the insurer beneficiary a top-up belongs to.
  *
+ * Only the insurer's own id counts here, never the MIS patient id the other insurance
+ * calls fall back to: it resolves to `null` for a patient the insurer does not know (a new
+ * user without insurance), whose top-up is then sent with `Authorization: null`, and to
+ * `undefined` when MIS could not be asked or does not know the patient at all.
+ *
  * Resolved again here rather than trusted from the row: MIS can be unreachable at the
  * moment a payment settles, and a top-up whose `beneficiaryId` is null must still be
  * creditable later instead of needing an operator to dig the id out by hand.
@@ -183,18 +196,18 @@ const creditViaInsurer = async ({
 export const resolveBeneficiaryId = async (
   userId: string,
   phone: string
-): Promise<string | null> => {
+): Promise<string | null | undefined> => {
   try {
     const insurance = await misService.getUserInsuranceDetails(userId, phone);
 
-    return insurance?.beneficiaryId ?? null;
+    return insurance ? insurance.externalId : undefined;
   } catch (error) {
     creditLogger.warn(
       { err: error, userId },
       'Could not resolve beneficiary for med-account topup'
     );
 
-    return null;
+    return undefined;
   }
 };
 
@@ -247,7 +260,9 @@ export const creditTopup = async (topupId: string): Promise<MedAccountTopupStatu
   const beneficiaryId =
     topup.beneficiaryId ?? (await resolveBeneficiaryId(topup.userId, topup.user.phone));
 
-  if (!beneficiaryId) {
+  // `null` is a patient with no insurer id and is credited as such; only a patient MIS could
+  // not resolve at all is left for an operator.
+  if (beneficiaryId === undefined) {
     await prismaClient.medAccountTopup.update({
       where: { id: topupId },
       data: {
