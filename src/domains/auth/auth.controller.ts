@@ -15,6 +15,7 @@ import * as auditLogService from '@/shared/services/audit-log.service';
 import { AuditEvent } from '@/shared/services/audit-log.service';
 import * as smsService from '@/infrastructure/sms/sms.service';
 import * as insuranceService from '@/domains/insurance/insurance.service';
+import { ensureBeneficiaryId } from '@/domains/insurance/beneficiary.service';
 import * as patientService from '@/domains/patient/patient.service';
 import * as misService from '@/domains/mis/mis.service';
 
@@ -303,6 +304,8 @@ export const registerComplete = async (req: Request, res: Response) => {
     metadata: { flow: 'registration' },
   });
 
+  ensureBeneficiaryId(user.id, phone);
+
   return res.status(201).json({
     success: true,
     accessToken: tokens.accessToken,
@@ -358,6 +361,8 @@ export const verifyOtp = async (req: Request, res: Response) => {
     phone,
     req,
   });
+
+  ensureBeneficiaryId(user.id, user.phone);
 
   return res.status(200).json({
     success: true,
@@ -549,6 +554,8 @@ export const verifyPin = async (req: Request, res: Response) => {
     phone: user.phone,
     req,
   });
+
+  ensureBeneficiaryId(user.id, user.phone);
 
   return res.status(200).json({
     success: true,

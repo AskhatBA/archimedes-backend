@@ -162,6 +162,31 @@ The `program-orders` domain serves them:
 moves are audited as `PROGRAM_ORDER_STATUS_CHANGED`, and the handler's write as
 `PROGRAM_ORDER_CREATED`.
 
+### Insurer beneficiary id
+
+Every `/insurance/*` call (and the med-account top-up) authenticates to the insurer with the
+patient's `benId`, sent as `Authorization`. It comes from the insurer itself —
+`GET /v3/checkPhone?iin=` answers `{ errorCode, phone, benId }` — and is stored on
+`Patient.beneficiaryId`. MIS is no longer asked for it.
+
+`getBeneficiaryId(userId, phone)` (`src/domains/insurance/beneficiary.service.ts`) is the only
+way to read it:
+
+- the stored value when there is one, with no external call;
+- otherwise `checkPhone` by the profile's IIN (the demo account uses `DEMO_MIS_ACCOUNT_IIN`, as it
+  did with MIS); a returned `benId` is used at once and written to the profile without
+  waiting for the write;
+- `null` when the insurer does not know the IIN (no insurance) — the `/insurance/*`
+  endpoints then answer 404 `INSURANCE_NOT_FOUND_IN_MIS`; there is no fallback to the MIS
+  patient id. That answer is cached in-process per user for 10 minutes, because the app
+  polls some of these screens every 40 seconds;
+- `undefined` when there is no profile or the insurer could not be asked. Never throws.
+
+Login (`verify-otp`, `verify-pin`), registration and `POST /patient/profile` call
+`ensureBeneficiaryId`, which fills an empty `beneficiaryId` in the background and never
+overwrites a stored one. A dashboard IIN change sets it back to `null`, so it is looked up
+again by the new IIN.
+
 ### Medical-account top-ups
 
 The medical account ("медсчёт") is the prepaid balance the clinic keeps for a patient. It
@@ -194,8 +219,8 @@ When the payment settles the purpose's handler
 (`med-account.payment-handler.ts`) writes a `MedAccountTopup`. `paymentId` is unique, so a
 replayed FreedomPay callback or the reconciliation sweep cannot record the same top-up
 twice, and a top-up therefore never exists without money behind it. The row snapshots the
-`beneficiaryId` resolved from MIS at that moment — best effort, because MIS can be down
-when a payment settles.
+`beneficiaryId` resolved at that moment (see *Insurer beneficiary id*) — best effort,
+because the insurer can be down when a payment settles.
 
 ### Crediting a top-up to the insurer
 
@@ -211,19 +236,19 @@ system), whose worker calls `creditTopup`, which:
   same money twice;
 - returns immediately when `MED_ACCOUNT_CREDIT_ENABLED=false`, logging that the top-up is
   waiting for an operator — the switch to pull if the insurer's endpoint misbehaves;
-- re-resolves `beneficiaryId` when the row has none, so a MIS outage at payment time does
-  not strand a top-up;
+- re-resolves `beneficiaryId` when the row has none, so an insurer outage at payment time
+  does not strand a top-up;
 - marks the row `CREDITED` with whatever reference the insurer returned, or `FAILED` with
   the error, and audits both as `MED_ACCOUNT_TOPUP_CREDITED`.
 
 `creditViaInsurer` builds the insurer's payload. `/v3/topupBalance` identifies the payer by
 their **own details** — `lastName` / `firstName` / `middleName` / `iin` / `dateBirth` /
 `phoneMobile`, read from our `Patient` row and `User.phone`; the `beneficiaryId` only
-authenticates the call in the `Authorization` header. That id is the insurer's own
-(`beneficiary_external_id`, else the MIS `external_id`) and never the MIS patient id the
-other `/insurance/*` calls fall back to: a patient with neither — a new user without
-insurance — is sent with `Authorization` null (axios then omits the header), with `insuranceId: null` and no
-programs lookup. Only a patient MIS cannot resolve at all is left `FAILED` for an operator.
+authenticates the call in the `Authorization` header. That id is the insurer's
+`benId` (see *Insurer beneficiary id*): a patient the insurer does not know — a new user
+without insurance — is sent with `Authorization` null (axios then omits the header), with
+`insuranceId: null` and no programs lookup. Only a patient the insurer could not be asked
+about at all is left `FAILED` for an operator.
 `dateBirth` is the stored `YYYY-MM-DD`
 widened to midnight **UTC**, so a birthday cannot slip a day on an eastern offset. A user
 with no `Patient` profile cannot be identified at all and goes straight to `FAILED`.
@@ -381,13 +406,13 @@ one of the caller's own programmes (the insurer answers `/family` for any id, so
 checked here) and the insurer lists `familyMemberId` in that programme's family. Anything
 else is a 403 `INSURANCE_FAMILY_MEMBER_NOT_FOUND`, and `familyMemberId` without `programId`
 is a 400. The family is cached in-process per user and programme for 10 minutes, because the
-app polls these lists every 40 seconds and one check costs three external calls. Views are
+app polls these lists every 40 seconds and one check costs two insurer calls. Views are
 audited with `familyMemberId` in the metadata.
 
 `GET /insurance/family` marks the caller's own row with `isSelf`: the insurer lists the
 policy holder in their own family, and its `benId` is the insurer's id rather than
-`misPatientId`, so the app has nothing to compare it with — only the backend, which resolved
-the caller's `beneficiaryId` for the call, can tell that row apart.
+`misPatientId`, so the app has nothing to compare it with — only the backend, which holds
+the caller's `beneficiaryId`, can tell that row apart.
 
 Cancelling needs no parameter: the cancellation finds our row by the MIS appointment id
 through the requests of the account owner **and** of everyone the owner has booked for (the

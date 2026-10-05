@@ -5,8 +5,7 @@ import { AppError } from '@/shared/services/app-error.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
 import * as auditLogService from '@/shared/services/audit-log.service';
 import { AuditEvent } from '@/shared/services/audit-log.service';
-import * as misService from '@/domains/mis/mis.service';
-
+import { getBeneficiaryId } from './beneficiary.service';
 import * as insuranceService from './insurance.service';
 
 export const sendOtp = async (req: Request, res: Response) => {
@@ -120,9 +119,9 @@ export const refundRequest = async (req: Request, res: Response) => {
 
   const { date, amount, files, personId, programId, category, comments } = req.body;
 
-  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
 
-  if (!misInsurance?.beneficiaryId) {
+  if (!beneficiaryId) {
     auditLogService.log({
       event: AuditEvent.REFUND_ACCESS_DENIED,
       success: false,
@@ -147,7 +146,7 @@ export const refundRequest = async (req: Request, res: Response) => {
       category,
       comments,
     },
-    misInsurance.beneficiaryId,
+    beneficiaryId,
     req.user.id
   );
 
@@ -171,9 +170,9 @@ export const getRefundRequests = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
 
-  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
 
-  if (!misInsurance?.beneficiaryId) {
+  if (!beneficiaryId) {
     auditLogService.log({
       event: AuditEvent.REFUND_ACCESS_DENIED,
       success: false,
@@ -188,7 +187,7 @@ export const getRefundRequests = async (req: Request, res: Response) => {
     });
   }
 
-  const refundRequests = await insuranceService.getRefundRequests(misInsurance.beneficiaryId);
+  const refundRequests = await insuranceService.getRefundRequests(beneficiaryId);
 
   auditLogService.log({
     event: AuditEvent.REFUND_REQUESTS_VIEWED,
@@ -232,16 +231,16 @@ export const getPrograms = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
 
-  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
 
-  if (!misInsurance?.beneficiaryId) {
+  if (!beneficiaryId) {
     return res.status(404).json({
       success: false,
       message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
     });
   }
 
-  const programs = await insuranceService.getPrograms(misInsurance.beneficiaryId);
+  const programs = await insuranceService.getPrograms(beneficiaryId);
 
   return res.status(200).json({
     success: true,
@@ -254,9 +253,9 @@ export const getProgramById = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
 
-  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
 
-  if (!misInsurance?.beneficiaryId) {
+  if (!beneficiaryId) {
     return res.status(404).json({
       success: false,
       message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
@@ -264,7 +263,7 @@ export const getProgramById = async (req: Request, res: Response) => {
   }
 
   const program = await insuranceService.getProgramById(
-    misInsurance.beneficiaryId,
+    beneficiaryId,
     req.params.programId
   );
 
@@ -281,9 +280,9 @@ export const getFamily = async (req: Request, res: Response) => {
 
   await query('programId').notEmpty().withMessage('Program ID is required').run(req);
 
-  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
 
-  if (!misInsurance?.beneficiaryId) {
+  if (!beneficiaryId) {
     return res.status(404).json({
       success: false,
       message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
@@ -291,7 +290,7 @@ export const getFamily = async (req: Request, res: Response) => {
   }
 
   const family = await insuranceService.getFamily(
-    misInsurance.beneficiaryId,
+    beneficiaryId,
     req.query.programId as string
   );
 
@@ -302,7 +301,7 @@ export const getFamily = async (req: Request, res: Response) => {
     success: true,
     family: (family || []).map((member) => ({
       ...member,
-      isSelf: member.benId === misInsurance.beneficiaryId,
+      isSelf: member.benId === beneficiaryId,
     })),
   });
 };
@@ -312,9 +311,9 @@ export const getInsuranceCertificate = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
 
-  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
 
-  if (!misInsurance?.beneficiaryId) {
+  if (!beneficiaryId) {
     return res.status(404).json({
       success: false,
       message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
@@ -322,7 +321,7 @@ export const getInsuranceCertificate = async (req: Request, res: Response) => {
   }
 
   const certificate = await insuranceService.getInsuranceCertificate(
-    misInsurance.beneficiaryId,
+    beneficiaryId,
     req.params.programId
   );
 
@@ -336,16 +335,16 @@ export const getAvailableCities = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
 
-  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
 
-  if (!misInsurance?.beneficiaryId) {
+  if (!beneficiaryId) {
     return res.status(404).json({
       success: false,
       message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
     });
   }
 
-  const cities = await insuranceService.getAvailableCities(misInsurance.beneficiaryId);
+  const cities = await insuranceService.getAvailableCities(beneficiaryId);
 
   return res.status(200).json({
     success: true,
@@ -370,9 +369,9 @@ export const getMedicalNetwork = async (req: Request, res: Response) => {
     });
   }
 
-  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
 
-  if (!misInsurance?.beneficiaryId) {
+  if (!beneficiaryId) {
     return res.status(404).json({
       success: false,
       message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
@@ -380,7 +379,7 @@ export const getMedicalNetwork = async (req: Request, res: Response) => {
   }
 
   const clinics = await insuranceService.getMedicalNetwork({
-    beneficiaryId: misInsurance.beneficiaryId,
+    beneficiaryId,
     programId: req.query.programId as string,
     cityId: req.query.cityId as string,
     type: req.query.type as string,
@@ -397,16 +396,16 @@ export const getContacts = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
 
-  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
 
-  if (!misInsurance?.beneficiaryId) {
+  if (!beneficiaryId) {
     return res.status(404).json({
       success: false,
       message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
     });
   }
 
-  const contacts = await insuranceService.getContacts(misInsurance.beneficiaryId);
+  const contacts = await insuranceService.getContacts(beneficiaryId);
 
   return res.status(200).json({
     success: true,
@@ -430,9 +429,9 @@ export const getElectronicReferrals = async (req: Request, res: Response) => {
     });
   }
 
-  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
 
-  if (!misInsurance?.beneficiaryId) {
+  if (!beneficiaryId) {
     return res.status(404).json({
       errorCode: -1,
       data: [],
@@ -441,7 +440,7 @@ export const getElectronicReferrals = async (req: Request, res: Response) => {
   }
 
   const response = await insuranceService.getElectronicReferrals(
-    misInsurance.beneficiaryId,
+    beneficiaryId,
     req.query.programId as string
   );
 
@@ -456,16 +455,16 @@ export const getClinicTypes = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
 
-  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
 
-  if (!misInsurance?.beneficiaryId) {
+  if (!beneficiaryId) {
     return res.status(404).json({
       success: false,
       message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
     });
   }
 
-  const response = await insuranceService.getClinicTypes(misInsurance.beneficiaryId);
+  const response = await insuranceService.getClinicTypes(beneficiaryId);
 
   return res.status(200).json({
     success: true,
@@ -496,9 +495,9 @@ export const getQrAppointments = async (req: Request, res: Response) => {
     });
   }
 
-  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
 
-  if (!misInsurance?.beneficiaryId) {
+  if (!beneficiaryId) {
     return res.status(404).json({
       success: false,
       message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
@@ -506,7 +505,7 @@ export const getQrAppointments = async (req: Request, res: Response) => {
   }
 
   const data = await insuranceService.getQrAppointments(
-    misInsurance.beneficiaryId,
+    beneficiaryId,
     req.query.clinicId as string
   );
 
@@ -533,9 +532,9 @@ export const submitQrAppointment = async (req: Request, res: Response) => {
     });
   }
 
-  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
 
-  if (!misInsurance?.beneficiaryId) {
+  if (!beneficiaryId) {
     return res.status(404).json({
       success: false,
       message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
@@ -543,7 +542,7 @@ export const submitQrAppointment = async (req: Request, res: Response) => {
   }
 
   const data = await insuranceService.submitQrAppointment(
-    misInsurance.beneficiaryId,
+    beneficiaryId,
     req.query.clinicId as string,
     Number(req.query.appCode)
   );
@@ -570,9 +569,9 @@ export const getPriceList = async (req: Request, res: Response) => {
     });
   }
 
-  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
 
-  if (!misInsurance?.beneficiaryId) {
+  if (!beneficiaryId) {
     return res.status(404).json({
       success: false,
       message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
@@ -580,7 +579,7 @@ export const getPriceList = async (req: Request, res: Response) => {
   }
 
   const priceList = await insuranceService.getPriceList(
-    misInsurance.beneficiaryId,
+    beneficiaryId,
     req.query.clinicId as string
   );
 
@@ -607,9 +606,9 @@ export const getMedicService = async (req: Request, res: Response) => {
     });
   }
 
-  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
 
-  if (!misInsurance?.beneficiaryId) {
+  if (!beneficiaryId) {
     return res.status(404).json({
       success: false,
       message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
@@ -617,7 +616,7 @@ export const getMedicService = async (req: Request, res: Response) => {
   }
 
   const medicService = await insuranceService.getMedicService(
-    misInsurance.beneficiaryId,
+    beneficiaryId,
     req.query.clinicId as string,
     req.query.medicIIN as string
   );
@@ -645,9 +644,9 @@ export const getServicePrice = async (req: Request, res: Response) => {
     });
   }
 
-  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
 
-  if (!misInsurance?.beneficiaryId) {
+  if (!beneficiaryId) {
     return res.status(404).json({
       success: false,
       message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
@@ -655,7 +654,7 @@ export const getServicePrice = async (req: Request, res: Response) => {
   }
 
   const servicePrice = await insuranceService.getServicePrice(
-    misInsurance.beneficiaryId,
+    beneficiaryId,
     req.query.clinicId as string,
     req.query.serviceId as string
   );
@@ -671,16 +670,16 @@ export const getClinicsMO = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
 
-  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
 
-  if (!misInsurance?.beneficiaryId) {
+  if (!beneficiaryId) {
     return res.status(404).json({
       success: false,
       message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
     });
   }
 
-  const clinicsMO = await insuranceService.getClinicsMO(misInsurance.beneficiaryId);
+  const clinicsMO = await insuranceService.getClinicsMO(beneficiaryId);
 
   return res.status(200).json({
     success: true,
@@ -693,16 +692,16 @@ export const getPayPrograms = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
 
-  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
 
-  if (!misInsurance?.beneficiaryId) {
+  if (!beneficiaryId) {
     return res.status(404).json({
       success: false,
       message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
     });
   }
 
-  const payPrograms = await insuranceService.getPayPrograms(misInsurance.beneficiaryId);
+  const payPrograms = await insuranceService.getPayPrograms(beneficiaryId);
 
   return res.status(200).json({
     success: true,
@@ -715,16 +714,16 @@ export const getMedAccount = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
 
-  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
 
-  if (!misInsurance?.beneficiaryId) {
+  if (!beneficiaryId) {
     return res.status(404).json({
       success: false,
       message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
     });
   }
 
-  const medAccount = await insuranceService.getMedAccount(misInsurance.beneficiaryId);
+  const medAccount = await insuranceService.getMedAccount(beneficiaryId);
 
   return res.status(200).json({
     success: true,
@@ -758,9 +757,9 @@ export const updateElectronicReferralServiceStatus = async (req: Request, res: R
     .withMessage('Service status referral id is required')
     .run(req);
 
-  const misInsurance = await misService.getUserInsuranceDetails(req.user.id, req.user.phone);
+  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
 
-  if (!misInsurance?.beneficiaryId) {
+  if (!beneficiaryId) {
     return res.status(404).json({
       success: false,
       message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
@@ -768,7 +767,7 @@ export const updateElectronicReferralServiceStatus = async (req: Request, res: R
   }
 
   await insuranceService.updateElectronicReferralServiceStatus(
-    misInsurance.beneficiaryId,
+    beneficiaryId,
     req.params.electronicReferralId,
     req.body.serviceStatus,
     req.body.satisfactionLevel

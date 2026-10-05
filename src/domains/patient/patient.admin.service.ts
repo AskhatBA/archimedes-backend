@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 
+import { forgetBeneficiaryLookup } from '@/domains/insurance/beneficiary.service';
 import * as misService from '@/domains/mis/mis.service';
 import * as db from '@/infrastructure/db';
 import { ErrorCodes } from '@/shared/constants/error-codes';
@@ -158,13 +159,17 @@ export const updatePatient = async (
         // name part changes: re-encrypting it under the current key also repairs a row whose
         // stored `fullName` no longer decrypts.
         fullName: `${next.firstName} ${next.lastName}`,
-        ...(iinChanged && { iin: next.iin, misPatientId }),
+        // The insurer's `benId` belongs to the old IIN; it is looked up again by the new one
+        // on the next insurance call.
+        ...(iinChanged && { iin: next.iin, misPatientId, beneficiaryId: null }),
       },
       select: PATIENT_LIST_SELECT,
     });
   } catch (err) {
     throw toConflict(err);
   }
+
+  if (iinChanged) forgetBeneficiaryLookup(current.userId);
 
   return {
     patient: toListItem(updated),

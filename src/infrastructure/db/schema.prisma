@@ -47,17 +47,19 @@ model User {
 }
 
 model Patient {
-  id           String @id @default(uuid()) @db.Uuid
-  userId       String @unique @db.Uuid
-  firstName    String
-  lastName     String
-  patronymic   String
-  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fullName     String
-  birthDate    String
-  gender       String
-  iin          String @unique
-  misPatientId String @unique
+  id            String  @id @default(uuid()) @db.Uuid
+  userId        String  @unique @db.Uuid
+  firstName     String
+  lastName      String
+  patronymic    String
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName      String
+  birthDate     String
+  gender        String
+  iin           String  @unique
+  misPatientId  String  @unique
+  /// The insurer's `benId` from `/v3/checkPhone`, keyed by `iin`. Null until resolved.
+  beneficiaryId String?
 }
 
 model Doctor {

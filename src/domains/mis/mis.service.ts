@@ -1,6 +1,3 @@
-import { getPatientById } from '@/domains/patient/patient.service';
-// import { config, isDevelopment } from '@/config';
-import { useDemoAccount } from '@/shared/helpers';
 import { zoomService } from '@/shared/lib/zoom/zoom.service';
 import * as appointmentService from '@/domains/appointments/appointments.service';
 import * as insuranceService from '@/domains/insurance/insurance.service';
@@ -31,7 +28,6 @@ import {
   MIS_API_GET_SPECIALIZATION_BY_BRANCH_ID,
   MIS_API_GET_USER_APPOINTMENTS,
   MIS_API_GET_USER_BY_PHONE,
-  MIS_API_GET_USER_PROFILE_BY_ID,
   MIS_API_LABORATORY_RESULTS,
   MIS_API_GET_APPOINTMENT_DETAILS,
   MIS_API_GET_APPOINTMENT_REQUESTS,
@@ -50,42 +46,6 @@ import {
   MISAppointmentDetailsResponse,
   MISAppointmentRequestsResponse,
 } from './mis.types';
-
-export const getUserInsuranceDetails = async (userId: string, phone: string) => {
-  const patient = await getPatientById(userId);
-  if (!patient) return;
-
-  const { isDemoAccount, misIin } = useDemoAccount();
-  const showDemo = isDemoAccount(phone, patient.iin);
-
-  const misPatient = await findPatientByIinAndPhone(showDemo ? misIin : patient.iin);
-  if (!misPatient) return;
-
-  const misPatientProfile = await misRequest<MISFindPatientResponse>({
-    resolverName: MIS_API_GET_USER_PROFILE_BY_ID,
-    params: {
-      userId: misPatient.id,
-    },
-  });
-
-  // if ((isDevelopment && config.insuranceService.testId) || showDemo) {
-  //   return {
-  //     beneficiaryId: config.insuranceService.testId,
-  //   };
-  // }
-
-  // The insurer's own id for the patient, `null` for a patient the insurer does not know
-  // (no insurance, or a patient we created in MIS ourselves).
-  const externalId =
-    misPatientProfile?.profile?.insurance?.beneficiary_external_id ||
-    misPatient?.externalId ||
-    null;
-
-  return {
-    beneficiaryId: externalId || misPatient?.id,
-    externalId,
-  };
-};
 
 export const findPatientByIinAndPhone = async (
   iin: string,

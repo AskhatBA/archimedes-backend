@@ -1,9 +1,8 @@
+import { getBeneficiaryId } from '@/domains/insurance/beneficiary.service';
 import * as insuranceService from '@/domains/insurance/insurance.service';
 import { getPatientById } from '@/domains/patient/patient.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
 import { AppError } from '@/shared/services/app-error.service';
-
-import { getUserInsuranceDetails } from './mis.service';
 
 /**
  * Чьи приёмы читать из МИС: владельца аккаунта или члена его семьи.
@@ -26,8 +25,8 @@ export interface FamilyMemberQuery {
 
 /**
  * Состав семьи держим в памяти: список приёмов опрашивается раз в 40 секунд, а каждая
- * проверка — это три запроса во внешние системы (МИС за beneficiaryId, программы и семья
- * у страховой). Новый родственник в полисе появится здесь не позже чем через TTL.
+ * проверка — это два запроса к страховой (программы и семья). Новый родственник в полисе
+ * появится здесь не позже чем через TTL.
  */
 const FAMILY_CACHE_TTL_MS = 10 * 60 * 1000;
 const FAMILY_CACHE_SWEEP_SIZE = 1000;
@@ -59,17 +58,17 @@ const readFamilyBenIds = async (
 
   if (cached && cached.expiresAt > Date.now()) return cached.benIds;
 
-  const insurance = await getUserInsuranceDetails(user.id, user.phone);
+  const beneficiaryId = await getBeneficiaryId(user.id, user.phone);
 
-  if (!insurance?.beneficiaryId) {
+  if (!beneficiaryId) {
     throw new AppError(ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS, 404);
   }
 
-  const programs = await insuranceService.getPrograms(insurance.beneficiaryId);
+  const programs = await insuranceService.getPrograms(beneficiaryId);
   const ownsProgram = (programs || []).some((program) => String(program.id) === programId);
 
   const family = ownsProgram
-    ? await insuranceService.getFamily(insurance.beneficiaryId, programId)
+    ? await insuranceService.getFamily(beneficiaryId, programId)
     : [];
 
   const benIds = new Set(

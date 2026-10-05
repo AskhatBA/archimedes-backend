@@ -2,9 +2,9 @@ import { MedAccountTopupStatus } from '@prisma/client';
 
 import { config } from '@/config';
 import { prismaClient } from '@/infrastructure/db';
+import { getBeneficiaryId } from '@/domains/insurance/beneficiary.service';
 import * as insuranceService from '@/domains/insurance/insurance.service';
 import type { Program, TopupBalancePayload } from '@/domains/insurance/insurance.types';
-import * as misService from '@/domains/mis/mis.service';
 import { createLogger } from '@/shared/lib/logger';
 import * as auditLogService from '@/shared/services/audit-log.service';
 import { AuditEvent } from '@/shared/services/audit-log.service';
@@ -184,32 +184,20 @@ const creditViaInsurer = async ({
 /**
  * Best-effort lookup of the insurer beneficiary a top-up belongs to.
  *
- * Only the insurer's own id counts here, never the MIS patient id the other insurance
- * calls fall back to: it resolves to `null` for a patient the insurer does not know (a new
- * user without insurance), whose top-up is then sent with `Authorization` null, and to
- * `undefined` when MIS could not be asked or does not know the patient at all.
+ * The insurer's own `benId` — stored on the patient profile, otherwise asked from
+ * `/v3/checkPhone` by the profile's IIN. It resolves to `null` for a patient the insurer
+ * does not know (a new user without insurance), whose top-up is then sent with
+ * `Authorization` null, and to `undefined` when there is no profile or the insurer could not
+ * be asked.
  *
- * Resolved again here rather than trusted from the row: MIS can be unreachable at the
- * moment a payment settles, and a top-up whose `beneficiaryId` is null must still be
+ * Resolved again here rather than trusted from the row: the insurer can be unreachable at
+ * the moment a payment settles, and a top-up whose `beneficiaryId` is null must still be
  * creditable later instead of needing an operator to dig the id out by hand.
  */
-export const resolveBeneficiaryId = async (
+export const resolveBeneficiaryId = (
   userId: string,
   phone: string
-): Promise<string | null | undefined> => {
-  try {
-    const insurance = await misService.getUserInsuranceDetails(userId, phone);
-
-    return insurance ? insurance.externalId : undefined;
-  } catch (error) {
-    creditLogger.warn(
-      { err: error, userId },
-      'Could not resolve beneficiary for med-account topup'
-    );
-
-    return undefined;
-  }
-};
+): Promise<string | null | undefined> => getBeneficiaryId(userId, phone);
 
 /**
  * Hands one paid top-up to the insurer and records what came back.
@@ -260,14 +248,14 @@ export const creditTopup = async (topupId: string): Promise<MedAccountTopupStatu
   const beneficiaryId =
     topup.beneficiaryId ?? (await resolveBeneficiaryId(topup.userId, topup.user.phone));
 
-  // `null` is a patient with no insurer id and is credited as such; only a patient MIS could
-  // not resolve at all is left for an operator.
+  // `null` is a patient with no insurer id and is credited as such; only a patient the
+  // insurer could not be asked about at all is left for an operator.
   if (beneficiaryId === undefined) {
     await prismaClient.medAccountTopup.update({
       where: { id: topupId },
       data: {
         status: MedAccountTopupStatus.FAILED,
-        comment: 'Не удалось определить beneficiaryId в МИС',
+        comment: 'Не удалось определить beneficiaryId в страховой',
       },
     });
 

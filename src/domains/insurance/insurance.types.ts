@@ -137,6 +137,8 @@ export interface ClinicType {
 export interface CheckIinResponse {
   errorCode: number;
   phone?: string;
+  /** Id застрахованного у страховой — то, что уходит в `Authorization` остальных `/v3/*`. */
+  benId?: string;
   message?: string;
 }
 

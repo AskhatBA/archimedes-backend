@@ -7,6 +7,7 @@ import { AuditEvent } from '@/shared/services/audit-log.service';
 import { useDemoAccount } from '@/shared/helpers';
 import { Gender } from '@/shared/types/gender';
 
+import { ensureBeneficiaryId, forgetBeneficiaryLookup } from '../insurance/beneficiary.service';
 import * as misService from '../mis/mis.service';
 
 import * as patientAdminService from './patient.admin.service';
@@ -124,6 +125,9 @@ export const createPatientProfile = async (req: Request, res: Response) => {
     metadata: { iin },
   });
 
+  forgetBeneficiaryLookup(req.user.id);
+  ensureBeneficiaryId(req.user.id, req.user.phone);
+
   return res.status(200).json({ success: true, patient: newPatient });
 };
 
@@ -162,6 +166,9 @@ export const createDemoPatient = async (req: Request, res: Response) => {
     req,
     metadata: { iin: demoIin, demo: true },
   });
+
+  forgetBeneficiaryLookup(req.user.id);
+  ensureBeneficiaryId(req.user.id, req.user.phone);
 
   return res.status(200).json({ success: true, patient: newPatient });
 };
