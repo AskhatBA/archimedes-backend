@@ -100,6 +100,15 @@ const router = Router();
  *         updatedAt:
  *           type: string
  *           format: date-time
+ *     MedAccountTopupHistoryItem:
+ *       allOf:
+ *         - $ref: '#/components/schemas/MedAccountTopup'
+ *         - type: object
+ *           properties:
+ *             receiptUrl:
+ *               type: string
+ *               nullable: true
+ *               description: OFD link to the sale receipt (Webkassa TicketUrl); null until it is issued
  * /med-account/options:
  *   get:
  *     summary: Amounts a patient can top the medical account up by
@@ -363,7 +372,7 @@ router.patch(
  *                 topups:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/MedAccountTopup'
+ *                     $ref: '#/components/schemas/MedAccountTopupHistoryItem'
  *       401:
  *         description: Unauthorized
  */

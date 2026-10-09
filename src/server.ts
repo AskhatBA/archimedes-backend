@@ -14,6 +14,7 @@ import { startPaymentReconciliationWorker } from './shared/queues/payment-reconc
 import { startProgramOrderEmailWorker } from './shared/queues/program-order-email.worker';
 import { startMedAccountCreditWorker } from './shared/queues/med-account-credit.worker';
 import { startAppointmentRefundWorker } from './shared/queues/appointment-refund.worker';
+import { startWebkassaWorker } from './shared/queues/webkassa.worker';
 
 // Start the notification worker
 startNotificationWorker();
@@ -27,6 +28,11 @@ startMedAccountCreditWorker();
 // Возвраты за отменённые платные приёмы: FreedomPay внешний и медленный, поэтому запрос
 // пациента на отмену его не ждёт.
 startAppointmentRefundWorker();
+
+// Фискальные чеки (Webkassa): продажа на каждую успешную оплату, возврат на каждый
+// проведённый возврат, ежедневный Z-отчёт. Одна очередь — запросы по кассе строго
+// последовательны.
+startWebkassaWorker();
 
 // Settles payments whose FreedomPay result callback never arrived. Runs in the background
 // so no client has to poll for an outcome.
@@ -82,6 +88,9 @@ const shutdown = async (signal: string) => {
     './shared/queues/appointment-refund.worker'
   );
   await stopAppointmentRefundWorker();
+
+  const { stopWebkassaWorker } = await import('./shared/queues/webkassa.worker');
+  await stopWebkassaWorker();
 
   if (config.mis.appointmentSync.enabled) {
     const { stopAppointmentSyncWorker } = await import('./shared/queues/appointment-sync.worker');

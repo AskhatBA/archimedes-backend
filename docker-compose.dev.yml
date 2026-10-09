@@ -1,0 +1,36 @@
+# Dev-режим поверх docker-compose.yml: бэкенд выполняет src из примонтированной папки
+# через ts-node-dev и перезапускается при сохранении файла.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# После изменения package.json добавьте -V, иначе останется старый node_modules
+# из анонимного volume.
+
+services:
+  redis:
+    # Открыт наружу, чтобы бэкенд можно было запускать и из терминала (npm run dev).
+    ports:
+      - "6379:6379"
+
+  backend:
+    # extra_hosts из docker-compose.yml — адреса МИС и страховой во внутренней сети сервера
+    # клиники. На ноутбуке 192.168.10.1 — это домашний роутер (TLS падает с
+    # UNABLE_TO_VERIFY_LEAF_SIGNATURE), а 10.0.2.254 недоступен, поэтому в dev — публичный DNS.
+    extra_hosts: !reset []
+    # migrate deploy, а не migrate dev: без TTY migrate dev падает на любом вопросе.
+    # Новые миграции: docker compose exec backend npm run db:migrate
+    # --poll: события изменения файлов с macOS доходят в контейнер не всегда.
+    # prisma generate: клиент лежит в анонимном volume node_modules и собран из схемы на
+    # момент сборки образа, а src примонтирован свежий — без генерации новые поля схемы
+    # не компилируются.
+    command: >
+      sh -c "
+      npx prisma generate --schema=./src/infrastructure/db/schema.prisma &&
+      npx prisma migrate deploy --schema=./src/infrastructure/db/schema.prisma &&
+      npx ts-node-dev --poll -r tsconfig-paths/register --respawn src/server.ts
+      "
+    # Перекрывает значения из .env: внутри сети compose база и Redis доступны по имени сервиса.
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://postgres:Passqqaazz%211@db:5432/archimedes
+      REDIS_HOST: redis

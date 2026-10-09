@@ -503,6 +503,82 @@ The dashboard works that queue:
 Env: `APPOINTMENT_REFUND_ENABLED` (default on), `APPOINTMENT_REFUND_FULL_WINDOW_HOURS` (12),
 `APPOINTMENT_LATE_CANCELLATION_FEE_PERCENT` (30 — `0` is a valid value and is read as one).
 
+### Fiscal receipts (Webkassa)
+
+Every card payment we take is fiscalised through Webkassa (cloud cash register, protocol
+2.0.4) by the `fiscal` domain (`src/domains/fiscal/`). The receipt follows the money and never
+gates it: a Webkassa outage cannot fail a payment, a FreedomPay callback, a booking or a
+refund. FreedomPay's own receipts are left as they are.
+
+- **Sale.** In `settlePayment`, inside the same transaction as the conditional move to
+  `SUCCESS`, `createSaleReceiptInTx` writes a `FiscalReceipt { SALE, PENDING }` for a purpose in
+  `WEBKASSA_FISCALIZE_PURPOSES` (default `APPOINTMENT,PAID_PROGRAM,MED_ACCOUNT_TOPUP`). Only the
+  winner of that update gets here, so there is exactly one sale row per payment, and it exists
+  whether or not the purpose handler then fails. `externalCheckNumber = payment.id` is unique
+  both in our table and in Webkassa. The row is written whatever `WEBKASSA_ENABLED` says.
+  After commit it is enqueued without awaiting — the callback never waits on Redis or Webkassa.
+- **Return.** When an `AppointmentRefund` becomes `COMPLETED` with `amount > 0` —
+  `processAppointmentRefund` after FreedomPay accepts, or `updateRefund` from the dashboard —
+  `createReturnReceipt` writes a `SALE_RETURN` (`externalCheckNumber = refund.id`, `refundId`
+  unique, so a second COMPLETED save is a no-op) for the refunded sum, with the sale's
+  position name/code and `ReturnBasisDetails` from the sale receipt. It waits (retries) until
+  the sale is `ISSUED`.
+- **Queue.** One BullMQ queue `webkassa` for everything that touches the register — receipts,
+  Z-reports and the sweep — with `concurrency: 1` and `setGlobalConcurrency(1)`, because
+  Webkassa refuses parallel requests per register (error 9). `issue-receipt` jobs
+  (`fiscal-receipt-<id>-<retryRound>`) retry `WEBKASSA_MAX_ATTEMPTS` times with exponential
+  backoff from 30 s — safe here, unlike `revoke.php`, since a repeated `ExternalCheckNumber`
+  answers error 14 **with the already registered receipt**, which is stored as `ISSUED`.
+  `sweep` (every `WEBKASSA_SWEEP_INTERVAL_SECONDS`) re-enqueues `PENDING` rows older than 2
+  minutes; `close-shift` runs on `WEBKASSA_SHIFT_CLOSE_CRON` in Asia/Almaty (empty unschedules).
+- **Outcomes** (`issueReceipt`, never throws except the deliberate retry error): success or 14
+  with data → `ISSUED` with `checkNumber`, РНК, shift, `fiscalizedAt`, `ticketUrl` (OFD) and
+  `ticketPrintUrl`; 2/3 → the client re-authorises once (token cached in Redis
+  `webkassa:token`); 11 → Z-report, then one more try; network/5xx/-1/505/18/«sequential» 9 →
+  `PENDING` with `lastError`, retried, `FAILED` after the last attempt; 1/4/5/6/7/10 and
+  validation 9 → `FAILED` at once with an `error` log, Sentry and `FISCAL_RECEIPT_FAILED`.
+  Z-report answering 12/13 (no open shift) is not an error.
+- **Guards.** `getWebkassaBlocker()` keeps everything `PENDING` when the switch is off or the
+  config is incomplete, and refuses to send sandbox payments (`FREEDOMPAY_TESTING_MODE=true`)
+  anywhere but `devkkm` — logged as `error` at startup and per attempt.
+- **Composition** (`fiscal.positions.ts`): every position is a service (`PositionType 2`,
+  `UnitCode 5114`), `RoundType 0`, VAT from `WEBKASSA_TAX_TYPE`/`WEBKASSA_TAX_PERCENT` (the
+  clinic is a VAT payer: `100`/`16`, `Tax = round2(Price*p/(100+p))`), one card payment equal to
+  the sum of positions. `APPOINTMENT` → one position named after `serviceName`;
+  `PAID_PROGRAM` → one per cart item (a cart that does not add up becomes one summary
+  position plus a `warn`); `MED_ACCOUNT_TOPUP` → «Пополнение медицинского счёта».
+  `CustomerPhone` (`WEBKASSA_SEND_CUSTOMER_PHONE`) and `CustomerEmail` are sent but never
+  stored in `positions` or logged; `CustomerXin` is not sent.
+
+The dashboard works the queue (all `requireRole(Role.ADMIN)`):
+
+- `GET /v1/api/fiscal/admin/receipts` — paginated, filterable by status/operationType/day
+  (cashbox days)/search (patient name, IIN, phone, payment id, `pgPaymentId`, `checkNumber`),
+  with `totalAmount` of the filtered set; `GET /admin/receipts/:id` adds `positions`
+- `POST /v1/api/fiscal/admin/receipts/:id/retry` — only from `FAILED` (409
+  `FISCAL_RECEIPT_NOT_RETRYABLE` otherwise): back to `PENDING`, `attempts = 0`, `retryRound + 1`,
+  re-queued; audited `FISCAL_RECEIPT_RETRIED`
+- `POST /v1/api/fiscal/admin/shift/close` — manual Z-report through the same queue, waits up
+  to 30 s; 409 `WEBKASSA_DISABLED`, 502 `WEBKASSA_UNAVAILABLE`
+
+The app sees only links: `receiptUrl` (the issued sale's `ticketUrl`) on
+`GET /appointments/history` items, `GET /med-account/topups` and `/program-orders`, and
+`refund.receiptUrl` on the history item. A receipt that is not `ISSUED` reads as `null`.
+
+`FiscalReceipt` relations are `onDelete: Restrict` — a fiscal document must not vanish with a
+user or a payment. Webkassa field names (`Token`, `Password`, `Login`, `x-api-key`,
+`Customer*`) are in the logger's redact list, and the client never logs request or response
+bodies. Payments settled before the rollout get no receipt (no backfill); refunds made by
+hand in the FreedomPay cabinet, outside `AppointmentRefund`, are fiscalised by hand in the
+Webkassa cabinet.
+
+Env: `WEBKASSA_ENABLED`, `WEBKASSA_API_URL` (devkkm by default), `WEBKASSA_API_KEY`,
+`WEBKASSA_LOGIN`, `WEBKASSA_PASSWORD` (secrets — `.env` only), `WEBKASSA_CASHBOX_UNIQUE_NUMBER`,
+`WEBKASSA_FISCALIZE_PURPOSES`, `WEBKASSA_TAX_TYPE` (100), `WEBKASSA_TAX_PERCENT` (16),
+`WEBKASSA_PAYMENT_TYPE` (1), `WEBKASSA_SEND_CUSTOMER_PHONE`, `WEBKASSA_SHIFT_CLOSE_CRON`
+(`55 23 * * *`), `WEBKASSA_TOKEN_TTL_MINUTES` (600), `WEBKASSA_MAX_ATTEMPTS` (8),
+`WEBKASSA_SWEEP_INTERVAL_SECONDS` (300).
+
 ### Appointment status sync
 
 MIS owns the status of a visit and never calls us back when it changes, so an `Appointment`

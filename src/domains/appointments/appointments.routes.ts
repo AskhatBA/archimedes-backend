@@ -238,6 +238,10 @@ router.get('/', authenticate, controller.getAppointments);
  *         paidAmount:
  *           type: number
  *           nullable: true
+ *         receiptUrl:
+ *           type: string
+ *           nullable: true
+ *           description: OFD link to the sale receipt (Webkassa TicketUrl); null until the receipt is issued
  *         refund:
  *           type: object
  *           nullable: true
@@ -253,6 +257,10 @@ router.get('/', authenticate, controller.getAppointments);
  *               type: string
  *               format: date-time
  *               nullable: true
+ *             receiptUrl:
+ *               type: string
+ *               nullable: true
+ *               description: OFD link to the refund receipt; null until it is issued
  *         cancelledAt:
  *           type: string
  *           format: date-time

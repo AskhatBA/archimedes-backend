@@ -26,19 +26,38 @@ const SENSITIVE_KEYS = [
   'client_secret',
   'apiKey',
   'authorization',
+  // Webkassa пишет поля в PascalCase, а имя заголовка ключа — через дефис.
+  'Token',
+  'Password',
+  'Login',
+  'x-api-key',
+  'CustomerPhone',
+  'CustomerEmail',
+  'CustomerXin',
+  'customerPhone',
+  'customerEmail',
+  'customerXin',
 ];
+
+/** `x-api-key` и подобные имена в путях redact пишутся только в скобочной нотации. */
+const isPlainIdentifier = (key: string): boolean => /^[A-Za-z_$][\w$]*$/.test(key);
+
+const child = (prefix: string, key: string): string =>
+  isPlainIdentifier(key) ? `${prefix}.${key}` : `${prefix}["${key}"]`;
+
+const topLevel = (key: string): string => (isPlainIdentifier(key) ? key : `["${key}"]`);
 
 /**
  * fast-redact (used by pino) supports a single wildcard per path, so nesting is covered
  * explicitly for the first three levels — deep enough for `err.response.data.iin`.
  */
 export const redactPaths = [
-  ...SENSITIVE_KEYS,
-  ...SENSITIVE_KEYS.map((key) => `*.${key}`),
-  ...SENSITIVE_KEYS.map((key) => `req.query.${key}`),
-  ...SENSITIVE_KEYS.map((key) => `req.params.${key}`),
-  ...SENSITIVE_KEYS.map((key) => `payload.*.${key}`),
-  ...SENSITIVE_KEYS.map((key) => `responseData.*.${key}`),
+  ...SENSITIVE_KEYS.map(topLevel),
+  ...SENSITIVE_KEYS.map((key) => child('*', key)),
+  ...SENSITIVE_KEYS.map((key) => child('req.query', key)),
+  ...SENSITIVE_KEYS.map((key) => child('req.params', key)),
+  ...SENSITIVE_KEYS.map((key) => child('payload.*', key)),
+  ...SENSITIVE_KEYS.map((key) => child('responseData.*', key)),
   'req.headers.authorization',
   'req.headers.cookie',
   'res.headers["set-cookie"]',

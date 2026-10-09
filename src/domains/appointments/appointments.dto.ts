@@ -82,12 +82,16 @@ export interface AppointmentHistoryItemDto {
   isForFamilyMember: boolean;
   /** Сколько заплачено картой; `null` — приём по программе, платила страховая. */
   paidAmount: number | null;
+  /** Ссылка ОФД на чек продажи (Webkassa `TicketUrl`); `null`, пока чек не выпущен. */
+  receiptUrl: string | null;
   /** Возврат за отменённый платный приём; `null`, если возвращать было нечего. */
   refund: {
     amount: number;
     feeAmount: number;
     status: AppointmentRefundStatus;
     refundedAt: Date | null;
+    /** Ссылка ОФД на чек возврата; `null`, пока чек не выпущен. */
+    receiptUrl: string | null;
   } | null;
   cancelledAt: Date | null;
   createdAt: Date;

@@ -7,6 +7,7 @@ import * as db from '@/infrastructure/db';
 import { config } from '@/config';
 import { createLogger } from '@/shared/lib/logger';
 import { AppError } from '@/shared/services/app-error.service';
+import { createSaleReceiptInTx, enqueueReceiptSafely } from '@/domains/fiscal/fiscal.service';
 
 import {
   FREEDOMPAY_CURRENCY,
@@ -352,23 +353,37 @@ async function settlePayment(
       ? [PaymentStatus.PENDING, PaymentStatus.CANCELLED]
       : [PaymentStatus.PENDING];
 
-  const settled = await db.prismaClient.$transaction(async (tx) => {
+  const { settled, fiscalReceiptId } = await db.prismaClient.$transaction(async (tx) => {
     const { count } = await tx.payment.updateMany({
       where: { id: payment.id, status: { in: settleableFrom } },
       data: { status, ...(pgPaymentId ? { pgPaymentId } : {}) },
     });
 
-    if (count === 0) return false;
+    if (count === 0) return { settled: false, fiscalReceiptId: null };
+
+    let receiptId: string | null = null;
 
     if (status === PaymentStatus.SUCCESS) {
       await tx.user.update({
         where: { id: payment.userId },
         data: { balance: { increment: payment.amount } },
       });
+
+      // Фискальный чек на полученные деньги — в той же транзакции, что и переход в
+      // SUCCESS: строка появляется ровно один раз на платёж (этот переход выигрывает
+      // один вызывающий) и не зависит от успеха обработчика назначения.
+      receiptId = await createSaleReceiptInTx(tx, payment);
     }
 
-    return true;
+    return { settled: true, fiscalReceiptId: receiptId };
   });
+
+  // Регистрация чека — в очереди `webkassa`, и колбэк FreedomPay её не ждёт: постановка
+  // не ожидается, а её сбой только логируется — строка уже записана, и проход-сверка
+  // очереди её подберёт.
+  if (fiscalReceiptId) {
+    void enqueueReceiptSafely(fiscalReceiptId);
+  }
 
   // Fired here rather than at the call sites: this is the only point that knows the
   // payment just transitioned out of PENDING, so post-payment logic runs exactly once

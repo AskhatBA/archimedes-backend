@@ -1,4 +1,6 @@
 import {
+  FiscalOperationType,
+  FiscalReceiptStatus,
   MedAccountTopup,
   MedAccountTopupOption,
   MedAccountTopupStatus,
@@ -16,6 +18,7 @@ import type {
   MedAccountOptionItem,
   MedAccountTopupAdminDto,
   MedAccountTopupDto,
+  MedAccountTopupHistoryDto,
   UpdateMedAccountOptionBody,
   UpdateMedAccountTopupBody,
 } from './med-account.dto';
@@ -195,14 +198,36 @@ export const createTopupForPayment = async ({
   return toTopupDto(topup);
 };
 
-/** The patient's own top-up history, newest first. */
-export const getUserTopups = async (userId: string): Promise<MedAccountTopupDto[]> => {
+/**
+ * The patient's own top-up history, newest first.
+ *
+ * Each row carries the link to its fiscal receipt, read in the same query. Only an ISSUED
+ * receipt is shown — a pending or failed one is the operator's to deal with.
+ */
+export const getUserTopups = async (userId: string): Promise<MedAccountTopupHistoryDto[]> => {
   const topups = await prismaClient.medAccountTopup.findMany({
     where: { userId },
     orderBy: { createdAt: 'desc' },
+    include: {
+      payment: {
+        select: {
+          fiscalReceipts: {
+            where: {
+              operationType: FiscalOperationType.SALE,
+              status: FiscalReceiptStatus.ISSUED,
+            },
+            select: { ticketUrl: true },
+            take: 1,
+          },
+        },
+      },
+    },
   });
 
-  return topups.map(toTopupDto);
+  return topups.map(({ payment, ...topup }) => ({
+    ...toTopupDto(topup),
+    receiptUrl: payment.fiscalReceipts[0]?.ticketUrl ?? null,
+  }));
 };
 
 const endOfDay = (date: string): Date => {

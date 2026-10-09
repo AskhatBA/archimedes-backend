@@ -44,6 +44,7 @@ model User {
   programOrders           ProgramOrder[]
   medAccountTopups        MedAccountTopup[]
   appointmentRefunds      AppointmentRefund[]
+  fiscalReceipts          FiscalReceipt[]
 }
 
 model Patient {
@@ -232,6 +233,8 @@ model Payment {
   appointment       Appointment?
   /// Refund of this payment, when the visit it paid for was cancelled.
   appointmentRefund AppointmentRefund?
+  /// Fiscal receipts (Webkassa) for this payment: the sale, and a return if it was refunded.
+  fiscalReceipts    FiscalReceipt[]
 
   @@index([userId])
   @@index([createdAt])
@@ -291,6 +294,10 @@ enum AuditEvent {
   APPOINTMENT_REFUND_STATUS_CHANGED
   PATIENT_PROFILE_UPDATED
   PATIENT_PROFILE_DELETED
+  FISCAL_RECEIPT_ISSUED
+  FISCAL_RECEIPT_FAILED
+  FISCAL_RECEIPT_RETRIED
+  FISCAL_SHIFT_CLOSED
 }
 
 model AuditLog {
@@ -550,11 +557,86 @@ model AppointmentRefund {
   createdAt     DateTime                @default(now())
   updatedAt     DateTime                @updatedAt
 
-  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
-  payment     Payment     @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appointment   Appointment    @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  payment       Payment        @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The return receipt (Webkassa) for this refund, once it has COMPLETED with money back.
+  fiscalReceipt FiscalReceipt?
 
   @@index([userId])
   @@index([status, createdAt])
+  @@index([createdAt])
+}
+
+enum FiscalOperationType {
+  /// Продажа — OperationType 2.
+  SALE
+  /// Возврат продажи — OperationType 3.
+  SALE_RETURN
+}
+
+enum FiscalReceiptStatus {
+  /// Создан, ещё не зарегистрирован в Webkassa (ждёт очереди, повтора или включения флага).
+  PENDING
+  /// Зарегистрирован, фискальный признак получен.
+  ISSUED
+  /// Webkassa отказала или исчерпаны попытки. Нужен оператор.
+  FAILED
+}
+
+/// Фискальный чек на движение денег по платежу: продажа на оплату, возврат на возврат.
+///
+/// Строка продажи пишется в той же транзакции, где платёж становится SUCCESS, поэтому
+/// появляется ровно один раз на платёж; строка возврата — когда `AppointmentRefund`
+/// становится COMPLETED. Регистрирует их в Webkassa очередь `webkassa`.
+///
+/// Связи — `Restrict`: фискальный документ юридически значим и не должен исчезать
+/// каскадом при удалении пользователя или платежа.
+model FiscalReceipt {
+  id                  String              @id @default(uuid()) @db.Uuid
+  paymentId           String              @db.Uuid
+  /// Только для SALE_RETURN — какой возврат он фиксирует.
+  refundId            String?             @unique @db.Uuid
+  userId              String              @db.Uuid
+  operationType       FiscalOperationType
+  status              FiscalReceiptStatus @default(PENDING)
+  /// Ключ идемпотентности в Webkassa: Payment.id для продажи, AppointmentRefund.id для возврата.
+  externalCheckNumber String              @unique
+  /// Сумма чека, тенге.
+  amount              Float
+  cashboxUniqueNumber String
+  /// Что ушло в Webkassa: Positions/Payments, без контактов покупателя.
+  positions           Json?
+  // --- реквизиты из ответа Webkassa ---
+  /// Фискальный признак (CheckNumber)
+  checkNumber         String?
+  /// РНК кассы — нужен для ReturnBasisDetails
+  registrationNumber  String?
+  checkOrderNumber    Int?
+  shiftNumber         Int?
+  offlineMode         Boolean?
+  /// DateTimeUTC из ответа
+  fiscalizedAt        DateTime?
+  /// Ссылка ОФД (QR)
+  ticketUrl           String?
+  /// Печатная форма Webkassa
+  ticketPrintUrl      String?
+  // --- диагностика ---
+  attempts            Int                 @default(0)
+  /// Сколько раз оператор вручную повторил чек. Входит в jobId задачи, иначе BullMQ
+  /// отверг бы повтор как дубль уже существующей задачи.
+  retryRound          Int                 @default(0)
+  lastErrorCode       Int?
+  lastError           String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  payment Payment            @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  refund  AppointmentRefund? @relation(fields: [refundId], references: [id], onDelete: Restrict)
+  user    User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([paymentId])
+  @@index([status, createdAt])
+  @@index([userId])
   @@index([createdAt])
 }

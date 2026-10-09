@@ -40,6 +40,8 @@ export interface ProgramOrderDto {
   contactPhone: string | null;
   comment: string | null;
   paymentId: string;
+  /** OFD link to the sale receipt (Webkassa `TicketUrl`); `null` until it is issued. */
+  receiptUrl: string | null;
   createdAt: Date;
   updatedAt: Date;
   items: ProgramOrderItemDto[];

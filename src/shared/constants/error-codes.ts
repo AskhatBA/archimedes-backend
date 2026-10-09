@@ -21,6 +21,13 @@ const AppointmentErrorCodes = {
   APPOINTMENT_REFUND_NOT_FOUND: 'APPOINTMENT_REFUND_NOT_FOUND',
 } as const;
 
+const FiscalErrorCodes = {
+  FISCAL_RECEIPT_NOT_FOUND: 'FISCAL_RECEIPT_NOT_FOUND',
+  FISCAL_RECEIPT_NOT_RETRYABLE: 'FISCAL_RECEIPT_NOT_RETRYABLE',
+  WEBKASSA_DISABLED: 'WEBKASSA_DISABLED',
+  WEBKASSA_UNAVAILABLE: 'WEBKASSA_UNAVAILABLE',
+} as const;
+
 const AdminErrorCodes = {
   INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
   INVALID_PASSWORD_FORMAT: 'INVALID_PASSWORD_FORMAT',
@@ -74,4 +81,5 @@ export const ErrorCodes = {
   ...NotificationsErrorCodes,
   ...MisErrorCodes,
   ...AppointmentErrorCodes,
+  ...FiscalErrorCodes,
 } as const;

@@ -55,6 +55,10 @@ const router = Router();
  *         paymentId:
  *           type: string
  *           format: uuid
+ *         receiptUrl:
+ *           type: string
+ *           nullable: true
+ *           description: OFD link to the sale receipt (Webkassa TicketUrl); null until it is issued
  *         createdAt:
  *           type: string
  *           format: date-time

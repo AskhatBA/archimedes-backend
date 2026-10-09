@@ -2,6 +2,7 @@ import { AppointmentRefund, AppointmentRefundStatus, Prisma } from '@prisma/clie
 
 import { config } from '@/config';
 import * as paymentService from '@/domains/payment/payment.service';
+import { createReturnReceipt } from '@/domains/fiscal/fiscal.service';
 import { prismaClient } from '@/infrastructure/db';
 import { ErrorCodes } from '@/shared/constants/error-codes';
 import { createLogger } from '@/shared/lib/logger';
@@ -214,6 +215,10 @@ export const processAppointmentRefund = async (
       comment: null,
     });
 
+    // Деньги ушли обратно — нужен фискальный чек возврата. Не бросает и на статус
+    // возврата не влияет.
+    await createReturnReceipt(refund);
+
     auditLogService.log({
       event: AuditEvent.APPOINTMENT_REFUND_PROCESSED,
       success: true,
@@ -419,6 +424,13 @@ export const updateRefund = async (
   }
 
   const updated = await prismaClient.appointmentRefund.update({ where: { id }, data });
+
+  // Оператор провёл возврат вручную — чек возврата пробивается так же, как после
+  // FreedomPay. Повторное сохранение COMPLETED второго чека не создаёт (refundId уникален),
+  // а нулевой возврат чека не получает.
+  if (updated.status === AppointmentRefundStatus.COMPLETED) {
+    await createReturnReceipt(updated);
+  }
 
   return { refund: toRefundDto(updated), previousStatus: existing.status };
 };

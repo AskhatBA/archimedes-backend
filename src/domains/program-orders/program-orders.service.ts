@@ -1,4 +1,6 @@
 import {
+  FiscalOperationType,
+  FiscalReceiptStatus,
   Prisma,
   ProgramOrder,
   ProgramOrderCategory,
@@ -19,7 +21,28 @@ import type {
   UpdateProgramOrderBody,
 } from './program-orders.dto';
 
-type OrderWithItems = ProgramOrder & { items: ProgramOrderItem[] };
+type OrderWithItems = ProgramOrder & {
+  items: ProgramOrderItem[];
+  /** Present when the read included `ORDER_INCLUDE` — the issued sale receipt, if any. */
+  payment?: { fiscalReceipts: { ticketUrl: string | null }[] };
+};
+
+/**
+ * Items plus the payment's issued sale receipt, read in the same query. Only an ISSUED
+ * receipt has a link worth showing — a pending or failed one is the operator's.
+ */
+const ORDER_INCLUDE = {
+  items: true,
+  payment: {
+    select: {
+      fiscalReceipts: {
+        where: { operationType: FiscalOperationType.SALE, status: FiscalReceiptStatus.ISSUED },
+        select: { ticketUrl: true },
+        take: 1,
+      },
+    },
+  },
+} as const;
 
 const toItemDto = (item: ProgramOrderItem) => ({
   id: item.id,
@@ -37,6 +60,7 @@ const toDto = (order: OrderWithItems): ProgramOrderDto => ({
   contactPhone: order.contactPhone,
   comment: order.comment,
   paymentId: order.paymentId,
+  receiptUrl: order.payment?.fiscalReceipts[0]?.ticketUrl ?? null,
   createdAt: order.createdAt,
   updatedAt: order.updatedAt,
   items: order.items.map(toItemDto),
@@ -136,7 +160,7 @@ export const getUserOrders = async (userId: string): Promise<ProgramOrderDto[]> 
   const orders = await prismaClient.programOrder.findMany({
     where: { userId },
     orderBy: { createdAt: 'desc' },
-    include: { items: true },
+    include: ORDER_INCLUDE,
   });
 
   return orders.map(toDto);
@@ -149,7 +173,7 @@ export const getUserOrderById = async (
 ): Promise<ProgramOrderDto> => {
   const order = await prismaClient.programOrder.findFirst({
     where: { id: orderId, userId },
-    include: { items: true },
+    include: ORDER_INCLUDE,
   });
 
   if (!order) {
@@ -209,7 +233,7 @@ export const getAdminOrders = async ({
       skip: (page - 1) * limit,
       take: limit,
       include: {
-        items: true,
+        ...ORDER_INCLUDE,
         user: {
           select: {
             phone: true,
@@ -244,7 +268,7 @@ export const getAdminOrders = async ({
 export const getAdminOrderById = async (orderId: string): Promise<ProgramOrderDto> => {
   const order = await prismaClient.programOrder.findUnique({
     where: { id: orderId },
-    include: { items: true },
+    include: ORDER_INCLUDE,
   });
 
   if (!order) {
@@ -276,7 +300,7 @@ export const updateOrder = async (
   const order = await prismaClient.programOrder.update({
     where: { id: orderId },
     data,
-    include: { items: true },
+    include: ORDER_INCLUDE,
   });
 
   return { order: toDto(order), previousStatus: existing.status };

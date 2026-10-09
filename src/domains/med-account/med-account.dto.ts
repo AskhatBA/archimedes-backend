@@ -51,6 +51,12 @@ export interface MedAccountTopupDto {
   updatedAt: Date;
 }
 
+/** A top-up in the patient's own history: the row plus the link to its fiscal receipt. */
+export interface MedAccountTopupHistoryDto extends MedAccountTopupDto {
+  /** OFD link to the sale receipt (Webkassa `TicketUrl`); `null` until it is issued. */
+  receiptUrl: string | null;
+}
+
 /** What the dashboard's top-up queue shows: the row plus who paid it. */
 export interface MedAccountTopupAdminDto extends MedAccountTopupDto {
   userId: string;

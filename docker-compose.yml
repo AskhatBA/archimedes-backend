@@ -12,6 +12,13 @@ services:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    # backend ждёт этой проверки, а не просто старта контейнера: иначе миграция успевает
+    # постучаться в базу, пока та ещё поднимается ("the database system is starting up").
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d archimedes"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
@@ -21,6 +28,7 @@ services:
 
   backend:
     build: ./
+    restart: always
     extra_hosts:
       - "misapi.archimedes.kz:192.168.10.1"
       - "mobileapi.archimedes.kz:10.0.2.254"
@@ -31,28 +39,19 @@ services:
     ports:
       - "4000:4000"
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     env_file:
       - .env
+    # migrate deploy, а не db:migrate (migrate dev): на проде нужны только готовые миграции,
+    # а migrate dev без TTY падает на любом вопросе и умеет предлагать сброс базы.
     command: >
       sh -c "
-      npm run db:migrate &&
+      npx prisma migrate deploy --schema=./src/infrastructure/db/schema.prisma &&
       npm start
       "
-
-  worker:
-    build: ./
-    volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/dist
-    depends_on:
-      - redis
-      - db
-    env_file:
-      - .env
-    command: npm run worker
 
 volumes:
   pgdata:

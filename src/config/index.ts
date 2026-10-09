@@ -218,6 +218,48 @@ export const config = {
     creditEnabled: process.env.MED_ACCOUNT_CREDIT_ENABLED !== 'false',
   },
 
+  // Фискальные чеки через облачную ККМ Webkassa (протокол 2.0.4). Чек пробивается
+  // фоновой очередью после того, как платёж стал SUCCESS, и ни при каком исходе не
+  // влияет на сам платёж.
+  webkassa: {
+    // Выключатель без выкатки кода. С `false` строки чеков всё равно создаются (PENDING),
+    // но в Webkassa ничего не уходит; после включения их подберёт проход-сверка.
+    enabled: process.env.WEBKASSA_ENABLED !== 'false',
+    apiUrl: (process.env.WEBKASSA_API_URL || 'https://devkkm.webkassa.kz').replace(/\/$/, ''),
+    // Секреты — только в .env, никогда в git и в логах.
+    apiKey: process.env.WEBKASSA_API_KEY || '',
+    login: process.env.WEBKASSA_LOGIN || '',
+    password: process.env.WEBKASSA_PASSWORD || '',
+    // ЗНК кассы (CashboxUniqueNumber).
+    cashboxUniqueNumber: process.env.WEBKASSA_CASHBOX_UNIQUE_NUMBER || '',
+    // Какие назначения платежей фискализируются.
+    fiscalizePurposes: (
+      process.env.WEBKASSA_FISCALIZE_PURPOSES ?? 'APPOINTMENT,PAID_PROGRAM,MED_ACCOUNT_TOPUP'
+    )
+      .split(',')
+      .map((purpose) => purpose.trim())
+      .filter(Boolean),
+    // Клиника — плательщик НДС, 16% на все услуги: TaxType 100 + TaxPercent 16.
+    // TaxType 0 — без НДС.
+    taxType: numberFromEnv(process.env.WEBKASSA_TAX_TYPE, 100),
+    taxPercent: numberFromEnv(process.env.WEBKASSA_TAX_PERCENT, 16),
+    // 1 — банковская карта: всё, что платится через FreedomPay.
+    paymentType: numberFromEnv(process.env.WEBKASSA_PAYMENT_TYPE, 1),
+    sendCustomerPhone: process.env.WEBKASSA_SEND_CUSTOMER_PHONE !== 'false',
+    // Ежедневный Z-отчёт, cron в часовом поясе Asia/Almaty. Пустая строка снимает расписание.
+    shiftCloseCron: process.env.WEBKASSA_SHIFT_CLOSE_CRON ?? '55 23 * * *',
+    // Сколько держать токен кассира в Redis до принудительной переавторизации.
+    tokenTtlMinutes: numberFromEnv(process.env.WEBKASSA_TOKEN_TTL_MINUTES, 600),
+    // Попыток на один чек до FAILED. Повторы безопасны: ExternalCheckNumber — ключ
+    // идемпотентности, и повтор возвращает уже пробитый чек (ошибка 14 с данными).
+    maxAttempts: Math.max(1, numberFromEnv(process.env.WEBKASSA_MAX_ATTEMPTS, 8)),
+    // Как часто подбирать PENDING-чеки, чья постановка в очередь потерялась.
+    sweepIntervalSeconds: Math.max(
+      30,
+      numberFromEnv(process.env.WEBKASSA_SWEEP_INTERVAL_SECONDS, 300)
+    ),
+  },
+
   appVersion: {
     iosUrl: process.env.APP_VERSION_IOS_URL || '',
     androidUrl: process.env.APP_VERSION_ANDROID_URL || '',

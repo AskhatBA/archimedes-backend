@@ -1,4 +1,4 @@
-import { PaymentStatus, Prisma } from '@prisma/client';
+import { FiscalOperationType, FiscalReceiptStatus, PaymentStatus, Prisma } from '@prisma/client';
 
 import { prismaClient } from '@/infrastructure/db';
 
@@ -26,8 +26,30 @@ import type { AppointmentHistoryItemDto } from './appointments.dto';
 const HISTORY_LIMIT = 200;
 
 const historyInclude = {
-  payment: { select: PAYMENT_SUMMARY_SELECT },
-  refund: { select: { amount: true, feeAmount: true, status: true, refundedAt: true } },
+  payment: {
+    select: {
+      ...PAYMENT_SUMMARY_SELECT,
+      // Чек продажи читается тем же запросом, без запроса на строку. Пациенту виден только
+      // выпущенный чек: PENDING/FAILED — работа оператора.
+      fiscalReceipts: {
+        where: {
+          operationType: FiscalOperationType.SALE,
+          status: FiscalReceiptStatus.ISSUED,
+        },
+        select: { ticketUrl: true },
+        take: 1,
+      },
+    },
+  },
+  refund: {
+    select: {
+      amount: true,
+      feeAmount: true,
+      status: true,
+      refundedAt: true,
+      fiscalReceipt: { select: { status: true, ticketUrl: true } },
+    },
+  },
 } as const;
 
 type HistoryRow = Prisma.AppointmentGetPayload<{ include: typeof historyInclude }>;
@@ -56,6 +78,7 @@ export const getAppointmentHistory = async (
     const doctor = doctors.get(row.doctorId) ?? UNKNOWN_DOCTOR;
     const paidWith: AppointmentPaymentSummary | null =
       payment ?? legacyPayments.get(row.id) ?? null;
+    const isPaid = paidWith?.status === PaymentStatus.SUCCESS;
 
     return {
       id: row.id,
@@ -69,8 +92,22 @@ export const getAppointmentHistory = async (
       branchAddress: doctor.branchAddress,
       isForFamilyMember: Boolean(patient?.misPatientId && patient.misPatientId !== row.patientId),
       // Только успешный платёж — тот же критерий, по которому отмена решает о возврате.
-      paidAmount: paidWith?.status === PaymentStatus.SUCCESS ? paidWith.amount : null,
-      refund,
+      paidAmount: isPaid ? paidWith.amount : null,
+      // Приёмы, привязанные к платежу по метаданным, оплачены до запуска фискализации —
+      // чека у них нет и не будет.
+      receiptUrl: isPaid ? (payment?.fiscalReceipts[0]?.ticketUrl ?? null) : null,
+      refund: refund
+        ? {
+            amount: refund.amount,
+            feeAmount: refund.feeAmount,
+            status: refund.status,
+            refundedAt: refund.refundedAt,
+            receiptUrl:
+              refund.fiscalReceipt?.status === FiscalReceiptStatus.ISSUED
+                ? (refund.fiscalReceipt.ticketUrl ?? null)
+                : null,
+          }
+        : null,
       cancelledAt: row.cancelledAt,
       createdAt: row.createdAt,
     };
