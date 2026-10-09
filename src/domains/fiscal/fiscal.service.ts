@@ -265,7 +265,7 @@ export const createReturnReceipt = async (refund: {
 
 const receiptInclude = {
   payment: { select: { id: true, amount: true, purpose: true, metadata: true } },
-  user: { select: { phone: true, email: true } },
+  user: { select: { phone: true, email: true, patient: { select: { iin: true } } } },
 } as const;
 
 type ReceiptWithContext = Prisma.FiscalReceiptGetPayload<{ include: typeof receiptInclude }>;
@@ -280,6 +280,12 @@ const toCustomerPhone = (phone: string | null | undefined): string | undefined =
   if (digits.length === 10) return `+7${digits}`;
 
   return undefined;
+};
+
+/** 12 цифр или ничего: Webkassa отклоняет чек с ИИН другой длины. */
+const toCustomerXin = (iin: string | null | undefined): string | undefined => {
+  const digits = (iin ?? '').replace(/\D/g, '');
+  return digits.length === 12 ? digits : undefined;
 };
 
 /** `dd.MM.yyyy HH:mm:ss[ ±HH:MM]` → Date; без смещения — время кассы. */
@@ -461,10 +467,12 @@ interface BuiltCheck {
 const customerFields = (receipt: ReceiptWithContext) => {
   const phone = config.webkassa.sendCustomerPhone ? toCustomerPhone(receipt.user.phone) : undefined;
   const email = receipt.user.email?.trim() || undefined;
+  const xin = toCustomerXin(receipt.user.patient?.iin);
 
   return {
     ...(phone ? { CustomerPhone: phone } : {}),
     ...(email ? { CustomerEmail: email } : {}),
+    ...(xin ? { CustomerXin: xin } : {}),
   };
 };
 

@@ -103,6 +103,8 @@ export interface WebkassaCheckRequest {
   ExternalOrderNumber?: string;
   CustomerEmail?: string;
   CustomerPhone?: string;
+  /** ИИН/БИН покупателя, 12 цифр. */
+  CustomerXin?: string;
   ReturnBasisDetails?: WebkassaReturnBasisDetails;
 }
 

@@ -547,8 +547,8 @@ refund. FreedomPay's own receipts are left as they are.
   the sum of positions. `APPOINTMENT` → one position named after `serviceName`;
   `PAID_PROGRAM` → one per cart item (a cart that does not add up becomes one summary
   position plus a `warn`); `MED_ACCOUNT_TOPUP` → «Пополнение медицинского счёта».
-  `CustomerPhone` (`WEBKASSA_SEND_CUSTOMER_PHONE`) and `CustomerEmail` are sent but never
-  stored in `positions` or logged; `CustomerXin` is not sent.
+  `CustomerPhone` (`WEBKASSA_SEND_CUSTOMER_PHONE`), `CustomerEmail` and `CustomerXin` (the
+  patient's ИИН, only when it is 12 digits) are sent but never stored in `positions` or logged.
 
 The dashboard works the queue (all `requireRole(Role.ADMIN)`):
 
