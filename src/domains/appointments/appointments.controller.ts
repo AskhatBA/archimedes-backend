@@ -13,6 +13,7 @@ import * as appointmentsHistoryService from './appointments.history.service';
 import * as appointmentCancellationService from './appointment-cancellation.service';
 import * as appointmentRefundService from './appointment-refund.service';
 import * as appointmentsSyncService from './appointments.sync.service';
+import * as appointmentTelemedicineService from './appointment-telemedicine.service';
 
 export const getAppointments = async (req: Request, res: Response) => {
   if (!req?.user) {
@@ -56,6 +57,20 @@ export const getAppointmentHistory = async (req: Request, res: Response): Promis
   });
 
   res.status(200).json({ success: true, appointments });
+};
+
+/**
+ * The online consultation the booking form shows and charges for a paid telemedicine
+ * visit: its price and name, both decided here so a change needs no app release.
+ */
+export const getTelemedicineOffer = async (req: Request, res: Response): Promise<void> => {
+  if (!req?.user) {
+    throw new AppError('User not found', 401);
+  }
+
+  res
+    .status(200)
+    .json({ success: true, telemedicine: appointmentTelemedicineService.getTelemedicineOffer() });
 };
 
 export const getAppointmentById = async (req: Request, res: Response) => {

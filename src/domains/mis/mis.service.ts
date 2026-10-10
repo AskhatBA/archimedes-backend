@@ -1,3 +1,4 @@
+import { config } from '@/config';
 import { zoomService } from '@/shared/lib/zoom/zoom.service';
 import * as appointmentService from '@/domains/appointments/appointments.service';
 import * as insuranceService from '@/domains/insurance/insurance.service';
@@ -46,6 +47,7 @@ import {
   MISAppointmentDetailsResponse,
   MISAppointmentRequestsResponse,
 } from './mis.types';
+import { filterTelemedicineSpecializations } from './mis.specializations';
 
 export const findPatientByIinAndPhone = async (
   iin: string,
@@ -115,13 +117,25 @@ export const getBranches = async () => {
   }));
 };
 
-export const getSpecializationsByBranchId = async (branchId: string) => {
+/**
+ * Specialties of a branch, as MIS lists them.
+ *
+ * For a telemedicine visit the ones that cannot be held online (ultrasound, massage,
+ * dentistry, home visits, …) are dropped by `config.telemedicine.excludedSpecialties`.
+ * Without `isTelemedicine` the MIS answer is passed through untouched.
+ */
+export const getSpecializationsByBranchId = async (branchId: string, isTelemedicine = false) => {
   const response = await misRequest<MISSpecializationsResponse>({
     resolverName: MIS_API_GET_SPECIALIZATION_BY_BRANCH_ID,
     params: { branchId },
   });
 
-  return response.specialties;
+  if (!isTelemedicine) return response.specialties;
+
+  return filterTelemedicineSpecializations(
+    response.specialties,
+    config.telemedicine.excludedSpecialties
+  );
 };
 
 export const getDoctorsBySpecializationIdAndBranchId = async (
@@ -230,7 +244,11 @@ export const createAppointment = async (newAppointment: CreateAppointmentDto) =>
       insurance: familyMemberProgramId || newAppointment.insuranceProgramId,
       meeting: meeting,
       is_telemedicine: newAppointment.isTelemedicine,
-      booked_service: newAppointment.medicServiceOid,
+      // Телемедицина — одна услуга клиники с одним кодом, какой бы врач её ни вёл, поэтому
+      // присланный `medicServiceOid` (старые сборки его шлют) для неё не используется.
+      booked_service: newAppointment.isTelemedicine
+        ? config.telemedicine.serviceCode
+        : newAppointment.medicServiceOid,
     },
   });
 

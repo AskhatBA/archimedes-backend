@@ -84,6 +84,11 @@ export const getSpecializations = async (req: Request, res: Response) => {
   }
 
   await query('branchId').notEmpty().withMessage('Branch ID is required').run(req);
+  await query('isTelemedicine')
+    .optional()
+    .isIn(['true', 'false'])
+    .withMessage('isTelemedicine must be true or false')
+    .run(req);
 
   const errors = validationResult(req);
 
@@ -95,7 +100,8 @@ export const getSpecializations = async (req: Request, res: Response) => {
   }
 
   const specializations = await misService.getSpecializationsByBranchId(
-    req.query.branchId as string
+    req.query.branchId as string,
+    req.query.isTelemedicine === 'true'
   );
 
   return res.status(200).json({

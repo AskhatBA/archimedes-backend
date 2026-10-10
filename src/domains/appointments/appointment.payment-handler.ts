@@ -1,8 +1,12 @@
 import { PaymentPurpose } from '@prisma/client';
 
+import { config } from '@/config';
 import * as misService from '@/domains/mis/mis.service';
 import * as patientService from '@/domains/patient/patient.service';
-import { checkAppointmentConflicts } from '@/domains/appointments/appointments.service';
+import {
+  APPOINTMENT_TELEMEDICINE_PRICE_MISMATCH_MESSAGE,
+  checkAppointmentConflicts,
+} from '@/domains/appointments/appointments.service';
 import {
   registerPaymentPurposeHandler,
   PaymentSuccessContext,
@@ -27,7 +31,11 @@ export interface AppointmentPaymentMetadata {
   isTelemedicine: boolean;
   /** MIS id of a family member, when booking for someone other than the account owner. */
   familyMemberId?: string;
-  /** `oid` of the doctor's service from `/insurance/medic-service`, sent to MIS as `booked_service`. */
+  /**
+   * `oid` of the doctor's service from `/insurance/medic-service`, sent to MIS as
+   * `booked_service` for an in-person visit. A telemedicine visit is booked as
+   * `config.telemedicine.serviceCode` whatever arrives here.
+   */
   medicServiceOid?: string;
   /**
    * Display-only copies of what the patient picked. MIS knows none of this until the
@@ -123,6 +131,48 @@ const ensureBookable = async ({
 };
 
 /**
+ * Refuses a paid telemedicine visit charged at anything but the telemedicine price.
+ *
+ * The amount of an `APPOINTMENT` payment comes from the client, and for telemedicine it is
+ * fixed: a price that went stale on the device, or an older build still charging the
+ * doctor's in-person price, is turned away here — before the payer is sent to the
+ * provider — rather than charged. An in-person visit's amount is not checked.
+ */
+const ensureTelemedicinePrice = ({
+  amount,
+  metadata,
+}: {
+  amount: number;
+  metadata: AppointmentPaymentMetadata;
+}): void => {
+  if (!metadata.isTelemedicine) return;
+
+  const expected = config.telemedicine.price;
+
+  if (amount !== expected) {
+    handlerLogger.warn(
+      { amount, expected, doctorId: metadata.doctorId, startTime: metadata.startTime },
+      'Rejected telemedicine payment with a price other than the telemedicine price'
+    );
+
+    throw new AppError(APPOINTMENT_TELEMEDICINE_PRICE_MISMATCH_MESSAGE, 409);
+  }
+};
+
+/**
+ * Everything checked before a paid visit is sent to checkout: the price first — a wrong
+ * sum is refused whatever the slot — then the booking-conflict rules.
+ */
+const ensurePayable = async (context: {
+  userId: string;
+  amount: number;
+  metadata: AppointmentPaymentMetadata;
+}): Promise<void> => {
+  ensureTelemedicinePrice(context);
+  await ensureBookable(context);
+};
+
+/**
  * Books the appointment a paid patient has just paid for.
  *
  * Runs on the payment settling successfully — from the FreedomPay result callback or
@@ -166,7 +216,7 @@ const bookPaidAppointment = async (context: PaymentSuccessContext): Promise<void
 export const registerAppointmentPaymentHandler = (): void => {
   registerPaymentPurposeHandler<AppointmentPaymentMetadata>(PaymentPurpose.APPOINTMENT, {
     validateMetadata,
-    beforePayment: ensureBookable,
+    beforePayment: ensurePayable,
     onSuccess: bookPaidAppointment,
   });
 };

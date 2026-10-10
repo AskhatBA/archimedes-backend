@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test --require ts-node/register/transpile-only --require tsconfig-paths/register \"src/**/*.test.ts\"",
     "dev": "ts-node-dev -r tsconfig-paths/register --respawn src/server.ts",
     "start": "node dist/server.js",
     "build": "tsc && tsc-alias",

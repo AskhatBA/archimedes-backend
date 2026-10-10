@@ -232,6 +232,12 @@ router.get('/branches', authenticate, controller.getBranches);
  *         required: true
  *         schema:
  *           type: string
+ *       - name: isTelemedicine
+ *         in: query
+ *         description: "`true` drops the specialties that cannot be booked for telemedicine (TELEMEDICINE_EXCLUDED_SPECIALTIES, case-insensitive substrings of the name). Absent or `false` — the MIS list as is."
+ *         required: false
+ *         schema:
+ *           type: boolean
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -445,7 +451,7 @@ router.get('/doctor/:doctorId/available-slots', authenticate, controller.getDoct
  *         medicServiceOid:
  *           type: string
  *           format: uuid
- *           description: "`oid` of the doctor's service from /insurance/medic-service, sent to MIS as `booked_service`."
+ *           description: "`oid` of the doctor's service from /insurance/medic-service, sent to MIS as `booked_service` for an in-person visit. Ignored when `isTelemedicine` is true — a telemedicine visit is always booked as TELEMEDICINE_SERVICE_CODE."
  *           example: "128e28d0-7431-4300-8592-71def440f16e"
  * /mis/create-appointment:
  *   post:

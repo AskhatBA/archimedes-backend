@@ -16,9 +16,13 @@ npm run db:studio    # Open Prisma Studio UI
 
 npm run db:seed-checkups  # Seed/refresh the check-up catalogue
 npm run db:seed-med-account-options  # Seed/refresh the med-account top-up amounts
+
+npm test             # Unit tests: node:test over src/**/*.test.ts via ts-node
 ```
 
-There are no tests. `npm test` exits with an error.
+Tests are few and cover pure functions only (`mis.specializations.test.ts`); they run on the
+built-in `node:test` runner, so there is no test framework dependency. `*.test.ts` is
+excluded from `tsc`, so tests never reach `dist/`.
 
 ## Architecture
 
@@ -288,10 +292,48 @@ proxies the insurer's `/v3/getServicePrice` — `clinicId` is the branch's `exte
 `null` (the full price applies), and a service with no usable full price comes back as
 `servicePrice: null`.
 
-A paid visit gets the same discount: the app shows `/insurance/medic-service`'s price struck
-out next to `priceMedAccount` and sends that lower sum as the `APPOINTMENT` payment's
-`amount`. Nothing server-side checks it — the amount of an `APPOINTMENT` payment has always
-been the client's. Nothing is charged through us for a med-account visit.
+A paid in-person visit gets the same discount: the app shows `/insurance/medic-service`'s
+price struck out next to `priceMedAccount` and sends that lower sum as the `APPOINTMENT`
+payment's `amount`. Nothing server-side checks it for an in-person visit — that amount is the
+client's. A paid **telemedicine** visit is the exception: it has a fixed price of ours and
+`/payment/init` checks it (see *Telemedicine*). Nothing is charged through us for a
+med-account visit.
+
+### Telemedicine
+
+An online consultation is one clinic service with one code and one price, whichever doctor
+holds it — not the doctor's in-person visit.
+
+- **Service code.** `mis.service.createAppointment` sends `booked_service:
+  config.telemedicine.serviceCode` (`A02.083.000`) for every `isTelemedicine` booking —
+  insured ones from `POST /mis/create-appointment` and paid ones from the `APPOINTMENT`
+  purpose handler alike, since both go through it. A `medicServiceOid` the client sends for
+  such a visit (older builds do) is ignored, not refused. In-person visits still send
+  `medicServiceOid`. The fiscal receipt is not involved: `fiscal.positions.ts` keeps naming
+  the position after `metadata.serviceName` and coding it with `metadata.medicServiceOid`,
+  which the current app no longer sends for telemedicine, so such a position has no code.
+- **Price.** `GET /v1/api/appointments/telemedicine` (`authenticate`, registered before
+  `/:id`) answers `{ success, telemedicine: { price, serviceName } }` —
+  `config.telemedicine.price` (6000) and `TELEMEDICINE_SERVICE_NAME`, which *is*
+  `POSITION_NAMES.telemedicine`, so the form and the receipt name the service alike. The app
+  shows it only on a **paid** telemedicine booking, without the med-account discount; under
+  any programme, the med-account one included, the patient is shown no price. The
+  `APPOINTMENT` purpose's `beforePayment` refuses a paid telemedicine visit whose `amount` is
+  not exactly that price with 409 `APPOINTMENT_TELEMEDICINE_PRICE_MISMATCH_MESSAGE` (a
+  Russian sentence, because current and older builds alike show `message` as is) **before**
+  the booking-conflict check, so no `Payment` row is written and nothing reaches FreedomPay.
+  There is deliberately no switch to turn the check off.
+- **Specialties.** `GET /mis/specializations?branchId=&isTelemedicine=true` drops every
+  specialty whose name contains one of `config.telemedicine.excludedSpecialties`
+  (case-insensitive substrings — `filterTelemedicineSpecializations` in
+  `mis.specializations.ts`, unit-tested). Without the parameter, or with `false`, the MIS list
+  is returned as is, so older builds keep their own client-side filter. Doctors are not
+  filtered and the booking itself does not re-check the specialty: this is a list filter, not
+  a guard.
+
+Env: `TELEMEDICINE_SERVICE_CODE` (`A02.083.000`), `TELEMEDICINE_PRICE` (6000),
+`TELEMEDICINE_EXCLUDED_SPECIALTIES` (`УЗИ,МАССАЖ,СТОМАТОЛОГ,ВЫЕЗДН,ПСИХОЛОГ,РЕНТГЕН`,
+comma-separated). Deploy the backend before an app build that relies on them.
 
 ### Order emails
 

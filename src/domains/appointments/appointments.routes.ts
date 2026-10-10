@@ -274,6 +274,51 @@ router.get('/history', authenticate, asyncHandler(controller.getAppointmentHisto
 
 /**
  * @openapi
+ * /appointments/telemedicine:
+ *   get:
+ *     summary: The online consultation — its price and name
+ *     description: >
+ *       A telemedicine visit is one clinic service at one price, whichever doctor holds it.
+ *       The app shows this price on a paid telemedicine booking and charges exactly it —
+ *       `POST /payment/init` refuses a paid telemedicine visit at any other amount (409).
+ *       Configured by TELEMEDICINE_PRICE; the MIS service code is not returned.
+ *     tags: [Appointments]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: The telemedicine offer
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 telemedicine:
+ *                   $ref: '#/components/schemas/TelemedicineOffer'
+ *       401:
+ *         description: Unauthorized
+ * components:
+ *   schemas:
+ *     TelemedicineOffer:
+ *       type: object
+ *       required: [price, serviceName]
+ *       properties:
+ *         price:
+ *           type: number
+ *           description: Price of a paid online consultation, KZT
+ *           example: 6000
+ *         serviceName:
+ *           type: string
+ *           example: "Онлайн-консультация врача"
+ */
+// Registered before `/:id`, otherwise the by-id handler swallows it.
+router.get('/telemedicine', authenticate, asyncHandler(controller.getTelemedicineOffer));
+
+/**
+ * @openapi
  * /appointments/admin:
  *   get:
  *     summary: Clinic-wide appointment listing (dashboard)

@@ -36,7 +36,9 @@ export interface CreateAppointmentDto {
   isTelemedicine?: boolean;
   /**
    * `oid` of the doctor's service from `GET /insurance/medic-service`, sent to MIS as
-   * `booked_service`. Optional because app builds released before it was added do not send it.
+   * `booked_service` for an in-person visit. Optional because app builds released before it
+   * was added do not send it. Ignored for a telemedicine visit, which is always booked as
+   * `config.telemedicine.serviceCode` — older builds still send it, and that is not an error.
    */
   medicServiceOid?: string;
   /** Платёж, которым оплачен визит. Только для приёма без программы. */

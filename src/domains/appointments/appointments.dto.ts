@@ -96,3 +96,11 @@ export interface AppointmentHistoryItemDto {
   cancelledAt: Date | null;
   createdAt: Date;
 }
+
+/** The online consultation: one service at one price, whichever doctor holds it. */
+export interface TelemedicineOfferDto {
+  /** What a paid telemedicine visit costs, in KZT; `/payment/init` refuses any other sum. */
+  price: number;
+  /** Name of the service — the same one the fiscal receipt uses. */
+  serviceName: string;
+}

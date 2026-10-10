@@ -34,6 +34,14 @@ function parseEmailList(value?: string): string[] | undefined {
   return emails.length > 0 ? emails : undefined;
 }
 
+/** Splits a comma-separated value ("a, b,c") into trimmed, non-empty entries. */
+function parseList(value: string): string[] {
+  return value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
 /**
  * Reads a numeric env var, keeping `0` as a real value.
  *
@@ -208,6 +216,21 @@ export const config = {
     lateCancellationFeePercent: numberFromEnv(
       process.env.APPOINTMENT_LATE_CANCELLATION_FEE_PERCENT,
       30
+    ),
+  },
+
+  // Телемедицина — одна услуга клиники с одним кодом и одной ценой, какой бы врач её ни вёл.
+  telemedicine: {
+    // Что уходит в МИС как `booked_service` для любой телемед-записи (по программе и платной).
+    serviceCode: process.env.TELEMEDICINE_SERVICE_CODE || 'A02.083.000',
+    // Цена платной онлайн-консультации, ₸. Приложение берёт её с
+    // `GET /appointments/telemedicine`, а `/payment/init` отказывает в любой другой сумме.
+    price: numberFromEnv(process.env.TELEMEDICINE_PRICE, 6000),
+    // Подстроки названий специальностей, скрытых в телемедицине (без учёта регистра).
+    // Список уточняется env-переменной по мере появления новых специальностей в МИС.
+    excludedSpecialties: parseList(
+      process.env.TELEMEDICINE_EXCLUDED_SPECIALTIES ??
+        'УЗИ,МАССАЖ,СТОМАТОЛОГ,ВЫЕЗДН,ПСИХОЛОГ,РЕНТГЕН'
     ),
   },
 

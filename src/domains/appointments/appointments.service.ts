@@ -55,6 +55,11 @@ const clinicDayRange = (dateTime: Date) => {
 export const APPOINTMENT_SAME_DOCTOR_SAME_DAY_MESSAGE =
   'У вас уже есть активная запись к этому врачу на выбранный день. Запись к одному врачу дважды за день недоступна.';
 
+// Платный телемед-приём стоит ровно `config.telemedicine.price`. Текст показывается как есть
+// и текущей, и старыми сборками, у которых на устройстве может быть другая цена.
+export const APPOINTMENT_TELEMEDICINE_PRICE_MISMATCH_MESSAGE =
+  'Стоимость онлайн-консультации изменилась. Обновите страницу записи и попробуйте снова.';
+
 export const checkAppointmentConflicts = async (
   patientId: string,
   doctorId: string,
