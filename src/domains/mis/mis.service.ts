@@ -48,6 +48,7 @@ import {
   MISAppointmentRequestsResponse,
 } from './mis.types';
 import { filterTelemedicineSpecializations } from './mis.specializations';
+import { ageOn, filterDoctorsByAge } from './mis.doctors';
 
 export const findPatientByIinAndPhone = async (
   iin: string,
@@ -138,16 +139,23 @@ export const getSpecializationsByBranchId = async (branchId: string, isTelemedic
   );
 };
 
+/**
+ * Врачи филиала по специальности. С датой рождения пациента список сужается по возрасту:
+ * ребёнку — только педиатрические врачи, взрослому — все, кроме них (`filterDoctorsByAge`).
+ */
 export const getDoctorsBySpecializationIdAndBranchId = async (
   specializationId: string,
-  branchId: string
+  branchId: string,
+  patientBirthDate?: string | null
 ) => {
   const response = await misRequest<MISDoctorsResponse>({
     resolverName: MIS_API_GET_DOCTOR_LIST,
     params: { branchId, specializationId },
   });
 
-  return response.doctors.map((doctor) => ({
+  const doctors = filterDoctorsByAge(response.doctors, ageOn(patientBirthDate, new Date()));
+
+  return doctors.map((doctor) => ({
     id: doctor.id,
     name: doctor.name,
     iin: doctor.iin,
@@ -155,6 +163,7 @@ export const getDoctorsBySpecializationIdAndBranchId = async (
     specialtyName: doctor.specialty_name,
     branchName: doctor.branch_name,
     appointmentDurationMinutes: doctor.appointment_duration_minutes,
+    isPediatric: doctor.is_pediatric === true,
   }));
 };
 

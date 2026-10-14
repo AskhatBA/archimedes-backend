@@ -10,7 +10,11 @@ import * as appointmentCancellationService from '../appointments/appointment-can
 import * as patientService from '../patient/patient.service';
 
 import * as misService from './mis.service';
-import { FamilyMemberQuery, resolveAppointmentsPatientId } from './mis.family.service';
+import {
+  FamilyMemberQuery,
+  resolveAppointmentsPatientId,
+  resolvePatientBirthDate,
+} from './mis.family.service';
 
 /**
  * `?familyMemberId=&programId=` — смотреть приёмы родственника вместо своих. Проверку, что
@@ -127,9 +131,14 @@ export const getDoctors = async (req: Request, res: Response) => {
     });
   }
 
+  // Список зависит от возраста того, на кого записываемся: ребёнку — детские врачи.
+  const familyMember = await readFamilyMemberQuery(req);
+  const patientBirthDate = await resolvePatientBirthDate(req.user, familyMember);
+
   const doctors = await misService.getDoctorsBySpecializationIdAndBranchId(
     req.query.specializationId as string,
-    req.query.branchId as string
+    req.query.branchId as string,
+    patientBirthDate
   );
 
   return res.status(200).json({

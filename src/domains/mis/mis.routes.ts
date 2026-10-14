@@ -281,6 +281,9 @@ router.get('/specializations', authenticate, controller.getSpecializations);
  *           type: string
  *         appointmentDurationMinutes:
  *           type: number
+ *         isPediatric:
+ *           type: boolean
+ *           description: Детский врач — показывается только пациентам младше 16 лет
  * /mis/doctors:
  *   get:
  *     summary: Get medical specializations from MIS
@@ -296,6 +299,21 @@ router.get('/specializations', authenticate, controller.getSpecializations);
  *         in: query
  *         description: Specialization ID from MIS
  *         required: true
+ *         schema:
+ *           type: string
+ *       - name: familyMemberId
+ *         in: query
+ *         description: >
+ *           benId родственника, на которого запись (вместе с programId). Список врачей
+ *           фильтруется по возрасту пациента — младше 16 лет только is_pediatric, с 16 лет
+ *           без них; без параметра — по возрасту владельца аккаунта.
+ *         required: false
+ *         schema:
+ *           type: string
+ *       - name: programId
+ *         in: query
+ *         description: Программа, в семье которой состоит familyMemberId
+ *         required: false
  *         schema:
  *           type: string
  *     security:

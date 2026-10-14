@@ -31,9 +31,12 @@ export interface FamilyMemberQuery {
 const FAMILY_CACHE_TTL_MS = 10 * 60 * 1000;
 const FAMILY_CACHE_SWEEP_SIZE = 1000;
 
-const familyCache = new Map<string, { benIds: Set<string>; expiresAt: number }>();
+/** `benId` члена семьи → его дата рождения, как её отдала страховая. */
+type FamilyBirthDates = Map<string, string | null>;
 
-const rememberFamily = (key: string, benIds: Set<string>) => {
+const familyCache = new Map<string, { members: FamilyBirthDates; expiresAt: number }>();
+
+const rememberFamily = (key: string, members: FamilyBirthDates) => {
   const now = Date.now();
 
   if (familyCache.size >= FAMILY_CACHE_SWEEP_SIZE) {
@@ -42,21 +45,21 @@ const rememberFamily = (key: string, benIds: Set<string>) => {
     }
   }
 
-  familyCache.set(key, { benIds, expiresAt: now + FAMILY_CACHE_TTL_MS });
+  familyCache.set(key, { members, expiresAt: now + FAMILY_CACHE_TTL_MS });
 };
 
 /**
- * `benId` семьи по программе вызывающего. Пустой набор — если программа не его: страховая
- * отдаёт семью по любому `programId`, так что принадлежность проверяем сами.
+ * Семья по программе вызывающего: `benId` → дата рождения. Пусто — если программа не его:
+ * страховая отдаёт семью по любому `programId`, так что принадлежность проверяем сами.
  */
-const readFamilyBenIds = async (
+const readFamily = async (
   user: { id: string; phone: string },
   programId: string
-): Promise<Set<string>> => {
+): Promise<FamilyBirthDates> => {
   const key = `${user.id}:${programId}`;
   const cached = familyCache.get(key);
 
-  if (cached && cached.expiresAt > Date.now()) return cached.benIds;
+  if (cached && cached.expiresAt > Date.now()) return cached.members;
 
   const beneficiaryId = await getBeneficiaryId(user.id, user.phone);
 
@@ -67,17 +70,39 @@ const readFamilyBenIds = async (
   const programs = await insuranceService.getPrograms(beneficiaryId);
   const ownsProgram = (programs || []).some((program) => String(program.id) === programId);
 
-  const family = ownsProgram
-    ? await insuranceService.getFamily(beneficiaryId, programId)
-    : [];
+  const family = ownsProgram ? await insuranceService.getFamily(beneficiaryId, programId) : [];
 
-  const benIds = new Set(
-    (family || []).filter((member) => member?.benId).map((member) => String(member.benId))
+  const members: FamilyBirthDates = new Map(
+    (family || [])
+      .filter((member) => member?.benId)
+      .map((member) => [String(member.benId), member.dateBirth || null])
   );
 
-  rememberFamily(key, benIds);
+  rememberFamily(key, members);
 
-  return benIds;
+  return members;
+};
+
+/**
+ * Родственник из семьи по программе вызывающего, или 403, не раскрывая, чего именно не
+ * хватило. Возвращает его дату рождения (`null`, если страховая её не дала).
+ */
+const requireFamilyMember = async (
+  user: { id: string; phone: string },
+  familyMemberId: string,
+  programId: string | undefined
+): Promise<string | null> => {
+  if (!programId) {
+    throw new AppError('programId is required with familyMemberId', 400);
+  }
+
+  const members = await readFamily(user, programId);
+
+  if (!members.has(familyMemberId)) {
+    throw new AppError(ErrorCodes.INSURANCE_FAMILY_MEMBER_NOT_FOUND, 403);
+  }
+
+  return members.get(familyMemberId) ?? null;
 };
 
 /**
@@ -101,15 +126,22 @@ export const resolveAppointmentsPatientId = async (
     return patient.misPatientId;
   }
 
-  if (!programId) {
-    throw new AppError('programId is required with familyMemberId', 400);
-  }
-
-  const benIds = await readFamilyBenIds(user, programId);
-
-  if (!benIds.has(familyMemberId)) {
-    throw new AppError(ErrorCodes.INSURANCE_FAMILY_MEMBER_NOT_FOUND, 403);
-  }
+  await requireFamilyMember(user, familyMemberId, programId);
 
   return familyMemberId;
+};
+
+/**
+ * Дата рождения того, на кого записываемся: владельца аккаунта — из нашей БД, родственника
+ * — из семьи по программе (с той же проверкой, что и для его приёмов). `null`, если её нет.
+ */
+export const resolvePatientBirthDate = async (
+  user: { id: string; phone: string },
+  { familyMemberId, programId }: FamilyMemberQuery = {}
+): Promise<string | null> => {
+  if (familyMemberId) return requireFamilyMember(user, familyMemberId, programId);
+
+  const patient = await getPatientById(user.id);
+
+  return patient?.birthDate || null;
 };

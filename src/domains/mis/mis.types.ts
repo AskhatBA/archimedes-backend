@@ -50,6 +50,8 @@ export interface MISDoctor {
   branch_name: string;
   position: string;
   appointment_duration_minutes: number;
+  /** Детский врач: принимает только пациентов младше 16 лет (см. `filterDoctorsByAge`). */
+  is_pediatric?: boolean;
 }
 
 export interface MISDoctorsResponse {
