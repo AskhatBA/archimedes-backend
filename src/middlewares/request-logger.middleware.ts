@@ -68,6 +68,8 @@ const options: Options = {
         remoteAddress: req.raw.socket?.remoteAddress,
         headers: {
           'user-agent': req.headers['user-agent'],
+          // The User-Agent carries only the build number, which restarts every release.
+          'x-app-version': req.headers['x-app-version'],
           referer: req.headers.referer,
         },
       };

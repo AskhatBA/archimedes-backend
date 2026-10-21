@@ -64,6 +64,12 @@ export const config = {
     level: process.env.LOG_LEVEL || (nodeEnv === 'production' ? 'info' : 'debug'),
     // Human-readable output via pino-pretty. JSON to stdout everywhere else.
     pretty: process.env.LOG_PRETTY ? process.env.LOG_PRETTY === 'true' : nodeEnv !== 'production',
+    // Lines at this level and above are also kept in the `AppLog` table for the dashboard.
+    store: {
+      enabled: process.env.LOG_STORE_ENABLED !== 'false',
+      level: process.env.LOG_STORE_LEVEL || 'info',
+      retentionDays: Number(process.env.LOG_RETENTION_DAYS) || 14,
+    },
   },
 
   token: {
@@ -130,6 +136,8 @@ export const config = {
     username: process.env.SMS_SERVICE_USERNAME,
     password: process.env.SMS_SERVICE_PASSWORD,
     originator: process.env.SMS_SERVICE_ORIGINATOR,
+    // ВРЕМЕННО: отправлять OTP по SMS и вне production (локальная отладка).
+    forceSend: process.env.SMS_FORCE_SEND === 'true',
   },
 
   insuranceService: {

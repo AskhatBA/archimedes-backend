@@ -298,6 +298,8 @@ enum AuditEvent {
   FISCAL_RECEIPT_FAILED
   FISCAL_RECEIPT_RETRIED
   FISCAL_SHIFT_CLOSED
+  AUTH_ATTEMPTS_VIEWED
+  APP_LOGS_VIEWED
 }
 
 model AuditLog {
@@ -307,6 +309,9 @@ model AuditLog {
   userId    String?    @db.Uuid
   user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
   phone     String?
+  /// Typed at sign-in/registration — kept so an attempt by someone with no account
+  /// (hence no `userId`) can still be found by IIN in the dashboard.
+  iin       String?
   ipAddress String?
   userAgent String?
   metadata  Json?
@@ -315,7 +320,32 @@ model AuditLog {
   @@index([event])
   @@index([userId])
   @@index([phone])
+  @@index([iin])
   @@index([createdAt])
+}
+
+/// Backend log lines (pino), kept for `LOG_RETENTION_DAYS` so the dashboard can show what
+/// happened in a user's requests. Written after redaction — never holds IIN, phone or tokens.
+model AppLog {
+  id         BigInt   @id @default(autoincrement())
+  time       DateTime
+  level      String
+  msg        String?
+  reqId      String?
+  /// No relation on purpose: a log line must outlive the account it mentions.
+  userId     String?  @db.Uuid
+  component  String?
+  method     String?
+  url        String?
+  statusCode Int?
+  durationMs Int?
+  /// The whole line as pino wrote it — stack traces, upstream responses and all.
+  data       Json
+
+  @@index([time])
+  @@index([reqId])
+  @@index([userId, time])
+  @@index([level, time])
 }
 
 model Notification {

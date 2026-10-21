@@ -3,6 +3,7 @@ import Sentry from '@sentry/node';
 import app from './app';
 import { config } from './config';
 import { logger } from './shared/lib/logger';
+import { flushLogStore, startLogStore } from './shared/lib/logger/log-store';
 import { startNotificationWorker } from './shared/queues/notification.worker';
 import {
   scheduleAppointmentSync,
@@ -15,6 +16,9 @@ import { startProgramOrderEmailWorker } from './shared/queues/program-order-emai
 import { startMedAccountCreditWorker } from './shared/queues/med-account-credit.worker';
 import { startAppointmentRefundWorker } from './shared/queues/appointment-refund.worker';
 import { startWebkassaWorker } from './shared/queues/webkassa.worker';
+
+// Логи копируются в таблицу AppLog — их читает экран «Логи» в дашборде.
+startLogStore();
 
 // Start the notification worker
 startNotificationWorker();
@@ -103,6 +107,7 @@ const shutdown = async (signal: string) => {
 
   await Sentry.flush(2000);
   // Flush buffered log lines before the process disappears.
+  await flushLogStore();
   logger.flush();
 
   // eslint-disable-next-line n/no-process-exit
@@ -118,7 +123,7 @@ process.on('uncaughtException', (err) => {
   Sentry.captureException(err);
   logger.fatal({ err }, 'Uncaught exception');
 
-  void Sentry.flush(2000).then(() => {
+  void Promise.all([Sentry.flush(2000), flushLogStore()]).then(() => {
     logger.flush();
     // eslint-disable-next-line n/no-process-exit
     process.exit(1);

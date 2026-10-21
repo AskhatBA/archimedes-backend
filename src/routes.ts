@@ -15,6 +15,7 @@ import checkupsRoutes from '@/domains/checkups/checkups.routes';
 import programOrdersRoutes from '@/domains/program-orders/program-orders.routes';
 import medAccountRoutes from '@/domains/med-account/med-account.routes';
 import fiscalRoutes from '@/domains/fiscal/fiscal.routes';
+import auditRoutes from '@/domains/audit/audit.routes';
 
 export const setupRoutes = (app: Express) => {
   app.use('/v1/api/appointments', appointmentsRoutes);
@@ -32,6 +33,7 @@ export const setupRoutes = (app: Express) => {
   app.use('/v1/api/program-orders', programOrdersRoutes);
   app.use('/v1/api/med-account', medAccountRoutes);
   app.use('/v1/api/fiscal', fiscalRoutes);
+  app.use('/v1/api/audit', auditRoutes);
   app.get('/v1/api/debug-sentry', function mainHandler() {
     throw new Error('My first Sentry error!');
   });

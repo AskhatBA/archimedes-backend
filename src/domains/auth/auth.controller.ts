@@ -19,6 +19,7 @@ import { ensureBeneficiaryId } from '@/domains/insurance/beneficiary.service';
 import * as patientService from '@/domains/patient/patient.service';
 import * as misService from '@/domains/mis/mis.service';
 
+import { auditAuthAttempt } from './auth-attempt';
 import * as authService from './auth.service';
 
 const PHONE_REGEX = /^7\d{10}$/;
@@ -35,20 +36,23 @@ const assertValidPhone = (phone: unknown): string => {
  * Login only. Unlike before, this never provisions an account — a phone/IIN with
  * no account in our DB is sent to the registration flow instead.
  */
-export const requestOtp = async (req: Request, res: Response) => {
+export const requestOtp = auditAuthAttempt('login', async (req, res, attempt) => {
   let { phone } = req.body;
   const iin: string | undefined = req.body.iin;
 
   if (iin) {
+    attempt.step = 'insurance_check';
     const checkIin = await insuranceService.checkIin(iin);
     const patient = await patientService.getPatientByIin(iin);
 
+    attempt.step = 'phone_match';
     if (checkIin.errorCode === 0 && checkIin.phone) {
       if (checkIin.phone !== phone) {
         throw new AppError(ErrorCodes.INSURANCE_PHONE_IS_NOT_MATCHED, 400);
       }
 
       phone = checkIin.phone;
+      attempt.phone = phone;
 
       if (patient) {
         const existingUser = await authService.findUserById(patient.userId);
@@ -72,30 +76,29 @@ export const requestOtp = async (req: Request, res: Response) => {
     }
   }
 
+  attempt.step = 'phone_format';
   assertValidPhone(phone);
 
+  attempt.step = 'account_lookup';
   const user = iin
     ? await authService.findAccountByIinOrPhone(iin, phone)
     : await authService.findUserByPhone(phone);
 
   if (!user) {
-    await auditLogService.log({
-      event: AuditEvent.AUTH_LOGIN_FAILED,
-      success: false,
-      phone,
-      req,
-      metadata: { reason: 'ACCOUNT_NOT_FOUND' },
-    });
     throw new AppError(ErrorCodes.ACCOUNT_NOT_FOUND, 404);
   }
+
+  attempt.userId = user.id;
 
   const otp = otpService.generateOTPCode();
   const hashedOTP = await otpService.hashOTP(otp);
 
-  if (isProduction) {
+  attempt.step = 'sms';
+  if (isProduction || config.smsService.forceSend) {
     await smsService.sendSMS(phone, `Код для авторизации: ${otp}`);
   }
 
+  attempt.step = 'otp_save';
   await otpService.saveOTP(user.id, hashedOTP);
 
   auditLogService.log({
@@ -103,21 +106,25 @@ export const requestOtp = async (req: Request, res: Response) => {
     success: true,
     userId: user.id,
     phone,
+    iin,
     req,
+    metadata: { flow: 'login' },
   });
 
   return res.status(200).json({ id: user.id, phone: phone, otp: isProduction ? undefined : otp });
-};
+});
 
 /**
  * Registration, step 1: claim a phone/IIN pair and send a confirmation code.
  * Rejects identities that already have an account — those belong in the login
  * flow — and identities whose insurance record is registered to another number.
  */
-export const registerStart = async (req: Request, res: Response) => {
+export const registerStart = auditAuthAttempt('registration', async (req, res, attempt) => {
+  attempt.step = 'phone_format';
   const phone = assertValidPhone(req.body.phone);
   const iin = req.body.iin as string;
 
+  attempt.step = 'account_lookup';
   if (await authService.accountExists(iin, phone)) {
     throw new AppError(ErrorCodes.ACCOUNT_ALREADY_EXISTS, 409);
   }
@@ -125,8 +132,10 @@ export const registerStart = async (req: Request, res: Response) => {
   // When the insurance service knows this IIN its phone is authoritative:
   // registering under a different number would build an account the insured
   // person can never reach.
+  attempt.step = 'insurance_check';
   const checkIin = await insuranceService.checkIin(iin).catch(() => undefined);
 
+  attempt.step = 'phone_match';
   if (checkIin?.errorCode === 0 && checkIin.phone && checkIin.phone !== phone) {
     throw new AppError(ErrorCodes.INSURANCE_PHONE_IS_NOT_MATCHED, 400);
   }
@@ -134,9 +143,11 @@ export const registerStart = async (req: Request, res: Response) => {
   const otp = otpService.generateOTPCode();
   const hashedOtp = await otpService.hashOTP(otp);
 
+  attempt.step = 'otp_save';
   await registrationOtpService.saveRegistrationOtp(phone, iin, hashedOtp);
 
-  if (isProduction) {
+  attempt.step = 'sms';
+  if (isProduction || config.smsService.forceSend) {
     await smsService.sendSMS(phone, `Код для регистрации: ${otp}`);
   }
 
@@ -144,6 +155,7 @@ export const registerStart = async (req: Request, res: Response) => {
     event: AuditEvent.AUTH_OTP_REQUEST,
     success: true,
     phone,
+    iin,
     req,
     metadata: { flow: 'registration' },
   });
@@ -153,7 +165,7 @@ export const registerStart = async (req: Request, res: Response) => {
     phone,
     otp: isProduction ? undefined : otp,
   });
-};
+});
 
 /**
  * Registration, step 2: exchange the code for a short-lived registration token
@@ -162,32 +174,22 @@ export const registerStart = async (req: Request, res: Response) => {
  * purpose — it returns a real person's name and birth date, which must not be
  * readable by anyone who merely knows an IIN.
  */
-export const registerVerifyOtp = async (req: Request, res: Response) => {
+export const registerVerifyOtp = auditAuthAttempt('registration', async (req, res, attempt) => {
+  attempt.step = 'phone_format';
   const phone = assertValidPhone(req.body.phone);
   const iin = req.body.iin as string;
   const { otp } = req.body;
 
-  try {
-    await registrationOtpService.validateRegistrationOtp(phone, iin, otp);
-  } catch (err) {
-    await auditLogService.log({
-      event: AuditEvent.AUTH_LOGIN_FAILED,
-      success: false,
-      phone,
-      req,
-      metadata: {
-        flow: 'registration',
-        reason: err instanceof AppError ? err.message : 'OTP validation failed',
-      },
-    });
-    throw err;
-  }
+  attempt.step = 'otp_check';
+  await registrationOtpService.validateRegistrationOtp(phone, iin, otp);
 
   // The account could have been created while the code was in flight.
+  attempt.step = 'account_lookup';
   if (await authService.accountExists(iin, phone)) {
     throw new AppError(ErrorCodes.ACCOUNT_ALREADY_EXISTS, 409);
   }
 
+  attempt.step = 'mis_lookup';
   const misPatient = await misService.findPatientByIinAndPhone(iin).catch(() => undefined);
 
   const registrationToken = jwtService.generateRegistrationToken({
@@ -211,16 +213,17 @@ export const registerVerifyOtp = async (req: Request, res: Response) => {
         }
       : undefined,
   });
-};
+});
 
 /**
  * Registration, step 3: create the MIS patient (when missing), the user and the
  * patient profile, then sign the user in. The phone/IIN come from the
  * registration token, never from the request body.
  */
-export const registerComplete = async (req: Request, res: Response) => {
+export const registerComplete = auditAuthAttempt('registration', async (req, res, attempt) => {
   const { registrationToken, firstName, lastName, patronymic, birthDate, gender } = req.body;
 
+  attempt.step = 'registration_token';
   if (!registrationToken || typeof registrationToken !== 'string') {
     throw new AppError(ErrorCodes.INVALID_REGISTRATION_TOKEN, 401);
   }
@@ -237,11 +240,15 @@ export const registerComplete = async (req: Request, res: Response) => {
   }
 
   const { phone, iin, misPatientId } = jwtService.verifyRegistrationToken(registrationToken);
+  attempt.phone = phone;
+  attempt.iin = iin;
 
+  attempt.step = 'account_lookup';
   if (await authService.accountExists(iin, phone)) {
     throw new AppError(ErrorCodes.ACCOUNT_ALREADY_EXISTS, 409);
   }
 
+  attempt.step = 'mis_create_patient';
   let resolvedMisPatientId = misPatientId;
 
   if (!resolvedMisPatientId) {
@@ -262,6 +269,7 @@ export const registerComplete = async (req: Request, res: Response) => {
     throw new AppError(ErrorCodes.MIS_PATIENT_NOT_FOUND, 400);
   }
 
+  attempt.step = 'account_create';
   const { user } = await authService.createPatientAccount({
     phone,
     iin,
@@ -285,6 +293,7 @@ export const registerComplete = async (req: Request, res: Response) => {
     success: true,
     userId: user.id,
     phone,
+    iin,
     req,
     metadata: { flow: 'registration', misPatientCreated: !misPatientId },
   });
@@ -311,45 +320,36 @@ export const registerComplete = async (req: Request, res: Response) => {
     accessToken: tokens.accessToken,
     refreshToken: tokens.refreshToken,
   });
-};
+});
 
-export const verifyOtp = async (req: Request, res: Response) => {
+export const verifyOtp = auditAuthAttempt('login', async (req, res, attempt) => {
   const { phone, otp } = req.body;
 
   if (!otp) {
-    const user = await authService.findUserByPhone(phone).catch(() => null);
-    await auditLogService.log({
-      event: AuditEvent.AUTH_LOGIN_FAILED,
-      success: false,
-      ...(user?.id !== undefined && { userId: user.id }),
-      phone,
-      req,
-      metadata: { reason: 'OTP_NOT_PROVIDED' },
-    });
+    attempt.step = 'otp_missing';
+    attempt.userId = (await authService.findUserByPhone(phone).catch(() => null))?.id;
     throw new AppError(ErrorCodes.INVALID_OTP, 400);
   }
 
+  attempt.step = 'otp_check';
   try {
     await otpService.validateOTP(phone, otp);
   } catch (err) {
-    const user = await authService.findUserByPhone(phone).catch(() => null);
-    await auditLogService.log({
-      event: AuditEvent.AUTH_LOGIN_FAILED,
-      success: false,
-      ...(user?.id !== undefined && { userId: user.id }),
-      phone,
-      req,
-      metadata: { reason: err instanceof AppError ? err.message : 'OTP validation failed' },
-    });
+    // A wrong code is the commonest failure — tie it to the account so it shows up in
+    // that patient's history even when the dashboard is searched by IIN.
+    attempt.userId = (await authService.findUserByPhone(phone).catch(() => null))?.id;
     throw err;
   }
 
+  attempt.step = 'account_lookup';
   const user = await authService.findUserByPhone(phone);
 
   if (!user) {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 404);
   }
 
+  attempt.userId = user.id;
+  attempt.step = 'session_create';
   const updatedUser = await authService.incrementTokenVersion(user.id);
   const tokens = jwtService.generateTokenPair({ userId: user.id, role: user.role, tokenVersion: updatedUser.tokenVersion });
   await jwtService.saveRefreshToken(user.id, tokens.refreshToken);
@@ -360,6 +360,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
     userId: user.id,
     phone,
     req,
+    metadata: { flow: 'login' },
   });
 
   ensureBeneficiaryId(user.id, user.phone);
@@ -369,7 +370,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
     accessToken: tokens.accessToken,
     refreshToken: tokens.refreshToken,
   });
-};
+});
 
 export const logout = async (req: Request, res: Response) => {
   if (!req.user) {

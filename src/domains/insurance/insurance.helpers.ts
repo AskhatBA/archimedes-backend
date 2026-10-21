@@ -39,7 +39,6 @@ export const insuranceRequest = async <T>({
   query = {},
   beneficiaryId,
 }: InsuranceRequestPayload) => {
-  console.log('beneficiaryId: ', beneficiaryId);
   const apiResolver =
     insuranceApiResolverDefault[resolverName as keyof typeof insuranceApiResolverDefault];
   const startedAt = Date.now();
@@ -60,8 +59,6 @@ export const insuranceRequest = async <T>({
         Authorization: beneficiaryId === null ? null : beneficiaryId || '',
       },
     });
-
-    console.log('response insurance: ', response);
 
     insuranceLogger.debug(
       {
@@ -94,7 +91,18 @@ export const insuranceRequest = async <T>({
     );
 
     const errorData = parseApiError(error);
+    const responseData = axiosError?.response?.data as
+      | { errorCode?: number; message?: string; error?: string }
+      | undefined;
+
     Sentry.captureException(error);
-    throw new AppError(errorData.message, errorData.status);
+    throw new AppError(errorData.message, errorData.status, true, {
+      service: 'insurance',
+      resolver: resolverName,
+      status: axiosError?.response?.status,
+      errorCode: responseData?.errorCode,
+      // No response at all means a timeout or a refused connection — axios says which.
+      message: responseData?.message ?? responseData?.error ?? axiosError?.message,
+    });
   }
 };
