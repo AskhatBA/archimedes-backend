@@ -41,17 +41,19 @@ export const requestOtp = auditAuthAttempt('login', async (req, res, attempt) =>
   const iin: string | undefined = req.body.iin;
 
   if (iin) {
+    // An IIN the insurer does not know is not a reason to refuse: the person may be a
+    // paid-only patient, or have no account at all — the account lookup below decides.
     attempt.step = 'insurance_check';
-    const checkIin = await insuranceService.checkIin(iin);
+    const insured = await insuranceService.findInsuredByIin(iin);
     const patient = await patientService.getPatientByIin(iin);
 
     attempt.step = 'phone_match';
-    if (checkIin.errorCode === 0 && checkIin.phone) {
-      if (checkIin.phone !== phone) {
+    if (insured?.errorCode === 0 && insured.phone) {
+      if (insured.phone !== phone) {
         throw new AppError(ErrorCodes.INSURANCE_PHONE_IS_NOT_MATCHED, 400);
       }
 
-      phone = checkIin.phone;
+      phone = insured.phone;
       attempt.phone = phone;
 
       if (patient) {

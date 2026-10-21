@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 
 import * as db from '@/infrastructure/db';
+import { ErrorCodes } from '@/shared/constants/error-codes';
 import { AppError } from '@/shared/services/app-error.service';
 
 import { RefundRequestDTO } from './insurance.dto';
@@ -279,6 +280,27 @@ export const checkIin = async (iin: string) => {
     query: { iin },
   });
   return response;
+};
+
+/**
+ * The insured person behind an IIN, or `null` when the insurer does not know it — which
+ * it answers with a 404 "Пользователь не найден". That is a normal answer, not a failure:
+ * a paid-only patient, or someone with no account at all, is simply not insured. Anything
+ * else (a timeout, a 5xx) means the insurer could not be asked, and says so.
+ */
+export const findInsuredByIin = async (iin: string): Promise<CheckIinResponse | null> => {
+  try {
+    return await checkIin(iin);
+  } catch (err) {
+    if (err instanceof AppError && err.details?.status === 404) return null;
+
+    throw new AppError(
+      ErrorCodes.INSURANCE_UNAVAILABLE,
+      503,
+      true,
+      err instanceof AppError ? err.details : undefined
+    );
+  }
 };
 
 export const getNews = async () => {
