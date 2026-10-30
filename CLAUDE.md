@@ -480,6 +480,14 @@ policy holder in their own family, and its `benId` is the insurer's id rather th
 `misPatientId`, so the app has nothing to compare it with — only the backend, which holds
 the caller's `beneficiaryId`, can tell that row apart.
 
+The clinic-QR referrals take the same pair. The QR at a clinic holds only its GUID, and
+`GET /insurance/qr/appointments` / `/insurance/qr/submit-appointment` ask the insurer as
+whoever is in `Authorization` — the insurer accepts a relative's `benId` there just as the
+caller's own `beneficiaryId`, and the referral items carry no beneficiary or programme of
+their own. So with `?familyMemberId=&programId=` they read and confirm the relative's
+referrals, through `resolveInsuranceBeneficiaryId` (`mis.family.service.ts`) with the same
+family check; `readFamilyMemberQuery` there parses the pair for both domains.
+
 Cancelling needs no parameter: the cancellation finds our row by the MIS appointment id
 through the requests of the account owner **and** of everyone the owner has booked for (the
 distinct `patientId`s of their own `Appointment` rows).

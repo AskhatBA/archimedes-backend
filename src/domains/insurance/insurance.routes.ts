@@ -906,6 +906,9 @@ router.patch(
  * /insurance/qr/appointments:
  *   get:
  *     summary: Get QR appointments for a clinic
+ *     description: >-
+ *       Referrals to the clinic whose QR was scanned — the caller's own, or with
+ *       `familyMemberId` + `programId` a relative's on the caller's programme.
  *     tags: [Insurance]
  *     security:
  *       - bearerAuth: []
@@ -917,6 +920,8 @@ router.patch(
  *         schema:
  *           type: string
  *           format: uuid
+ *       - $ref: '#/components/parameters/FamilyMemberIdQuery'
+ *       - $ref: '#/components/parameters/FamilyMemberProgramIdQuery'
  *     responses:
  *       200:
  *         description: Response
@@ -957,6 +962,8 @@ router.get('/qr/appointments', authenticate, controller.getQrAppointments);
  *         required: true
  *         schema:
  *           type: integer
+ *       - $ref: '#/components/parameters/FamilyMemberIdQuery'
+ *       - $ref: '#/components/parameters/FamilyMemberProgramIdQuery'
  *     responses:
  *       200:
  *         description: Response
@@ -972,6 +979,8 @@ router.get('/qr/appointments', authenticate, controller.getQrAppointments);
  *                   type: object
  *       400:
  *         description: appCode is required
+ *       403:
+ *         description: The family member is not on the caller's programme
  */
 router.get('/qr/submit-appointment', authenticate, controller.submitQrAppointment);
 

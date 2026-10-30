@@ -11,35 +11,11 @@ import * as patientService from '../patient/patient.service';
 
 import * as misService from './mis.service';
 import {
-  FamilyMemberQuery,
+  readFamilyMemberQuery,
   resolveAppointmentsPatientId,
   resolvePatientBirthDate,
 } from './mis.family.service';
 import { isInsuranceCoverBooking } from './mis.programs.service';
-
-/**
- * `?familyMemberId=&programId=` — смотреть приёмы родственника вместо своих. Проверку, что
- * это действительно семья вызывающего, делает `resolveAppointmentsPatientId`.
- */
-const readFamilyMemberQuery = async (req: Request): Promise<FamilyMemberQuery> => {
-  await query('familyMemberId')
-    .optional()
-    .isString()
-    .withMessage('familyMemberId must be a string')
-    .run(req);
-  await query('programId').optional().isString().withMessage('programId must be a string').run(req);
-
-  const errors = validationResult(req);
-
-  if (!errors.isEmpty()) {
-    throw new AppError(String(errors.array()[0]?.msg), 400);
-  }
-
-  return {
-    familyMemberId: (req.query.familyMemberId as string) || undefined,
-    programId: (req.query.programId as string) || undefined,
-  };
-};
 
 export const findPatient = async (req: Request, res: Response) => {
   if (!req?.user) {

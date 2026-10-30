@@ -1,3 +1,6 @@
+import { Request } from 'express';
+import { query, validationResult } from 'express-validator';
+
 import { getBeneficiaryId } from '@/domains/insurance/beneficiary.service';
 import * as insuranceService from '@/domains/insurance/insurance.service';
 import { getPatientById } from '@/domains/patient/patient.service';
@@ -22,6 +25,31 @@ export interface FamilyMemberQuery {
   familyMemberId?: string | undefined;
   programId?: string | undefined;
 }
+
+/**
+ * `?familyMemberId=&programId=` — смотреть данные родственника вместо своих. Проверку, что
+ * это действительно семья вызывающего, делают `resolveAppointmentsPatientId` и
+ * `resolveInsuranceBeneficiaryId`.
+ */
+export const readFamilyMemberQuery = async (req: Request): Promise<FamilyMemberQuery> => {
+  await query('familyMemberId')
+    .optional()
+    .isString()
+    .withMessage('familyMemberId must be a string')
+    .run(req);
+  await query('programId').optional().isString().withMessage('programId must be a string').run(req);
+
+  const errors = validationResult(req);
+
+  if (!errors.isEmpty()) {
+    throw new AppError(String(errors.array()[0]?.msg), 400);
+  }
+
+  return {
+    familyMemberId: (req.query.familyMemberId as string) || undefined,
+    programId: (req.query.programId as string) || undefined,
+  };
+};
 
 /**
  * Состав семьи держим в памяти: список приёмов опрашивается раз в 40 секунд, а каждая
@@ -129,6 +157,33 @@ export const resolveAppointmentsPatientId = async (
   await requireFamilyMember(user, familyMemberId, programId);
 
   return familyMemberId;
+};
+
+/**
+ * Id, которым спрашивать страховую от имени человека (уходит в `Authorization`).
+ *
+ * Без `familyMemberId` — `beneficiaryId` владельца аккаунта. С ним — `benId` родственника:
+ * страховая принимает его так же, как свой, и отдаёт уже его данные — например, его
+ * направления в клинику по QR. Поэтому и здесь только после той же проверки семьи, иначе
+ * 403, не раскрывая, чего именно не хватило.
+ */
+export const resolveInsuranceBeneficiaryId = async (
+  user: { id: string; phone: string },
+  { familyMemberId, programId }: FamilyMemberQuery = {}
+): Promise<string> => {
+  if (familyMemberId) {
+    await requireFamilyMember(user, familyMemberId, programId);
+
+    return familyMemberId;
+  }
+
+  const beneficiaryId = await getBeneficiaryId(user.id, user.phone);
+
+  if (!beneficiaryId) {
+    throw new AppError(ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS, 404);
+  }
+
+  return beneficiaryId;
 };
 
 /**

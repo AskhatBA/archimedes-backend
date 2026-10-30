@@ -5,6 +5,10 @@ import { AppError } from '@/shared/services/app-error.service';
 import { ErrorCodes } from '@/shared/constants/error-codes';
 import * as auditLogService from '@/shared/services/audit-log.service';
 import { AuditEvent } from '@/shared/services/audit-log.service';
+import {
+  readFamilyMemberQuery,
+  resolveInsuranceBeneficiaryId,
+} from '@/domains/mis/mis.family.service';
 import { getBeneficiaryId } from './beneficiary.service';
 import * as insuranceService from './insurance.service';
 
@@ -481,10 +485,16 @@ export const getNews = async (_req: Request, res: Response) => {
   });
 };
 
+/**
+ * Направления в клинику по её QR — свои или, с `?familyMemberId=&programId=`, родственника
+ * из семьи по программе вызывающего.
+ */
 export const getQrAppointments = async (req: Request, res: Response) => {
   if (!req.user) {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
   }
+
+  await query('clinicId').notEmpty().withMessage('clinicId is required').run(req);
 
   const errors = validationResult(req);
 
@@ -495,14 +505,8 @@ export const getQrAppointments = async (req: Request, res: Response) => {
     });
   }
 
-  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
-
-  if (!beneficiaryId) {
-    return res.status(404).json({
-      success: false,
-      message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
-    });
-  }
+  const familyMember = await readFamilyMemberQuery(req);
+  const beneficiaryId = await resolveInsuranceBeneficiaryId(req.user, familyMember);
 
   const data = await insuranceService.getQrAppointments(
     beneficiaryId,
@@ -515,6 +519,7 @@ export const getQrAppointments = async (req: Request, res: Response) => {
   });
 };
 
+/** Подтверждает направление — того же человека, чьё оно было в списке. */
 export const submitQrAppointment = async (req: Request, res: Response) => {
   if (!req.user) {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, 401);
@@ -532,14 +537,8 @@ export const submitQrAppointment = async (req: Request, res: Response) => {
     });
   }
 
-  const beneficiaryId = await getBeneficiaryId(req.user.id, req.user.phone);
-
-  if (!beneficiaryId) {
-    return res.status(404).json({
-      success: false,
-      message: ErrorCodes.INSURANCE_NOT_FOUND_IN_MIS,
-    });
-  }
+  const familyMember = await readFamilyMemberQuery(req);
+  const beneficiaryId = await resolveInsuranceBeneficiaryId(req.user, familyMember);
 
   const data = await insuranceService.submitQrAppointment(
     beneficiaryId,
