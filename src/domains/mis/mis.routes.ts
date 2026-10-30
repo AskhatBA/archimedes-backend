@@ -238,6 +238,12 @@ router.get('/branches', authenticate, controller.getBranches);
  *         required: false
  *         schema:
  *           type: boolean
+ *       - name: programId
+ *         in: query
+ *         description: "Insurance program the visit is booked under (the same id as `insuranceProgramId` on create-appointment). A program that is not the medical account (`isMedAccount`) drops the branch's MIS_INSURED_HIDDEN_SPECIALTIES. Absent (paid visit) or a med-account program — no such filter."
+ *         required: false
+ *         schema:
+ *           type: string
  *     security:
  *       - bearerAuth: []
  *     responses:

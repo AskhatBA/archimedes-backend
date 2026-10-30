@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { filterTelemedicineSpecializations } from './mis.specializations';
+import {
+  filterInsuredSpecializations,
+  filterTelemedicineSpecializations,
+} from './mis.specializations';
 
 /** The default of TELEMEDICINE_EXCLUDED_SPECIALTIES. */
 const DEFAULT_EXCLUDED = ['УЗИ', 'МАССАЖ', 'СТОМАТОЛОГ', 'ВЫЕЗДН', 'ПСИХОЛОГ', 'РЕНТГЕН'];
@@ -62,5 +65,44 @@ describe('filterTelemedicineSpecializations', () => {
     const list = [{ id: 'x', name: undefined as unknown as string }, specialty('Терапевт')];
 
     assert.equal(filterTelemedicineSpecializations(list, DEFAULT_EXCLUDED).length, 2);
+  });
+});
+
+/** Almaty, Kaldayakova 79 — the default of MIS_INSURED_HIDDEN_SPECIALTIES. */
+const KALDAYAKOVA = 'db0b5ba6-c4e7-4bc9-8860-e72282f58ed3';
+const HIDDEN_BY_BRANCH = { [KALDAYAKOVA]: ['ПСИХОЛОГ'] };
+
+describe('filterInsuredSpecializations', () => {
+  it('drops the listed specialty at the listed branch only', () => {
+    const names = filterInsuredSpecializations(BRANCH, KALDAYAKOVA, HIDDEN_BY_BRANCH).map(
+      (s) => s.name
+    );
+
+    assert.deepEqual(
+      names,
+      BRANCH.map((s) => s.name).filter((name) => name !== 'Психолог')
+    );
+  });
+
+  it('passes any other branch through untouched', () => {
+    assert.deepEqual(
+      filterInsuredSpecializations(BRANCH, 'other-branch', HIDDEN_BY_BRANCH),
+      BRANCH
+    );
+  });
+
+  it('passes the list through when no branch is configured', () => {
+    assert.deepEqual(filterInsuredSpecializations(BRANCH, KALDAYAKOVA, {}), BRANCH);
+  });
+
+  it('matches without regard to case', () => {
+    const list = ['психолог', 'Детский ПСИХОЛОГ', 'Терапевт'].map(specialty);
+
+    assert.deepEqual(
+      filterInsuredSpecializations(list, KALDAYAKOVA, { [KALDAYAKOVA]: ['Психолог'] }).map(
+        (s) => s.name
+      ),
+      ['Терапевт']
+    );
   });
 });

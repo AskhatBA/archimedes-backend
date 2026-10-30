@@ -43,6 +43,28 @@ function parseList(value: string): string[] {
 }
 
 /**
+ * Parses "branchId:A,B;branchId2:C" into `{ branchId: ['A', 'B'], branchId2: ['C'] }`.
+ * Entries without a branch id or without a pattern are dropped.
+ */
+function parseBranchLists(value: string): Record<string, string[]> {
+  const result: Record<string, string[]> = {};
+
+  for (const entry of value.split(';')) {
+    const separator = entry.indexOf(':');
+    if (separator === -1) continue;
+
+    const branchId = entry.slice(0, separator).trim();
+    const patterns = parseList(entry.slice(separator + 1));
+
+    if (branchId && patterns.length > 0) {
+      result[branchId] = [...(result[branchId] ?? []), ...patterns];
+    }
+  }
+
+  return result;
+}
+
+/**
  * Reads a numeric env var, keeping `0` as a real value.
  *
  * `Number(x) || fallback` silently swaps a configured zero for the default, which for a
@@ -104,6 +126,13 @@ export const config = {
   mis: {
     apiUrl: `${process.env.MIS_API_URL}${process.env.MIS_API_PREFIX}`,
     devApiUrl: `${process.env.MIS_DEV_API_URL}${process.env.MIS_API_PREFIX}`,
+
+    // Специальности, скрытые при записи по страховой программе (не медсчёт), по филиалам:
+    // id филиала МИС → подстроки названий (без учёта регистра). Для медсчёта и платной
+    // записи список МИС не трогается. По умолчанию — психолог в Алматы, Калдаякова 79.
+    insuredHiddenSpecialties: parseBranchLists(
+      process.env.MIS_INSURED_HIDDEN_SPECIALTIES ?? 'db0b5ba6-c4e7-4bc9-8860-e72282f58ed3:ПСИХОЛОГ'
+    ),
 
     // Статусы приёмов живут в МИС, колбэков оттуда нет — локальные строки подтягивает
     // фоновая синхронизация.

@@ -47,7 +47,10 @@ import {
   MISAppointmentDetailsResponse,
   MISAppointmentRequestsResponse,
 } from './mis.types';
-import { filterTelemedicineSpecializations } from './mis.specializations';
+import {
+  filterInsuredSpecializations,
+  filterTelemedicineSpecializations,
+} from './mis.specializations';
 import { ageOn, filterDoctorsByAge } from './mis.doctors';
 
 export const findPatientByIinAndPhone = async (
@@ -123,20 +126,38 @@ export const getBranches = async () => {
  *
  * For a telemedicine visit the ones that cannot be held online (ultrasound, massage,
  * dentistry, home visits, …) are dropped by `config.telemedicine.excludedSpecialties`.
- * Without `isTelemedicine` the MIS answer is passed through untouched.
+ * For a visit under insurance cover (`isInsuranceCover`) the branch's entries in
+ * `config.mis.insuredHiddenSpecialties` are dropped too. Without either flag the MIS
+ * answer is passed through untouched.
  */
-export const getSpecializationsByBranchId = async (branchId: string, isTelemedicine = false) => {
+export const getSpecializationsByBranchId = async (
+  branchId: string,
+  isTelemedicine = false,
+  isInsuranceCover = false
+) => {
   const response = await misRequest<MISSpecializationsResponse>({
     resolverName: MIS_API_GET_SPECIALIZATION_BY_BRANCH_ID,
     params: { branchId },
   });
 
-  if (!isTelemedicine) return response.specialties;
+  let specializations = response.specialties;
 
-  return filterTelemedicineSpecializations(
-    response.specialties,
-    config.telemedicine.excludedSpecialties
-  );
+  if (isTelemedicine) {
+    specializations = filterTelemedicineSpecializations(
+      specializations,
+      config.telemedicine.excludedSpecialties
+    );
+  }
+
+  if (isInsuranceCover) {
+    specializations = filterInsuredSpecializations(
+      specializations,
+      branchId,
+      config.mis.insuredHiddenSpecialties
+    );
+  }
+
+  return specializations;
 };
 
 /**

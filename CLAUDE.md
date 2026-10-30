@@ -335,6 +335,30 @@ Env: `TELEMEDICINE_SERVICE_CODE` (`A02.083.000`), `TELEMEDICINE_PRICE` (6000),
 `TELEMEDICINE_EXCLUDED_SPECIALTIES` (`УЗИ,МАССАЖ,СТОМАТОЛОГ,ВЫЕЗДН,ПСИХОЛОГ,РЕНТГЕН`,
 comma-separated). Deploy the backend before an app build that relies on them.
 
+### Specialties hidden under insurance cover
+
+Some branches do not offer a specialty under insurance even though MIS lists it — the
+psychologist at Almaty, Kaldayakova 79 is seen only for med-account and paid visits.
+`GET /mis/specializations` takes an optional `?programId=` (the same id the app later sends
+as `insuranceProgramId`), and `isInsuranceCoverBooking` (`mis.programs.service.ts`) decides
+the kind of visit:
+
+- no `programId` — a paid visit, nothing hidden;
+- a program the insurer flags `isMedAccount` — the medical account, nothing hidden;
+- anything else, including a program that could not be checked (insurer down, not the
+  caller's) — insurance cover, and the branch's patterns in
+  `config.mis.insuredHiddenSpecialties` are dropped (`filterInsuredSpecializations` in
+  `mis.specializations.ts`, unit-tested, matched like the telemedicine list).
+
+The caller's programs are cached in-process for 10 minutes. As with telemedicine this is a
+list filter, not a guard: doctors are not filtered and booking does not re-check it, and a
+build that does not send `programId` keeps seeing the full list.
+
+Env: `MIS_INSURED_HIDDEN_SPECIALTIES` — `branchId:PATTERN,PATTERN;branchId2:PATTERN`, MIS
+branch ids from `/mis/branches` (default `db0b5ba6-c4e7-4bc9-8860-e72282f58ed3:ПСИХОЛОГ`;
+the Kaldayakova pediatric branch `5b7ba4c6-…` has no psychologist). An empty value turns the
+filter off.
+
 ### Order emails
 
 Besides the row in our tables, every settled paid-programs order is emailed to the

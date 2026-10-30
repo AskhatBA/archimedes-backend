@@ -15,6 +15,7 @@ import {
   resolveAppointmentsPatientId,
   resolvePatientBirthDate,
 } from './mis.family.service';
+import { isInsuranceCoverBooking } from './mis.programs.service';
 
 /**
  * `?familyMemberId=&programId=` — смотреть приёмы родственника вместо своих. Проверку, что
@@ -93,6 +94,7 @@ export const getSpecializations = async (req: Request, res: Response) => {
     .isIn(['true', 'false'])
     .withMessage('isTelemedicine must be true or false')
     .run(req);
+  await query('programId').optional().isString().withMessage('programId must be a string').run(req);
 
   const errors = validationResult(req);
 
@@ -103,9 +105,16 @@ export const getSpecializations = async (req: Request, res: Response) => {
     });
   }
 
+  // Программа, по которой записываемся: от неё зависит, что скрыть для страховой записи.
+  const isInsuranceCover = await isInsuranceCoverBooking(
+    req.user,
+    (req.query.programId as string) || undefined
+  );
+
   const specializations = await misService.getSpecializationsByBranchId(
     req.query.branchId as string,
-    req.query.isTelemedicine === 'true'
+    req.query.isTelemedicine === 'true',
+    isInsuranceCover
   );
 
   return res.status(200).json({
